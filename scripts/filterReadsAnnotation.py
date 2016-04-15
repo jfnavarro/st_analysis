@@ -59,7 +59,7 @@ def main(bed_file, annotation_file, outfile):
                     if chr == chr_orig and start >= start_orig and start <= end_orig:
                         types_count[type] += 1
                         if type in filter: filehandler_write.write(line)
-    for type,count in types_counts.iteritems():
+    for type,count in types_count.iteritems():
         print type + " " + str(count) + "\n"                         
     
 if __name__ == '__main__':

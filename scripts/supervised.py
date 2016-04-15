@@ -7,11 +7,12 @@ import os
 import numpy as np
 import pandas as pd
 from stpipeline.common.utils import fileOk
+from sklearn.feature_selection import VarianceThreshold
 sys.path.append('./')
 from cyclone import cyclone
 import tempfile
 
-def main(train_data, test_data, classes_train, classes_test, outdir):
+def main(train_data, test_data, classes_train, classes_test, signatures, outdir):
 
     if not fileOk(train_data) or not fileOk(test_data) \
     or not fileOk(classes_train) or not fileOk(classes_test):
@@ -38,7 +39,15 @@ def main(train_data, test_data, classes_train, classes_test, outdir):
             barcodes_classes_test[tokens[0]] = tokens[1]
       
     # loads the training set
-    train_data_frame = pd.read_table(train_data, sep="\t", header=0).transpose()      
+    train_data_frame = pd.read_table(train_data, sep="\t", header=0).transpose()
+    if signatures is not None and os.path.isfile(signatures):
+        with open(signatures,"r") as filehander:
+            signatures = [sign for sign in filehandler.readlines()]
+            train_data_frame = train_data_frame[signatures]
+    else:
+        sel = VarianceThreshold(threshold=(.8 * (1 - .8)))
+        train_data_frame = sel.fit_transform(train_data_frame)
+        
     train_genes = list(train_data_frame.columns.values)
     train_labels = list(train_data_frame.index)
     train_labels_updated = list()
@@ -128,7 +137,10 @@ if __name__ == '__main__':
                         help="A tab delimited file mapping barcodes to their classes for training")
     parser.add_argument("--test-classes", 
                         help="A tab delimited file mapping barcodes to their classes for testing")
+    parser.add_argument("--signatures",
+                        help="a list of genes to be used as signatures")
     parser.add_argument("--outdir", help="Path to output dir")
     args = parser.parse_args()
-    main(args.train_data, args.test_data, args.train_classes, args.test_classes, args.outdir)
+    main(args.train_data, args.test_data, args.train_classes, 
+         args.test_classes, args.signatures, args.outdir)
 

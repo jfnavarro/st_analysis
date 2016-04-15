@@ -1,0 +1,51 @@
+To compute CTTs
+
+- Run ST Pipeline for each dataset of the same sample (Run)
+- Take the bed file with counts and decide how to filter it out 
+  (include or not non annotated transcripts and remove or not features outside tissue) 
+  To remove non annotated simply use a grep (__no_feature) 
+  To remove features outside the tissue use the script filterSTData.py 
+  with a selections file exported from the viewer on the same dataset. 
+- Make sure that the selection made in the viewer is from the exactly 
+  the same run as the original bed file. 
+  Otherwise update the counts by using convertSelectionsNewPipelline.py
+- Merge the bed file with the counts for all the datasets of the same sample (Run)
+- Run countClusters.py with several values of the min_distance and min_value parameters to generate ctts.
+  Then look in Zenbu and choose the parameters that fit the best 
+  (use clusters_to_igv.py to add to zenbu the ctts files 
+  and compute_bed_counts.sh to transform the reads.bed and also add it to Zenbu). 
+- Run computeCountTable.py on the ctts with the optional parameters for each 
+  sample. So we obtain a ctts counts table for each sample.                                                
+
+- Note : one could run filterCountTable.py with the extracted region/s 
+  and the ctts counts table to filter out features
+
+To do un-supervised learning
+
+- Install stclust (link here)
+- Run the unsupersived_stclust.R command to get the optimal number of clusters and then again with the optimal number
+  Make sure the file paths are correct in the command before running
+  Basically you need :
+    - The file containing the Ids
+    - Path to either the gene counts (selection from the viewer) or the ctts counts
+    - Min and max number of clusters
+    - Clustering algorithm and optimal number of clusters 
+- Use stDataPlotter.py to show the computed clusters overlapped with the image
+  You need :
+    - The image 
+    - The alignment of spots to image coordinates
+    - The gene counts
+    - The computed regions from the R command
+    
+To do supervised learning
+
+- Run classifier.py
+  You need :
+    - A train set (the normalized counts from the stclust command)
+    - A test set (the normalized counts from the stclust command)
+    - Annotation for training (barcode to class tab delimited file)
+    - Annotation for testing if available (barcode to class tab delimited file)
+    
+- Several files are generated (plots, prefictions, etc..)
+- Use the file with the predicted regions and stDataPlotter.py to plot the 
+  preditions over the image
