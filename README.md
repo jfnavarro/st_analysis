@@ -1,2 +1,2 @@
-# stctts
-Different tools for computing and analysing CTTS from the Spatial Transcriptomics data
+# st_tc
+Different tools for computation and analysing TTS from the Spatial Transcriptomics data
