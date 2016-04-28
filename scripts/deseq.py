@@ -78,17 +78,19 @@ class DSet(object):
             'per-condition',
             'blind')
     
-    def __init__(self, data, conds, sizeFactors=None):
+    def __init__(self, data, conds=None, sizeFactors=None):
         
         if isinstance(data, DataFrame):
-            """ set experimental conditions as hierarchical index """
-            index = MultiIndex.from_tuples(zip(conds, data.columns), \
-                    names=['conditions','replicates'])
-            new = data.reindex(columns = index)
-            for idx in index:
-                new[idx] = data[idx[1]]
-            
-            self.data = new
+            if conds is not None:
+                """ set experimental conditions as hierarchical index """
+                index = MultiIndex.from_tuples(zip(conds, data.columns), \
+                                               names=['conditions','replicates'])
+                new = data.reindex(columns = index)
+                for idx in index:
+                    new[idx] = data[idx[1]]
+                self.data = new
+            else:
+                self.data = data
             self.conds = conds
             self.sizeFactors = sizeFactors
             self.disps = None
@@ -99,6 +101,10 @@ class DSet(object):
         """ params: 
             function - use specific function when estimating the factors,
                        median is the default """
+       #   loggeomeans <- rowMeans( log(counts) )
+       #   apply( counts, 2, function(cnts)
+       #    exp( locfunc( ( log(cnts) - loggeomeans )[ is.finite(loggeomeans) ] ) ) )
+   
         array = self.data.values
         geometricMean = st.gmean(array, axis=1)
         divided = np.divide(np.delete(array, np.where(geometricMean == 0),

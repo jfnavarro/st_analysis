@@ -7,9 +7,9 @@ import os
 from collections import defaultdict
 from stpipeline.common.utils import fileOk
 
-def main(original_file, barcodes_file, outfile):
+def main(original_file, ids_file, outfile):
 
-    if not fileOk(original_file) or not fileOk(barcodes_file):
+    if not fileOk(original_file) or not fileOk(ids_file):
         sys.stderr.write("Error, input file not present or invalid format\n")
         sys.exit(-1)
      
@@ -18,8 +18,8 @@ def main(original_file, barcodes_file, outfile):
            
     # loads all the barcodes
     barcodes = dict()
-    with open(barcodes_file, "r") as filehandler:
-        for line in filehandler.readlines()[1:]:
+    with open(ids_file, "r") as filehandler:
+        for line in filehandler.readlines():
             tokens = line.split()
             barcodes[tokens[0]] = (tokens[1], tokens[2])
         
@@ -39,9 +39,9 @@ if __name__ == '__main__':
     parser.add_argument("original_file", 
                         help="Tab delimited file containing the predicted classes")
     parser.add_argument("--outfile", help="Name of the output file")
-    parser.add_argument("--barcodes-file",
-                        help="Tab delimited file containing barcodes from the viewer")
+    parser.add_argument("--ids-file",
+                        help="Tab delimited file containing the barcodes and coordinates")
     args = parser.parse_args()
-    main(args.original_file, args.barcodes_file, args.outfile)
+    main(args.original_file, args.ids_file, args.outfile)
 
 

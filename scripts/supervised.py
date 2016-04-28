@@ -29,25 +29,24 @@ def main(train_data, test_data, classes_train, classes_test, signatures, outdir)
     with open(classes_train, "r") as filehandler:
         for line in filehandler.readlines():
             tokens = line.split()
-            barcodes_classes_train[tokens[0]] = tokens[1]
+            barcodes_classes_train[tokens[1]] = tokens[0]
        
     # loads all the barcodes classes for the test set
     barcodes_classes_test = dict()
     with open(classes_test, "r") as filehandler:
         for line in filehandler.readlines():
             tokens = line.split()
-            barcodes_classes_test[tokens[0]] = tokens[1]
+            barcodes_classes_test[tokens[1]] = tokens[0]
       
     # loads the training set
-    train_data_frame = pd.read_table(train_data, sep="\t", header=0).transpose()
+    train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0)
     if signatures is not None and os.path.isfile(signatures):
         with open(signatures,"r") as filehander:
             signatures = [sign for sign in filehandler.readlines()]
             train_data_frame = train_data_frame[signatures]
-    else:
-        sel = VarianceThreshold(threshold=(.8 * (1 - .8)))
-        train_data_frame = sel.fit_transform(train_data_frame)
-        
+    #else:
+    #    sel = VarianceThreshold(threshold=(.8 * (1 - .8)))
+    #    train_data_frame = sel.fit_transform(train_data_frame)
     train_genes = list(train_data_frame.columns.values)
     train_labels = list(train_data_frame.index)
     train_labels_updated = list()
@@ -62,7 +61,7 @@ def main(train_data, test_data, classes_train, classes_test, signatures, outdir)
     train_counts = train_data_frame.values # Assume they are normalized
     
     # loads the test set
-    test_data_frame = pd.read_table(test_data, sep="\t", header=0).transpose()      
+    test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0)    
     test_genes = list(test_data_frame.columns.values)
     test_labels = list(test_data_frame.index)
     test_labels_updated = list()
@@ -135,9 +134,9 @@ if __name__ == '__main__':
                         help="The data frame with the normalized counts for testing")
     parser.add_argument("--train-classes", 
                         help="A tab delimited file mapping barcodes to their classes for training")
-    parser.add_argument("--test-classes", 
+    parser.add_argument("--test-classes", default=None,
                         help="A tab delimited file mapping barcodes to their classes for testing")
-    parser.add_argument("--signatures",
+    parser.add_argument("--signatures", default=None,
                         help="a list of genes to be used as signatures")
     parser.add_argument("--outdir", help="Path to output dir")
     args = parser.parse_args()

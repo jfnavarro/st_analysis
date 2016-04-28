@@ -12,7 +12,7 @@ import argparse
 import sys
 import os
 from collections import defaultdict
-from stpipeline.common.utils import fileOk, which
+from stpipeline.common.utils import fileOk, which_program
 import subprocess
 import tempfile
 
@@ -55,7 +55,7 @@ def main(bed_file, min_data_value, disable_filter, max_cluster_size, min_density
         sys.stderr.write("Error, input file not present or invalid format\n")
         sys.exit(-1)
      
-    if not which("paraclu"):
+    if not which_program("paraclu"):
         sys.stderr.write("Error, paraclu was not found in your system\n")
         sys.exit(-1)  
           
