@@ -10,15 +10,12 @@ import os
 import numpy as np
 import pandas as pd
 
-sys.path.append('./')
-from deseq import DSet
-
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA, FastICA
 #from sklearn.cluster import DBSCAN
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
-from sklearn.preprocessing import scale
+#from sklearn.preprocessing import scale
 
 import matplotlib.pyplot as plt
 from matplotlib import transforms
@@ -28,6 +25,26 @@ MIN_GENES_SPOT_VAR = 0.1
 MIN_FEATURES_GENE = 10
 MIN_EXPRESION = 2
 
+def computeSizeFactors(counts, function=np.median):
+    ''' Compute size factors to normalize gene counts
+    as in DESeq              
+    # R 
+    # locfunc = stats::median
+    # loggeomeans <- rowMeans(log(counts))
+    # if (all(is.infinite(loggeomeans))) {
+    #    stop("every gene contains at least one zero, cannot compute log geometric means")
+    # }
+    # sf <- apply(counts, 2, function(cnts) {
+    #           exp(locfunc((log(cnts) - loggeomeans)[is.finite(loggeomeans) & cnts > 0]))
+    #       })
+    '''
+    # Geometric means of rows
+    loggeomans = np.log(counts).mean(axis=1)
+    if np.all(np.isinf(loggeomans)):
+        raise RuntimeError("every gene contains at least one zero, cannot compute log geometric means")
+    # Apply to columns
+    return counts.apply(lambda x: np.exp(function( (np.log(x) - loggeomans)[np.isfinite(loggeomans)])), axis=0)
+        
 def main(counts_table, 
          normalization, 
          num_clusters, 
@@ -45,7 +62,7 @@ def main(counts_table,
        
     # Spots are rows and genes are columns
     counts = pd.read_table(counts_table, sep="\t", header=0)
-    
+
     # How many spots do we keep based on the number of genes expressed?
     min_genes_spot_exp = (counts != 0).sum(axis=1).quantile(MIN_GENES_SPOT_EXP)
     print "Number of expressed genes a spot must have to be kept (1% of total expressed genes) " + str(min_genes_spot_exp)
@@ -59,17 +76,15 @@ def main(counts_table,
     
     # Normalization
     if normalization in "DESeq":
-        # No conditions to treat all as individual samples
-        deseq_obj = DSet(counts, conds=None)
-        deseq_obj.setSizeFactors(function=np.median)
-        norm_counts = DSet.getNormalizedCounts(deseq_obj.data, deseq_obj.sizeFactors) 
+        size_factors = computeSizeFactors(counts, function=np.median)
+        norm_counts = counts.div(size_factors) 
     elif normalization in "TPM":
         #TODO finish this
         #    feature.sums = apply(exp.values, 2, sum)
         #    norm.counts = (t(t(exp.values) / feature.sums)*1e6) + 1
-        norm_counts = counts + 1
+        norm_counts = counts
     elif normalization in "RAW":
-        norm_counts = counts + 1
+        norm_counts = counts
     else:
         raise RuntimeError("Wrong normalization method..")
     
@@ -92,7 +107,7 @@ def main(counts_table,
         # method = barnes_hut or exact(slower)
         # init = pca or random
         # random_state = None or number
-        # metric = euclidian or any other
+        # metric = euclidean or any other
         # n_components = 2 is default
         decomp_model = TSNE(n_components=2, random_state=None, perplexity=5,
                             early_exaggeration=4.0, learning_rate=1000, n_iter=1000,
@@ -117,12 +132,11 @@ def main(counts_table,
     elif "Hierarchical" in clustering_algorithm:
         clustering = AgglomerativeClustering(n_clusters=num_clusters, 
                                              affinity='euclidean',
-                                             n_componens=None, linkage='ward') 
+                                             n_components=None, linkage='ward') 
     else:
         raise RuntimeError("Wrong clustering method..")  
-     
-    clustering.fit(reduced_data)
-    labels = clustering.predict(reduced_data)
+
+    labels = clustering.fit_predict(reduced_data)
     if 0 in labels: labels = labels + 1
     
     # Plot the clustered spots with the class color

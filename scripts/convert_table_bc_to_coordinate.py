@@ -10,15 +10,13 @@ a file with the barcode ids and the coordinates
 import argparse
 import sys
 import os
-import numpy as np
 import pandas as pd
-from stpipeline.common.utils import fileOk
 
 def main(counts_matrix, barcode_ids, outfile):
 
-    if not fileOk(counts_matrix) or len(barcode_ids) <= 0:
+    if not os.path.isfile(counts_matrix) or not os.path.isfile(barcode_ids):
         sys.stderr.write("Error, input file not present or invalid format\n")
-        sys.exit(-1)
+        sys.exit(1)
      
     if not outfile:
         outfile = "filtered_" + os.path.basename(counts_matrix)
@@ -30,16 +28,16 @@ def main(counts_matrix, barcode_ids, outfile):
             tokens = line.split()
             barcodes[tokens[0]] = (tokens[1],tokens[2])
     
+    # Read the data frame
     counts_table = pd.read_table(counts_matrix, sep="\t", header=0)
     transpose_counts_table = counts_table.transpose()
-    #transpose_counts_table = counts_table.transpose()
     column_values = list(transpose_counts_table.columns.values)
     new_column_values = list()
-    
+    # Replace barcode for coordinates
     for bc in column_values:
         (x,y) = barcodes[bc]
         new_column_values.append(x + "x" + y)
-    
+    # Write table again
     transpose_counts_table.columns = new_column_values
     transpose_counts_table.to_csv(outfile)
                
