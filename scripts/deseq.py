@@ -97,20 +97,27 @@ class DSet(object):
         else:
             raise TypeError("Data must be a pandas DataFrame object!")
  
-    def setSizeFactors(self, function=np.median):
+        
+        
         """ params: 
             function - use specific function when estimating the factors,
-                       median is the default """
-       #   loggeomeans <- rowMeans( log(counts) )
-       #   apply( counts, 2, function(cnts)
-       #    exp( locfunc( ( log(cnts) - loggeomeans )[ is.finite(loggeomeans) ] ) ) )
+                       median is the default """   
+        counts = self.data
+        # Geometric means of rows
+        loggeomans = np.log(counts).mean(axis=0)
+        if np.all(np.inf(loggeomans)):
+            print "every gene contains at least one zero, cannot compute log geometric means"
+            return
+        # Apply to columns 
+        def lamb(x):
+            np.exp(function( (np.log(x) - loggeomans).where(np.isfinite(loggeomans) & x > 0) )
+        self.sizeFactors = Series(counts.apply(lamb, axis=1, index=self.data.columns))
    
-        array = self.data.values
-        geometricMean = st.gmean(array, axis=1)
-        divided = np.divide(np.delete(array, np.where(geometricMean == 0),
-            axis=0).T, [x for x in geometricMean if x != 0])
-        self.sizeFactors = Series(function(divided, axis=1),
-                index=self.data.columns)
+        #array = self.data.values
+        #geometricMean = st.gmean(array, axis=1)
+        #divided = np.divide(np.delete(array, np.where(geometricMean == 0),
+        #    axis=0).T, [x for x in geometricMean if x != 0])
+        #self.sizeFactors = Series(function(divided, axis=1), index=self.data.columns)
          
     @staticmethod
     def getNormalizedCounts(dataframe, factors):
