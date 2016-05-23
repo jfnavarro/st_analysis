@@ -1,6 +1,9 @@
 #! /usr/bin/env python
 #@Author Jose Fernandez
-
+"""
+Ugly script that converts the output of countClusters.py
+to a format compatible with genome browsers
+"""
 import sys
 
 if len(sys.argv) == 2:

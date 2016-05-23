@@ -1,6 +1,7 @@
 #!/usr/bin/python
 """
-Toolkit for Cluster of Transcription Termination Sites from Spatial Transcriptomics data"
+A tool kit for analysis, visualization and classification 
+of single cell data (Mainly Spatial Transcriptomics data)
 """
 
 import os
@@ -15,15 +16,15 @@ with io.open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-  name = 'stctts',
+  name = 'stanalysis',
   version = version_number,
   description = __doc__.split("\n", 1)[0],
   long_description = long_description,
   keywords = 'rna-seq analysis spatial transcriptomics toolkit',
   author = 'Jose Fernandez Navarro',
   author_email = 'jose.fernandez.navarro@scilifelab.se',
-  license = 'LPGL',
-  packages = [],
+  license = 'BSD',
+  packages = find_packages(exclude=('tests*')),
   include_package_data = False,
   package_data = {'': ['RELEASE-VERSION']},
   zip_safe = False,
@@ -33,6 +34,8 @@ setup(
     'scipy',
     'numpy',
     'pandas',
+    'sklearn',
+    'matplotlib'
   ],
   test_suite = 'tests',
   scripts = glob.glob('scripts/*.py'),
@@ -41,7 +44,7 @@ setup(
     'Intended Audience :: Science/Research',
     'Topic :: Software Development',
     'Topic :: Scientific/Engineering :: Bio-Informatics',
-    'License :: OSI Approved :: Copyright Spatial Transcriptomics',
+    'License :: BSD:: Copyright Jose Fernandez Navarro',
     'Programming Language :: Python :: 2.7',
     'Environment :: Console',
   ],

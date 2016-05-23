@@ -1,49 +1,34 @@
 #! /usr/bin/env python
 #@Author Jose Fernandez
 """
-A tool to make un-supervised
-classification on the ST Data
+A script to make un-supervised
+classification on single cell data.
+It takes a data frame as input and outputs
+the normalized counts (data frame), a scatter plot
+with the predicted classes and file with the predicted
+classes and the spot coordinates.
+The user can select what clustering algorithm to use
+and what dimensionality reduction technique to use. 
 """
 import argparse
 import sys
 import os
 import numpy as np
 import pandas as pd
-
 from sklearn.manifold import TSNE
-from sklearn.decomposition import PCA, FastICA
+from sklearn.decomposition import PCA, FastICA, SparsePCA
 #from sklearn.cluster import DBSCAN
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
 #from sklearn.preprocessing import scale
-
 import matplotlib.pyplot as plt
-from matplotlib import transforms
+from stanalysis.visualization import plotSpotsWithImage
+from stanalysis.normalization import computeSizeFactors
 
 MIN_GENES_SPOT_EXP = 0.1
 MIN_GENES_SPOT_VAR = 0.1
 MIN_FEATURES_GENE = 10
 MIN_EXPRESION = 2
-
-def computeSizeFactors(counts, function=np.median):
-    ''' Compute size factors to normalize gene counts
-    as in DESeq              
-    # R 
-    # locfunc = stats::median
-    # loggeomeans <- rowMeans(log(counts))
-    # if (all(is.infinite(loggeomeans))) {
-    #    stop("every gene contains at least one zero, cannot compute log geometric means")
-    # }
-    # sf <- apply(counts, 2, function(cnts) {
-    #           exp(locfunc((log(cnts) - loggeomeans)[is.finite(loggeomeans) & cnts > 0]))
-    #       })
-    '''
-    # Geometric means of rows
-    loggeomans = np.log(counts).mean(axis=1)
-    if np.all(np.isinf(loggeomans)):
-        raise RuntimeError("every gene contains at least one zero, cannot compute log geometric means")
-    # Apply to columns
-    return counts.apply(lambda x: np.exp(function( (np.log(x) - loggeomans)[np.isfinite(loggeomans)])), axis=0)
         
 def main(counts_table, 
          normalization, 
@@ -51,7 +36,6 @@ def main(counts_table,
          clustering_algorithm, 
          dimensionality_algorithm,
          outdir,
-         barcodes_file,
          alignment, 
          image):
 
@@ -65,7 +49,8 @@ def main(counts_table,
 
     # How many spots do we keep based on the number of genes expressed?
     min_genes_spot_exp = (counts != 0).sum(axis=1).quantile(MIN_GENES_SPOT_EXP)
-    print "Number of expressed genes a spot must have to be kept (1% of total expressed genes) " + str(min_genes_spot_exp)
+    print "Number of expressed genes a spot must have to be kept " 
+    "(1% of total expressed genes) " + str(min_genes_spot_exp)
     
     # Remove noisy spots  
     counts = counts[(counts != 0).sum(axis=1) >= min_genes_spot_exp]
@@ -79,10 +64,10 @@ def main(counts_table,
         size_factors = computeSizeFactors(counts, function=np.median)
         norm_counts = counts.div(size_factors) 
     elif normalization in "TPM":
-        #TODO finish this
         #    feature.sums = apply(exp.values, 2, sum)
         #    norm.counts = (t(t(exp.values) / feature.sums)*1e6) + 1
-        norm_counts = counts
+        spots_sum = counts.sum(axis=1)
+        norm_counts = ((counts.transpose().div(spots_sum)) * 1e6).transpose()
     elif normalization in "RAW":
         norm_counts = counts
     else:
@@ -95,7 +80,8 @@ def main(counts_table,
     # How many genes do we keep based on the variance?
     # TODO this could be done based on expression level (keep the highest for instance)
     min_genes_spot_var = norm_counts.var(axis=1).quantile(MIN_GENES_SPOT_VAR)
-    print "Min variance a gene must have accross all spot to be kept (1% of total variance) " + str(min_genes_spot_var)
+    print "Min variance a gene must have over all spot "
+    "to be kept (1% of total variance) " + str(min_genes_spot_var)
     norm_counts = norm_counts[norm_counts.var(axis=1) >= min_genes_spot_var]
     
     # Spots as rows and genes as columns
@@ -120,6 +106,8 @@ def main(counts_table,
         decomp_model = FastICA(n_components=2, 
                                algorithm='parallel', whiten=True,
                                fun='logcosh', w_init=None, random_state=None)
+    elif "SPCA" in dimensionality_algorithm:
+        decomp_model = SparsePCA(n_components=2, alpha=1)
     else:
         raise RuntimeError("Wrong dimensionality reduction method..")   
     
@@ -143,64 +131,34 @@ def main(counts_table,
     fig = plt.figure(figsize=(8,8))
     a = fig.add_subplot(111, aspect='equal')
     a.scatter(reduced_data[:,0], reduced_data[:,1], c=labels, s=50)
-    fig.savefig(os.path.join(outdir,"computed_classes.png"))
+    fig.savefig(os.path.join(outdir,"computed_classes_scatter.png"))
     
     # Write the spots and their classes to a file
-    if barcodes_file is not None and os.path.isfile(barcodes_file):
-        assert(len(labels) == len(norm_counts.index))
-        # First get the barcodes coordinates
-        map_barcodes = dict()
-        x_points = list()
-        y_points = list()
-        with open(barcodes_file, "r") as filehandler:
-            for line in filehandler.readlines():
-                tokens = line.split()
-                map_barcodes[tokens[0]] = (tokens[1],tokens[2])
-        # Write barcodes, labels and coordinates
-        with open(os.path.join(outdir, "computed_classes.txt"), "w") as filehandler:
-            for i,bc in enumerate(norm_counts.index):
-                x,y = map_barcodes[bc]
-                x_points.append(int(x))
-                y_points.append(int(y))
-                filehandler.write(str(labels[i]) + "\t" + bc + "\t" + str(x) + "\t" + str(y) + "\n")
+    assert(len(labels) == len(norm_counts.index))
+    # First get the spots coordinates
+    x_points = list()
+    y_points = list()
+    # Write the coordinates and the label/class the belong to
+    with open(os.path.join(outdir, "computed_classes.txt"), "w") as filehandler:
+        for i,bc in enumerate(norm_counts.index):
+            # bc is XxY
+            tokens = bc.split("x")
+            assert(len(tokens) == 2)
+            x = int(tokens[0])
+            y = int(tokens[1])
+            x_points.append(x)
+            y_points.append(y)
+            filehandler.write(str(labels[i]) + "\t" + str(x) + "\t" + str(y) + "\n")
     
-        if image is not None and os.path.isfile(image):
-                # Create alignment matrix 
-                alignment_matrix = np.zeros((3,3), dtype=np.float)
-                alignment_matrix[0,0] = 1
-                alignment_matrix[0,1] = 0
-                alignment_matrix[0,2] = 0
-                alignment_matrix[1,0] = 0
-                alignment_matrix[1,1] = 1
-                alignment_matrix[1,2] = 0
-                alignment_matrix[2,0] = 0
-                alignment_matrix[2,1] = 0
-                alignment_matrix[2,2] = 1
-                if alignment and len(alignment) == 9:
-                    alignment_matrix[0,0] = alignment[0]
-                    alignment_matrix[0,1] = alignment[1]
-                    alignment_matrix[0,2] = alignment[2]
-                    alignment_matrix[1,0] = alignment[3]
-                    alignment_matrix[1,1] = alignment[4]
-                    alignment_matrix[1,2] = alignment[5]
-                    alignment_matrix[2,0] = alignment[6]
-                    alignment_matrix[2,1] = alignment[7]
-                    alignment_matrix[2,2] = alignment[8]
-                # Plot spots with the color class in the tissue image
-                img = plt.imread(image)
-                fig = plt.figure(figsize=(8,8))
-                a = fig.add_subplot(111, aspect='equal')
-                base_trans = a.transData
-                tr = transforms.Affine2D(matrix = alignment_matrix) + base_trans
-                a.scatter(x_points, y_points, c=labels, edgecolor="none", s=50,transform=tr)   
-                a.imshow(img)
-                fig.set_size_inches(16, 16)
-                fig.savefig(os.path.join(outdir,"computed_classes_tissue.png"), dpi=300)
+    if image is not None and os.path.isfile(image):
+        plotSpotsWithImage(x_points, y_points, labels, image,
+                           "computed_classes_tissue.png", alignment)
+
                                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--counts-table", 
-                        help="A table with gene counts per feature/spot")
+                        help="A table with gene counts per feature/spot (genes as columns)")
     parser.add_argument("--normalization", default="DESeq",
                         help="Normalize the counts using (RAW - DESeq - TPM)")
     parser.add_argument("--num-clusters", default=3,
@@ -208,18 +166,16 @@ if __name__ == '__main__':
     parser.add_argument("--clustering-algorithm", default="KMeans",
                         help="What clustering algorithm to use after the dimensionality reduction (Hierarchical - KMeans)")
     parser.add_argument("--dimensionality-algorithm", default="tSNE",
-                        help="What dimensionality reduction algorithm to use (tSNE - PCA - ICA)")
-    parser.add_argument("--barcodes-file", default=None,
-                        help="File with the barcodes and coordinates")
+                        help="What dimensionality reduction algorithm to use (tSNE - PCA - ICA - SPCA)")
     parser.add_argument("--alignment", 
                         help="Alignment matrix needed when using the image", 
                         nargs="+", type=float, default=None)
     parser.add_argument("--image", default=None, 
                         help="When given the data will plotted on top of the image, \
                         if the alignment matrix is given the data will be aligned")
-    parser.add_argument("--outdir", help="Path to output dir")
+    parser.add_argument("--outdir", default=None, help="Path to output dir")
     args = parser.parse_args()
     main(args.counts_table, args.normalization, int(args.num_clusters), 
          args.clustering_algorithm, args.dimensionality_algorithm,
-         args.outdir, args.barcodes_file, args.alignment, args.image)
+         args.outdir, args.alignment, args.image)
 
