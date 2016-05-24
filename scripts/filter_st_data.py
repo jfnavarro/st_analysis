@@ -4,7 +4,7 @@
 Script that takes the ST BED file generated
 from the ST pipeline and a one or more selections
 made in the ST Viewer and generate a new file
-with the coordinates that are present in the selections.
+with only the coordinates that are present in the selections.
 """
 
 import argparse
@@ -29,7 +29,7 @@ def main(bed_file, barcodes_files, outfile):
                     tokens = line.split()
                     x = int(tokens[0])
                     y = int(tokens[1])
-                    barcodes.add(x,y)
+                    barcodes.add((x,y))
         
     # Writes entries that contain a coordinate in the previous list
     with open(bed_file, "r") as filehandler_read:
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     parser.add_argument("bed_file", 
                         help="Tab delimited file containing the ST data in BED format")
     parser.add_argument("--outfile", help="Name of the output file")
-    parser.add_argument("--barcodes-files", nargs='+', type=str,
+    parser.add_argument("--barcodes-files", nargs='+', type=str, required=True,
                         help="Tab delimited file containing a selection from the ST viewer")
     args = parser.parse_args()
     main(args.bed_file, args.barcodes_files, args.outfile)

@@ -3,9 +3,10 @@
 """ 
 Script that takes as input a BED file generated
 from the ST Pipeline and computes peaks clusters
-based on the starting site and the strand. 
+based on the transcription termination site and the strand. 
 It uses paraclu to compute the clusters
 and paraclu-cut to filter out (optional)
+The computed ST-TTs are printed to a file in BED format. 
 """
 
 import argparse
@@ -30,9 +31,8 @@ def paracluFilter(file_input, file_output, max_cluster_size,
             proc = subprocess.Popen([str(i) for i in args], 
                                     stdout=filehandler, stderr=subprocess.PIPE)
             (stdout, errmsg) = proc.communicate()
-        except Exception as e:
-            sys.stderr.write("Error, sorting\n")
-            sys.exit(-1)
+        except Exception:
+            raise
                 
     # call paraclu-cut to filter + clusters
     with open(file_output, "w") as filehandler:

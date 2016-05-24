@@ -2,7 +2,7 @@
 #@Author Jose Fernandez
 """ 
 Script that parses the tab delimited file
-generated from countClusters.py with clusters
+generated from compute_st_tts.py with TTs
 and barcodes to a data frame format like this :
 
     cluster1.....clusterN
@@ -43,7 +43,7 @@ def main(input_files, outfile):
             if line.find("#"):
                 continue
             tokens = line.split()
-            assert(len(tokens) > 6)
+            assert(len(tokens) > 7)
             chromosome = str(tokens[0])
             start_site = int(tokens[1])
             end_site = int(tokens[2])

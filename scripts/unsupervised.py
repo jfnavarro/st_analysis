@@ -157,7 +157,7 @@ def main(counts_table,
                                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--counts-table", 
+    parser.add_argument("--counts-table", required=True,
                         help="A table with gene counts per feature/spot (genes as columns)")
     parser.add_argument("--normalization", default="DESeq",
                         help="Normalize the counts using (RAW - DESeq - TPM)")
@@ -167,9 +167,8 @@ if __name__ == '__main__':
                         help="What clustering algorithm to use after the dimensionality reduction (Hierarchical - KMeans)")
     parser.add_argument("--dimensionality-algorithm", default="tSNE",
                         help="What dimensionality reduction algorithm to use (tSNE - PCA - ICA - SPCA)")
-    parser.add_argument("--alignment", 
-                        help="Alignment matrix needed when using the image", 
-                        nargs="+", type=float, default=None)
+    parser.add_argument("--alignment", default=None,
+                        help="A file containing the alignment image (array coordinates to pixel coordinates) as a 3x3 matrix")
     parser.add_argument("--image", default=None, 
                         help="When given the data will plotted on top of the image, \
                         if the alignment matrix is given the data will be aligned")

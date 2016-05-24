@@ -43,10 +43,10 @@ def main(counts_matrix, barcode_ids, outfile):
                
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--counts-matrix",  
+    parser.add_argument("--counts-matrix", required=True,
                         help="Matrix with gene counts (genes as columns)")
     parser.add_argument("--outfile", help="Name of the output file")
-    parser.add_argument("--barcodes-ids",
+    parser.add_argument("--barcodes-ids", required=True,
                         help="File with the barcode ids and their coordinates")
     args = parser.parse_args()
     main(args.counts_matrix, args.barcodes_ids, args.outfile)

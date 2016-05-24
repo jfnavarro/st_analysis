@@ -20,12 +20,10 @@ import sys
 import os
 import numpy as np
 import pandas as pd
-from sklearn.feature_selection import VarianceThreshold
+#from sklearn.feature_selection import VarianceThreshold
 from sklearn.svm import LinearSVC
 from sklearn import metrics
 from sklearn.multiclass import OneVsRestClassifier
-import matplotlib.pyplot as plt
-from matplotlib import transforms
 import tempfile
 from stanalysis.visualization import plotSpotsWithImage
 
@@ -140,17 +138,16 @@ def main(train_data,
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--train-data", 
+    parser.add_argument("--train-data", required=True,
                         help="The data frame with the normalized counts for training")
-    parser.add_argument("--test-data", 
+    parser.add_argument("--test-data", required=True,
                         help="The data frame with the normalized counts for testing")
-    parser.add_argument("--train-classes", 
+    parser.add_argument("--train-classes", required=True,
                         help="A tab delimited file mapping barcodes to their classes for training")
     parser.add_argument("--test-classes", default=None,
                         help="A tab delimited file mapping barcodes to their classes for testing")
-    parser.add_argument("--alignment", 
-                        help="Alignment matrix needed when using the image", 
-                        nargs="+", type=float, default=None)
+    parser.add_argument("--alignment", default=None,
+                        help="A file containing the alignment image (array coordinates to pixel coordinates) as a 3x3 matrix")
     parser.add_argument("--image", default=None, 
                         help="When given the data will plotted on top of the image, \
                         if the alignment matrix is given the data will be aligned")
