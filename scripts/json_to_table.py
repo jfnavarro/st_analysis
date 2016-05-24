@@ -43,20 +43,16 @@ def main(json_file, outfile):
         outfile = "data_table.tsv"
     
     # Iterate the JSON file to get the counts   
-    genes = set()
-    spots = set()
     genes_spot_counts = defaultdict(int)
     with open(json_file, "r") as fh:
         for line in json.load(fh):
             gene = line["gene"]
-            x = int(line["x"])
-            y = int(line["y"])
+            x = line["x"]
+            y = line["y"]
             count = line["hits"]
-            genes.add(gene)
-            spots.add((x,y))
-            genes_spot_counts[(x,y),gene] = count
+            spot = "%sx%s" % (x, y)
+            genes_spot_counts[spot,gene] = count
     
-    print genes_spot_counts
     # Create a data frame with the counts (genes as columns, spots as rows)
     counts_table = pd.DataFrame(genes_spot_counts)
     # Write table to a ile
