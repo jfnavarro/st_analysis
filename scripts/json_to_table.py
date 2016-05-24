@@ -3,7 +3,27 @@
 """ 
 Script that takes a ST-data file in JSON
 format from the ST Pipeline and converts it
-to a data frame
+to a data frame (genes as columns and spots as rows).
+The JSON format must be like this :
+
+[
+  {
+    "y": 25,
+    "x": 31,
+    "hits": 1,
+    "barcode": "GATCGCTGAAAGGATAGA",
+    "gene": "ENSMUSG00000041378"
+  },
+  {
+    "y": 23,
+    "x": 13,
+    "hits": 4,
+    "barcode": "TGTTCCGATGGGAGAAGC",
+    "gene": "ENSMUSG00000001227"
+  },
+  ....
+  
+@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
 
 import argparse
@@ -15,12 +35,12 @@ import json
 
 def main(json_file, outfile):
 
-    if not os.path.isfile(json_file) or not json_file.tolower().endswith(".json"):
+    if not os.path.isfile(json_file) or not json_file.endswith(".json"):
         sys.stderr.write("Error, input file not present or invalid format\n")
         sys.exit(1)
      
     if not outfile:
-        outfile = "data_table.csv"
+        outfile = "data_table.tsv"
     
     # Iterate the JSON file to get the counts   
     genes = set()
@@ -36,10 +56,11 @@ def main(json_file, outfile):
             spots.add((x,y))
             genes_spot_counts[(x,y),gene] = count
     
+    print genes_spot_counts
     # Create a data frame with the counts (genes as columns, spots as rows)
     counts_table = pd.DataFrame(genes_spot_counts)
     # Write table to a ile
-    counts_table.to_csv(outfile)
+    counts_table.to_csv(outfile, sep="\t")
                
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)

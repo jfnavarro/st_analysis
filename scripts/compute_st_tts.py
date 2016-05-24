@@ -6,7 +6,13 @@ from the ST Pipeline and computes peaks clusters
 based on the transcription termination site and the strand. 
 It uses paraclu to compute the clusters
 and paraclu-cut to filter out (optional)
-The computed ST-TTs are printed to a file in BED format. 
+The computed ST-TTs are written to a file in BED format. 
+
+The ST BED file must has the following format:
+
+CHROMOSOME START END READ SCORE STRAND GENE X Y
+
+@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
 
 import argparse
@@ -63,16 +69,15 @@ def main(bed_file, min_data_value, disable_filter,
     map_reads = defaultdict(int)
     with open(bed_file, "r") as file_handler:
         for line in file_handler.readlines():
-            if line.find("#"):
+            if line.find("#") != -1:
                 continue
             tokens = line.split()
-            assert(len(tokens) > 5)
+            assert(len(tokens) == 9)
             chromosome = str(tokens[0])
             star_site = int(tokens[1])
             end_site = int(tokens[2])
             strand = str(tokens[5])
             gene = str(tokens[6])
-            # barcode = str(tokens[7])
             # Do not include MALAT1
             if gene.upper() != "ENSMUSG00000092341" and gene.upper() != "MALAT1":
                 # Swap star and end site if the gene is annotated in the negative strand
@@ -132,6 +137,8 @@ def main(bed_file, min_data_value, disable_filter,
             sys.stderr.write("Error, executing paraclu-cut\n")
             sys.stderr.write(str(e))
             sys.exit(1)
+    else:
+        os.rename(temp_paraclu, output)
         
     print "DONE!"
             

@@ -1,10 +1,14 @@
 #! /usr/bin/env python
-#@Author Jose Fernandez
 """ 
 Script that takes a matrix of counts
-where the columns are barcode Ids and convert
+where the columns are genes and the rows
+are BARCODE ids and convert
 the ids to XxY coordinates. For that it also needs
-a file with the barcode ids and the coordinates
+a file with the barcode ids and the coordinates as
+
+BARCODE X Y
+
+@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
 
 import argparse
@@ -26,6 +30,7 @@ def main(counts_matrix, barcode_ids, outfile):
     with open(barcode_ids, "r") as filehandler:
         for line in filehandler.readlines():
             tokens = line.split()
+            assert(len(tokens) == 3)
             barcodes[tokens[0]] = (tokens[1],tokens[2])
     
     # Read the data frame
@@ -39,7 +44,7 @@ def main(counts_matrix, barcode_ids, outfile):
         new_column_values.append(x + "x" + y)
     # Write table again
     transpose_counts_table.columns = new_column_values
-    transpose_counts_table.to_csv(outfile)
+    transpose_counts_table.transpose().to_csv(outfile, sep='\t')
                
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)

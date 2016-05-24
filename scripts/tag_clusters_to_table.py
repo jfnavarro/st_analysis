@@ -40,10 +40,10 @@ def main(input_files, outfile):
     map_original_clusters = defaultdict(list)
     with open(st_bed_file, "r") as filehandler:
         for line in filehandler.readlines():
-            if line.find("#"):
+            if line.find("#") != -1:
                 continue
             tokens = line.split()
-            assert(len(tokens) > 7)
+            assert(len(tokens) == 9)
             chromosome = str(tokens[0])
             start_site = int(tokens[1])
             end_site = int(tokens[2])
@@ -59,6 +59,8 @@ def main(input_files, outfile):
     barcodes = set()
     with open(tag_clusters_file, "r") as filehandler:
         for line in filehandler.readlines():
+            if line.find("#") != -1:
+                continue
             tokens = line.split()
             chromosome = str(tokens[0])
             start = int(tokens[2])

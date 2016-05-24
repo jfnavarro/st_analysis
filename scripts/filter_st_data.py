@@ -1,10 +1,19 @@
 #! /usr/bin/env python
-#@Author Jose Fernandez
 """ 
 Script that takes the ST BED file generated
 from the ST pipeline and a one or more selections
 made in the ST Viewer and generate a new file
 with only the coordinates that are present in the selections.
+
+The format of the BED file :
+
+CHROMOSOME START END READ SCORE STRAND GENE X Y
+
+The format of ST viewer selection
+
+GENE X Y COUNT
+
+@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
 
 import argparse
@@ -20,15 +29,16 @@ def main(bed_file, barcodes_files, outfile):
     if not outfile:
         outfile = "filtered_" + os.path.basename(bed_file)
            
-    # loads all the coordinates
+    # loads all the coordinates from the ST Viewer selection
     barcodes = set()
     for barcode_file in barcodes_files:
         with open(barcode_file, "r") as filehandler:
             for line in filehandler.readlines():
-                if line.find("#") != -1:
+                if line.find("#") == -1:
                     tokens = line.split()
-                    x = int(tokens[0])
-                    y = int(tokens[1])
+                    assert(len(tokens) == 4)
+                    x = int(tokens[1])
+                    y = int(tokens[2])
                     barcodes.add((x,y))
         
     # Writes entries that contain a coordinate in the previous list
@@ -37,6 +47,7 @@ def main(bed_file, barcodes_files, outfile):
             for line in filehandler_read.readlines():
                 if line.find("#") != -1:
                     continue
+                assert(len(tokens) == 9)
                 tokens = line.split()
                 x = int(tokens[7])
                 y = int(tokens[8])
