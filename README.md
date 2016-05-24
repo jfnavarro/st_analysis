@@ -1,15 +1,15 @@
-# ST Analsis 
+# ST Analysis 
 
 Different scripts for visualization and analysis of single cell data (Mainly Spatial Transcriptomics data)
 
-##To convert JSON output from the ST Pieline to a data frame
+###To convert JSON output from the ST Pieline to a data frame
 
 The current format of the ST Pipeline for the gene counts per spot is JSON
 but that is being changed to a data frame format. However, to
 quickly convert from JSON to a data frame (genes as columns) the script json_to_table.py 
 can be used
 
-##To compute ST_TTs
+###To compute ST_TTs
 
 ST_TTs gives means to obtain counts using the Transcription Termination Sites
 instead of the whole gene locus. This gives higher resolution. 
@@ -22,14 +22,14 @@ with a selection file exported from the ST viewer on the same dataset.
 - Make sure that the selection made in the viewer is from the exactly 
 the same run as the original bed file. 
 Otherwise update the counts by using convert_selection_counts.py
-- Run countClusters.py with several values of the min_distance and min_value parameters to generate ST_TTs.
+- Run compute_st_tts.py with several values of the min_distance and min_value parameters to generate ST_TTs.
 Then look in Zenbu or any other genome brower and choose the parameters that fit the best 
 (use clusters_to_igv.py to add to zenbu the ST_TTs files 
 and compute_bed_counts.sh to transform the bed file and add ist to Zenbu). 
 - Run tag_clusters_to_table.py on the optimal output from the step before. 
 So to obtain a counts table (TTs as columns and spots as rows).                                                
 
-##To do un-supervised learning
+###To do un-supervised learning
 
 - Run the unsupervised.py script (you need to know how many clusters you want to find beforehand)
 Basically you need :
@@ -39,7 +39,7 @@ Basically you need :
 - Image of the tissue (optional)
 - Alignment matrix to transform spot coordinates to image pixel coordinates (optional)
 
-##To do supervised learning
+###To do supervised learning
 
 - Run supervised.py with the output from unsupervised.py
 You need :
@@ -50,4 +50,9 @@ You need :
 - Image of the tissue (optional)
 - Alignment matrix to transform spot coordinates to image pixel coordinates (optional)
 
-##To visualize ST data (output from the ST Pipeline) 
+###To visualize ST data (output from the ST Pipeline) 
+
+Use the script st_data_plotter.py. It can plot ST data, it can use
+filters (counts or genes) it can highlight spots with reg. expressions
+of genes and it can highlight spots by giving a file with spot coordinates
+and labels. 
