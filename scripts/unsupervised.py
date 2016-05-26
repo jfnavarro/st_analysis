@@ -1,5 +1,4 @@
 #! /usr/bin/env python
-#@Author Jose Fernandez
 """
 A script to make un-supervised
 classification on single cell data.
@@ -9,6 +8,8 @@ with the predicted classes and file with the predicted
 classes and the spot coordinates.
 The user can select what clustering algorithm to use
 and what dimensionality reduction technique to use. 
+
+@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
 import argparse
 import sys
@@ -39,17 +40,18 @@ def main(counts_table,
          alignment, 
          image):
 
-    if outdir is None: outdir = "."
-    
     if not os.path.isfile(counts_table):
-        raise RuntimeError("Counts table file is not correct..")
+        sys.stderr.write("Error, input file/s not present or invalid format\n")
+        sys.exit(1)
+        
+    if outdir is None: outdir = "."
        
     # Spots are rows and genes are columns
-    counts = pd.read_table(counts_table, sep="\t", header=0)
+    counts = pd.read_table(counts_table, sep="\t", header=0, index_col=0)
 
     # How many spots do we keep based on the number of genes expressed?
     min_genes_spot_exp = (counts != 0).sum(axis=1).quantile(MIN_GENES_SPOT_EXP)
-    print "Number of expressed genes a spot must have to be kept " 
+    print "Number of expressed genes a spot must have to be kept " \
     "(1% of total expressed genes) " + str(min_genes_spot_exp)
     
     # Remove noisy spots  
@@ -71,7 +73,8 @@ def main(counts_table,
     elif normalization in "RAW":
         norm_counts = counts
     else:
-        raise RuntimeError("Wrong normalization method..")
+        sys.stderr.write("Error, incorrect normalization method\n")
+        sys.exit(1)
     
     # Scale spots (columns) against the mean and variance
     #norm_counts = pd.DataFrame(data=scale(norm_counts, axis=1, with_mean=True, with_std=True), 
@@ -80,7 +83,7 @@ def main(counts_table,
     # How many genes do we keep based on the variance?
     # TODO this could be done based on expression level (keep the highest for instance)
     min_genes_spot_var = norm_counts.var(axis=1).quantile(MIN_GENES_SPOT_VAR)
-    print "Min variance a gene must have over all spot "
+    print "Min variance a gene must have over all spot " \
     "to be kept (1% of total variance) " + str(min_genes_spot_var)
     norm_counts = norm_counts[norm_counts.var(axis=1) >= min_genes_spot_var]
     
@@ -109,7 +112,8 @@ def main(counts_table,
     elif "SPCA" in dimensionality_algorithm:
         decomp_model = SparsePCA(n_components=2, alpha=1)
     else:
-        raise RuntimeError("Wrong dimensionality reduction method..")   
+        sys.stderr.write("Error, incorrect dimensionality reduction method\n")
+        sys.exit(1)
     
     # Use log2 counts if we do not center the data
     reduced_data = decomp_model.fit_transform(np.log2(norm_counts + 1))
@@ -122,7 +126,8 @@ def main(counts_table,
                                              affinity='euclidean',
                                              n_components=None, linkage='ward') 
     else:
-        raise RuntimeError("Wrong clustering method..")  
+        sys.stderr.write("Error, incorrect clustering method\n")
+        sys.exit(1)
 
     labels = clustering.fit_predict(reduced_data)
     if 0 in labels: labels = labels + 1
@@ -159,16 +164,23 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--counts-table", required=True,
                         help="A table with gene counts per feature/spot (genes as columns)")
-    parser.add_argument("--normalization", default="DESeq",
-                        help="Normalize the counts using (RAW - DESeq - TPM)")
-    parser.add_argument("--num-clusters", default=3,
-                        help="If given the number of clusters will be adjusted. Otherwise they will be pre-computed")
-    parser.add_argument("--clustering-algorithm", default="KMeans",
-                        help="What clustering algorithm to use after the dimensionality reduction (Hierarchical - KMeans)")
-    parser.add_argument("--dimensionality-algorithm", default="tSNE",
-                        help="What dimensionality reduction algorithm to use (tSNE - PCA - ICA - SPCA)")
+    parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
+                        type=str, choices=["RAW", "DESeq", "TPM"],
+                        help="Normalize the counts using (RAW - DESeq - TPM) (default: %(default)s)")
+    parser.add_argument("--num-clusters", default=3, metavar="[INT]", type=int, choices=range(2, 10),
+                        help="If given the number of clusters will be adjusted. " \
+                        "Otherwise they will be pre-computed (default: %(default)s)")
+    parser.add_argument("--clustering-algorithm", default="KMeans", metavar="[STR]", 
+                        type=str, choices=["Hierarchical", "KMeans"],
+                        help="What clustering algorithm to use after the dimensionality reduction " \
+                        "(Hierarchical - KMeans) (default: %(default)s)")
+    parser.add_argument("--dimensionality-algorithm", default="tSNE", metavar="[STR]", 
+                        type=str, choices=["tSNE", "PCA", "ICA", "SPCA"],
+                        help="What dimensionality reduction algorithm to use " \
+                        "(tSNE - PCA - ICA - SPCA) (default: %(default)s)")
     parser.add_argument("--alignment", default=None,
-                        help="A file containing the alignment image (array coordinates to pixel coordinates) as a 3x3 matrix")
+                        help="A file containing the alignment image " \
+                        "(array coordinates to pixel coordinates) as a 3x3 matrix")
     parser.add_argument("--image", default=None, 
                         help="When given the data will plotted on top of the image, \
                         if the alignment matrix is given the data will be aligned")

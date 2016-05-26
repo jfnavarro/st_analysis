@@ -1,5 +1,4 @@
 #! /usr/bin/env python
-#@Author Jose Fernandez
 """ 
 Script that takes as input a BED file generated
 from the ST Pipeline and computes peaks clusters
@@ -24,6 +23,8 @@ import tempfile
 
 def paracluFilter(file_input, file_output, max_cluster_size, 
                   min_density_increase, single_cluster_density):
+    """ A simple wrapper to run paraclu-cut previous sorting
+    """
     # sort before filter
     temp_filtered = tempfile.mktemp(prefix="st_countClusters_filtered")
     with open(temp_filtered, "w") as filehandler:
@@ -145,15 +146,15 @@ def main(bed_file, min_data_value, disable_filter,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("bed_file", help="BED ST-data file")
-    parser.add_argument("--min-data-value", default=30, 
-                        help="Omits grouped entries whose total count is lower than this")
+    parser.add_argument("--min-data-value", default=30, metavar="[INT]", type=int, choices=range(1, 999),
+                        help="Omits grouped entries whose total count is lower than this (default: %(default)s)")
     parser.add_argument("--disable-filter", action="store_true", 
                         default=False, help="Disable second filter(paraclu-cut)")
-    parser.add_argument("--max-cluster-size", default=200, 
-                        help="Discard clusters whose size in positions is bigger than this")
-    parser.add_argument("--min-density-increase", default=2, 
+    parser.add_argument("--max-cluster-size", default=200, metavar="[INT]", type=int, choices=range(10, 999),
+                        help="Discard clusters whose size in positions is bigger than this (default: %(default)s)")
+    parser.add_argument("--min-density-increase", default=2, metavar="[INT]", type=int, choices=range(1, 99),
                         help="Discard clusters whose density is lower than this")
-    parser.add_argument("--output", default=None, help="The name and path of the output file")
+    parser.add_argument("--output", default=None, help="The name and path of the output file (default: %(default)s)")
     args = parser.parse_args()
     main(args.bed_file, args.min_data_value, args.disable_filter, 
          args.max_cluster_size, args.min_density_increase, args.output)

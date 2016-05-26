@@ -1,5 +1,4 @@
 #! /usr/bin/env python
-#@Author Jose Fernandez
 """ 
 This script performs a supervised prediction
 using a training set and a test set. 
@@ -14,6 +13,8 @@ test set. If class labels for the test sets
 are given the script will compute accuracy of the prediction.
 The script will output the predicted classes and the spots
 plotted on top of an image if the image is given.
+
+@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
 import argparse
 import sys

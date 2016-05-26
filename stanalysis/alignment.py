@@ -1,6 +1,6 @@
-#! /usr/bin/env python
-#@Author Jose Fernandez
-""" Aligment functions for the st analysis package"""
+""" 
+Alignment functions for the st analysis package
+"""
 import numpy as np
 import os
 
@@ -10,9 +10,9 @@ def parseAlignmentMatrix(alignment_file):
     the values of a 3x3 affine matrix in one line
     as :
     a11 a12 a13 a21 a22 a23 a31 a32 a33
-    and returns a 3x3 matrix with the elements
-    @param alignment_file a file containing the 9 elements of a 3x3 matrix
-    @return a 3x3 matrix (default identify if error happens)
+    and returns a 3x3 matrix with the parsed elements
+    :param alignment_file: a file containing the 9 elements of a 3x3 matrix
+    :return: a 3x3 matrix (default identify if error happens)
     """
     alignment_matrix = np.zeros((3,3), dtype=np.float)
     alignment_matrix[0,0] = 1
@@ -25,7 +25,7 @@ def parseAlignmentMatrix(alignment_file):
     alignment_matrix[2,1] = 0
     alignment_matrix[2,2] = 1
     if alignment_file is None or not os.path.isfile(alignment_file):
-        return  alignment_matrix
+        return alignment_matrix
     with open(alignment_file, "r") as filehandler:
         line = filehandler.readlines()
         tokens = line.split()

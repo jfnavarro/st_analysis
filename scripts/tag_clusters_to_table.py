@@ -1,5 +1,4 @@
 #! /usr/bin/env python
-#@Author Jose Fernandez
 """ 
 Script that parses the tab delimited file
 generated from compute_st_tts.py with TTs
@@ -13,6 +12,8 @@ BCN
 
 It needs the original BED file with ST data to extract the reads count
 If no output file is given the output will be : output_table_ctts.txt
+
+@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
 
 import argparse

@@ -1,5 +1,4 @@
 #! /usr/bin/env python
-#@Author Jose Fernandez
 """ 
 Script that takes a BED file from older
 versions of the ST pipeline and replaces
@@ -17,6 +16,7 @@ It requires a file with the BARCODE ids and the coordinates as
 
 BARCODE X Y
 
+@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
 
 import argparse

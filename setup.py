@@ -23,7 +23,7 @@ setup(
   author = 'Jose Fernandez Navarro',
   author_email = 'jose.fernandez.navarro@scilifelab.se',
   license = 'BSD',
-  packages = find_packages(exclude=('tests*')),
+  packages = find_packages(),
   include_package_data = False,
   package_data = {'': ['RELEASE-VERSION']},
   zip_safe = False,
@@ -36,7 +36,7 @@ setup(
     'sklearn',
     'matplotlib'
   ],
-  test_suite = 'tests',
+  #test_suite = 'tests',
   scripts = glob.glob('scripts/*.py'),
   classifiers = [
     'Development Status :: 4 - Beta',

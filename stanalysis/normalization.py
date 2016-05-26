@@ -1,10 +1,11 @@
-#! /usr/bin/env python
-#@Author Jose Fernandez
-""" Normalization functions for the st analysis package"""
+""" 
+Normalization functions for the st analysis package
+"""
 import numpy as np
 
 def computeSizeFactors(counts, function=np.median):
-    """ Compute size factors to normalize gene counts
+    """ 
+    Compute size factors to normalize gene counts
     as in DESeq 1 and 2
     This is just a code snipped from the original implementation
     in R :               
@@ -17,9 +18,9 @@ def computeSizeFactors(counts, function=np.median):
                exp(locfunc((log(cnts) - loggeomeans)[is.finite(loggeomeans) & cnts > 0]))
            })
            
-    @param counts a data frame with the counts to normalize (genes as rows)
-    @param function the distance function to apply to compute the factors
-    @return the size factors as an array
+    :param counts: a data frame with the counts to normalize (genes as rows)
+    :param function: the distance function to apply to compute the factors (default median)
+    :return: the size factors as an array
     """
     # Geometric means of rows
     loggeomans = np.log(counts).mean(axis=1)
