@@ -37,6 +37,8 @@ this you can do :
 
         compute_st_tts.py --min-data-value 30 --max-cluster-size 200 stdata.bed
   
+    The script will generate a bed file with the computed ST TTs. To know more about the parameters type --help
+    
         compute_st_tts.py --help
         
         Script that takes as input a BED file generated from the ST Pipeline and
@@ -52,15 +54,15 @@ this you can do :
         optional arguments:
             -h, --help            show this help message and exit
             --min-data-value [INT]
-                                Omits grouped entries whose total count is lower than
-                                this (default: 30)
-    --disable-filter      Disable second filter(paraclu-cut)
-    --max-cluster-size [INT]
-                          Discard clusters whose size in positions is bigger
-                          than this (default: 200)
-    --min-density-increase [INT]
-                          Discard clusters whose density is lower than this
-    --output OUTPUT       The name and path of the output file (default: None)    
+                                  Omits grouped entries whose total count is lower than
+                                  this (default: 30)
+            --disable-filter      Disable second filter(paraclu-cut)
+            --max-cluster-size [INT]
+                                  Discard clusters whose size in positions is bigger
+                                  than this (default: 200)
+            --min-density-increase [INT]
+                                  Discard clusters whose density is lower than this
+            --output OUTPUT       The name and path of the output file (default: None)    
   
 - Then look in Zenbu or any other genome brower and choose the parameters that fit the best to the data
   (use clusters_to_igv.py with the output of compute_st_tts.py to convert the output to genome browsers format)
