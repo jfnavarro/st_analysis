@@ -35,23 +35,25 @@ this you can do :
   
 - Compute ST TTs with several values of the min_distance and min_value parameters to generate ST_TTs.
 
-    compute_st_tts.py --min-data-value 30 --max-cluster-size 200 stdata.bed
+        compute_st_tts.py --min-data-value 30 --max-cluster-size 200 stdata.bed
   
-  Script that takes as input a BED file generated from the ST Pipeline and
-  computes peaks clusters based on the transcription termination site and the
-  strand. It uses paraclu to compute the clusters and paraclu-cut to filter out
-  (optional) The computed ST-TTs are written to a file in BED format. The ST BED
-  file must has the following format: CHROMOSOME START END READ SCORE STRAND
-  GENE X Y @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
+        compute_st_tts.py --help
+        
+        Script that takes as input a BED file generated from the ST Pipeline and
+        computes peaks clusters based on the transcription termination site and the
+        strand. It uses paraclu to compute the clusters and paraclu-cut to filter out
+        (optional) The computed ST-TTs are written to a file in BED format. The ST BED
+        file must has the following format: CHROMOSOME START END READ SCORE STRAND
+        GENE X Y @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 
-  positional arguments:
-    bed_file              BED ST-data file
+        positional arguments:
+            bed_file              BED ST-data file
 
-  optional arguments:
-    -h, --help            show this help message and exit
-    --min-data-value [INT]
-                          Omits grouped entries whose total count is lower than
-                          this (default: 30)
+        optional arguments:
+            -h, --help            show this help message and exit
+            --min-data-value [INT]
+                                Omits grouped entries whose total count is lower than
+                                this (default: 30)
     --disable-filter      Disable second filter(paraclu-cut)
     --max-cluster-size [INT]
                           Discard clusters whose size in positions is bigger
