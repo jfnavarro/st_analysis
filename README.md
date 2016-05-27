@@ -68,7 +68,7 @@ this you can do :
   (use clusters_to_igv.py with the output of compute_st_tts.py to convert the output to genome browsers format)
 - Intersect the computed ST TTs with the original counts from the ST Pipeline to build a matrix of counts
 
-    tag_clusters_to_table.py tag_clusters.bed stdata.bed --outfile tag_counts_matrix.tsv
+        tag_clusters_to_table.py tag_clusters.bed stdata.bed --outfile tag_counts_matrix.tsv
 
 - You can use now the data frame to do clustersing or anything else
 
@@ -81,39 +81,41 @@ To see how spots cluster together based on their expression profiles you can run
   
   To describe the parameters you can type --help 
   
-  A script that does un-supervised classification on single cell data. It takes
-  a data frame as input and outputs the normalized counts (data frame), a
-  scatter plot with the predicted classes and a file with the predicted classes
-  and the spot coordinates. The user can select what clustering algorithm to use
-  and what dimensionality reduction technique to use. If more than one data
-  frame is given as input they will be merged together to do the dimensionality
-  reduction and then generate plots/files for each one. @Author Jose Fernandez
-  Navarro <jose.fernandez.navarro@scilifelab.se>
+        unsupervised.py --help
+        
+        A script that does un-supervised classification on single cell data. It takes
+        a data frame as input and outputs the normalized counts (data frame), a
+        scatter plot with the predicted classes and a file with the predicted classes
+        and the spot coordinates. The user can select what clustering algorithm to use
+        and what dimensionality reduction technique to use. If more than one data
+        frame is given as input they will be merged together to do the dimensionality
+        reduction and then generate plots/files for each one. @Author Jose Fernandez
+        Navarro <jose.fernandez.navarro@scilifelab.se>
 
-  optional arguments:
-    -h, --help            show this help message and exit
-    --counts-table COUNTS_TABLE
-                          A table with gene counts per feature/spot (genes as
-                          columns)
-    --normalization [STR]
-                          Normalize the counts using (RAW - DESeq - TPM)
-                          (default: DESeq)
-    --num-clusters [INT]  If given the number of clusters will be adjusted.
-                          Otherwise they will be pre-computed (default: 3)
-    --clustering-algorithm [STR]
-                          What clustering algorithm to use after the
-                          dimensionality reduction (Hierarchical - KMeans)
-                          (default: KMeans)
-    --dimensionality-algorithm [STR]
-                          What dimensionality reduction algorithm to use (tSNE -
-                          PCA - ICA - SPCA) (default: tSNE)
-    --alignment ALIGNMENT
-                          A file containing the alignment image (array
-                          coordinates to pixel coordinates) as a 3x3 matrix
-    --image IMAGE         When given the data will plotted on top of the image,
-                          if the alignment matrix is given the data will be
-                          aligned
-    --outdir OUTDIR       Path to output dir
+        optional arguments:
+            -h, --help            show this help message and exit
+            --counts-table COUNTS_TABLE
+                                A table with gene counts per feature/spot (genes as
+                                columns)
+            --normalization [STR]
+                                Normalize the counts using (RAW - DESeq - TPM)
+                                (default: DESeq)
+            --num-clusters [INT]  If given the number of clusters will be adjusted.
+                                Otherwise they will be pre-computed (default: 3)
+            --clustering-algorithm [STR]
+                                What clustering algorithm to use after the
+                                dimensionality reduction (Hierarchical - KMeans)
+                                (default: KMeans)
+            --dimensionality-algorithm [STR]
+                                What dimensionality reduction algorithm to use (tSNE -
+                                PCA - ICA - SPCA) (default: tSNE)
+            --alignment ALIGNMENT
+                                A file containing the alignment image (array
+                                coordinates to pixel coordinates) as a 3x3 matrix
+            --image IMAGE       When given the data will plotted on top of the image,
+                                if the alignment matrix is given the data will be
+                                aligned
+            --outdir OUTDIR       Path to output dir
 
 ###To do supervised learning
 You can train a classifier with the expression profiles of a set of spots
