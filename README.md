@@ -28,7 +28,7 @@ instead of the whole gene locus. This gives higher resolution.
 (remove or not spots outside tissue or use spots from a certain area of the tissue). For
 this you can do :
  
-    filter_st_data.py --barcodes-files selection.txt stdata.bed
+        filter_st_data.py --barcodes-files selection.txt stdata.bed
 
   Where selection.txt is a selection exported from the ST Viewer (can pass more than one)
   Where stdata.bed is the output from the ST Pipeline in BED format.
