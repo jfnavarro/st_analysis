@@ -127,36 +127,38 @@ of the same tissue. For that you can use the following script :
   This will generate some statistics, a file with the predicted classes for each spot and a plot of the predicted spots on     top of the tissue image (if the image and the alignment matrix are given). 
   To know more about the parameters you can type --help
   
-  This script performs a supervised prediction using a training set and a test
-  set. The training set will be a data frame with normalized counts from single
-  cell data and the test set will also be a data frame with counts. A file with
-  class labels for the training set is needed so the classifier knows what class
-  each spot(row) in the training set belongs to. It will then try to predict the
-  classes of the spots(rows) in the test set. If class labels for the test sets
-  are given the script will compute accuracy of the prediction. The script will
-  output the predicted classes and the spots plotted on top of an image if the
-  image is given. @Author Jose Fernandez Navarro
-  <jose.fernandez.navarro@scilifelab.se>
+        supervised.py --help
+        
+        This script performs a supervised prediction using a training set and a test
+        set. The training set will be a data frame with normalized counts from single
+        cell data and the test set will also be a data frame with counts. A file with
+        class labels for the training set is needed so the classifier knows what class
+        each spot(row) in the training set belongs to. It will then try to predict the
+        classes of the spots(rows) in the test set. If class labels for the test sets
+        are given the script will compute accuracy of the prediction. The script will
+        output the predicted classes and the spots plotted on top of an image if the
+        image is given. @Author Jose Fernandez Navarro
+        <jose.fernandez.navarro@scilifelab.se>
 
-  optional arguments:
-    -h, --help            show this help message and exit
-    --train-data TRAIN_DATA
-                          The data frame with the normalized counts for training
-    --test-data TEST_DATA
-                          The data frame with the normalized counts for testing
-    --train-classes TRAIN_CLASSES
-                          A tab delimited file mapping barcodes to their classes
-                          for training
-    --test-classes TEST_CLASSES
-                          A tab delimited file mapping barcodes to their classes
-                          for testing
-    --alignment ALIGNMENT
-                          A file containing the alignment image (array
-                          coordinates to pixel coordinates) as a 3x3 matrix
-    --image IMAGE         When given the data will plotted on top of the image,
-                          if the alignment matrix is given the data will be
-                          aligned
-    --outdir OUTDIR         Path to output dir
+        optional arguments:
+            -h, --help            show this help message and exit
+            --train-data TRAIN_DATA
+                                The data frame with the normalized counts for training
+            --test-data TEST_DATA
+                                The data frame with the normalized counts for testing
+            --train-classes TRAIN_CLASSES
+                                A tab delimited file mapping barcodes to their classes
+                                for training
+            --test-classes TEST_CLASSES
+                                A tab delimited file mapping barcodes to their classes
+                                for testing
+            --alignment ALIGNMENT
+                                A file containing the alignment image (array
+                                coordinates to pixel coordinates) as a 3x3 matrix
+            --image IMAGE       When given the data will plotted on top of the image,
+                                if the alignment matrix is given the data will be
+                                aligned
+            --outdir OUTDIR     Path to output dir
 
 ###To visualize ST data (output from the ST Pipeline) 
 
@@ -170,42 +172,44 @@ the a tissue image and an alignment matrix. A example run would be :
     
   This will generate a scatter plot of the expression of the spots that contain a gene Actb and with higher expression than 2 and it will use the tissue image as background. You could optionally pass a list of spots with their classes (Generated with unsupervised.py) to highlight spots in the scatter plot. More info if you type --help
   
-  Script that creates a quality scatter plot from a ST-data file in data frame
-  format. The output will be a .png file with the same name as the input file if
-  no name if given. It allows to highlight spots with colors using a file with
-  the following format : CLASS_NUMBER X Y It allows to choose transparency for
-  the data points It allows to pass an image so the spots are plotted on top of
-  it (an alignment file can be passed along to convert spot coordinates to pixel
-  coordinates) It allows to normalize the counts using DESeq It allows to filter
-  out by counts or gene names (following a reg-exp pattern) what spots to plot
-  @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
+        st_data_plotter.py --help
+        
+        Script that creates a quality scatter plot from a ST-data file in data frame
+        format. The output will be a .png file with the same name as the input file if
+        no name if given. It allows to highlight spots with colors using a file with
+        the following format : CLASS_NUMBER X Y It allows to choose transparency for
+        the data points It allows to pass an image so the spots are plotted on top of
+        it (an alignment file can be passed along to convert spot coordinates to pixel
+        coordinates) It allows to normalize the counts using DESeq It allows to filter
+        out by counts or gene names (following a reg-exp pattern) what spots to plot
+        @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 
-  positional arguments:
-    input_data            A data frame with counts from ST data (genes as
-                          columns)
+        positional arguments:
+            input_data            A data frame with counts from ST data (genes as
+                                columns)
 
-  optional arguments:
-    -h, --help            show this help message and exit
-    --image IMAGE         When given the data will plotted on top of the image,
-                          if the alignment matrix is given the data will be
-                          aligned
-    --cutoff [FLOAT]      Do not include genes below this reads cut off
-                          (default: 0.0)
-    --highlight-spots HIGHLIGHT_SPOTS
-                          A file containing spots (x,y) and the class/label they
-                          belong to CLASS_NUMBER X Y
-    --alignment ALIGNMENT
-                          A file containing the alignment image (array
-                          coordinates to pixel coordinates) as a 3x3 matrix
-    --data-alpha [FLOAT]  The transparency level for the data points, 0 min and
-                          1 max (default: 1.0)
-    --highlight-alpha [FLOAT]
-                          The transparency level for the highlighted barcodes, 0
-                          min and 1 max (default: 1.0)
-    --dot-size [INT]      The size of the dots (default: 50)
-    --normalize-counts    If given the counts in the imput table will be
-                          normalized using DESeq
-    --filter-genes FILTER_GENES
-                          Regular expression for gene symbols to filter out. Can
-                          be given several times.
-    --outfile OUTFILE     Name of the output file
+        optional arguments:
+            -h, --help            show this help message and exit
+            --image IMAGE         When given the data will plotted on top of the image,
+                                if the alignment matrix is given the data will be
+                                aligned
+            --cutoff [FLOAT]      Do not include genes below this reads cut off
+                                (default: 0.0)
+            --highlight-spots HIGHLIGHT_SPOTS
+                                A file containing spots (x,y) and the class/label they
+                                belong to CLASS_NUMBER X Y
+            --alignment ALIGNMENT
+                                A file containing the alignment image (array
+                                coordinates to pixel coordinates) as a 3x3 matrix
+            --data-alpha [FLOAT]  The transparency level for the data points, 0 min and
+                                1 max (default: 1.0)
+            --highlight-alpha [FLOAT]
+                                The transparency level for the highlighted barcodes, 0
+                                min and 1 max (default: 1.0)
+            --dot-size [INT]    The size of the dots (default: 50)
+            --normalize-counts  If given the counts in the imput table will be
+                                normalized using DESeq
+            --filter-genes FILTER_GENES
+                                Regular expression for gene symbols to filter out. Can
+                                be given several times.
+            --outfile OUTFILE     Name of the output file
