@@ -1,13 +1,17 @@
 #! /usr/bin/env python
 """
-A script to make un-supervised
+A script that does un-supervised
 classification on single cell data.
 It takes a data frame as input and outputs
 the normalized counts (data frame), a scatter plot
-with the predicted classes and file with the predicted
+with the predicted classes and a file with the predicted
 classes and the spot coordinates.
 The user can select what clustering algorithm to use
 and what dimensionality reduction technique to use. 
+
+If more than one data frame is given as input
+they will be merged together to do the dimensionality
+reduction and then generate plots/files for each one.
 
 @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
@@ -22,9 +26,9 @@ from sklearn.decomposition import PCA, FastICA, SparsePCA
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
 #from sklearn.preprocessing import scale
-import matplotlib.pyplot as plt
-from stanalysis.visualization import plotSpotsWithImage
+from stanalysis.visualization import scatter_plot
 from stanalysis.normalization import computeSizeFactors
+from stanalysis.alignment import parseAlignmentMatrix
 
 MIN_GENES_SPOT_EXP = 0.1
 MIN_GENES_SPOT_VAR = 0.1
@@ -44,7 +48,8 @@ def main(counts_table,
         sys.stderr.write("Error, input file/s not present or invalid format\n")
         sys.exit(1)
         
-    if outdir is None: outdir = "."
+    if outdir is None: 
+        outdir = os.getcwd()
        
     # Spots are rows and genes are columns
     counts = pd.read_table(counts_table, sep="\t", header=0, index_col=0)
@@ -132,11 +137,22 @@ def main(counts_table,
     labels = clustering.fit_predict(reduced_data)
     if 0 in labels: labels = labels + 1
     
+    # alignment_matrix will be identity if alignment file is None
+    alignment_matrix = parseAlignmentMatrix(alignment)
+    
     # Plot the clustered spots with the class color
-    fig = plt.figure(figsize=(8,8))
-    a = fig.add_subplot(111, aspect='equal')
-    a.scatter(reduced_data[:,0], reduced_data[:,1], c=labels, s=50)
-    fig.savefig(os.path.join(outdir,"computed_classes_scatter.png"))
+    scatter_plot(x_points=reduced_data[:,0], 
+                 y_points=reduced_data[:,1], 
+                 colors=labels, 
+                 output=os.path.join(outdir,"computed_classes.png"), 
+                 alignment=None, 
+                 cmap=None, 
+                 title='Computed classes', 
+                 xlabel='X', 
+                 ylabel='Y',
+                 image=None, 
+                 alpha=1.0, 
+                 size=80)
     
     # Write the spots and their classes to a file
     assert(len(labels) == len(norm_counts.index))
@@ -153,12 +169,21 @@ def main(counts_table,
             y = int(tokens[1])
             x_points.append(x)
             y_points.append(y)
-            filehandler.write(str(labels[i]) + "\t" + str(x) + "\t" + str(y) + "\n")
+            filehandler.write("%s\t%s\t%s\n" % (str(labels[i]), str(x), str(y)))
     
     if image is not None and os.path.isfile(image):
-        plotSpotsWithImage(x_points, y_points, labels, image,
-                           "computed_classes_tissue.png", alignment)
-
+        scatter_plot(x_points=x_points, 
+                     y_points=y_points, 
+                     colors=labels, 
+                     output=os.path.join(outdir,"computed_classes_tissue.png"), 
+                     alignment=alignment_matrix, 
+                     cmap=None, 
+                     title='Computed classes tissue', 
+                     xlabel='X', 
+                     ylabel='Y',
+                     image=image, 
+                     alpha=1.0, 
+                     size=60)
                                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)

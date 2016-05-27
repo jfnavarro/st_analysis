@@ -25,9 +25,20 @@ import pandas as pd
 from sklearn.svm import LinearSVC
 from sklearn import metrics
 from sklearn.multiclass import OneVsRestClassifier
-import tempfile
-from stanalysis.visualization import plotSpotsWithImage
+from stanalysis.visualization import scatter_plot
+from stanalysis.alignment import parseAlignmentMatrix
 
+def get_classes_coordinate(class_file):
+    barcodes_classes = dict()
+    with open(class_file, "r") as filehandler:
+        for line in filehandler.readlines():
+            tokens = line.split()
+            x = int(tokens[1])
+            y = int(tokens[2])
+            class_label = str(tokens[0])
+            barcodes_classes["%sx%s" % (x,y)] = class_label
+    return barcodes_classes
+               
 def main(train_data, 
          test_data, 
          classes_train, 
@@ -42,29 +53,15 @@ def main(train_data,
         sys.exit(1)
      
     if not outdir or not os.path.isdir(outdir):
-        outdir = tempfile.mktemp()
+        outdir = os.getcwd()
         
     print "Out folder " + outdir
            
     # loads all the barcodes classes for the training set
-    barcodes_classes_train = dict()
-    with open(classes_train, "r") as filehandler:
-        for line in filehandler.readlines():
-            tokens = line.split()
-            x = int(tokens[1])
-            y = int(tokens[2])
-            class_label = str(tokens[0])
-            barcodes_classes_train[(x,y)] = class_label
-       
+    barcodes_classes_train = get_classes_coordinate(classes_train)
+
     # loads all the barcodes classes for the test set
-    barcodes_classes_test = dict()
-    with open(classes_test, "r") as filehandler:
-        for line in filehandler.readlines():
-            tokens = line.split()
-            x = int(tokens[1])
-            y = int(tokens[2])
-            class_label = str(tokens[0])
-            barcodes_classes_test[(x,y)] = class_label[0]
+    barcodes_classes_test = get_classes_coordinate(classes_test)
       
     # loads the training set
     # spots are rows and genes are columns
@@ -109,7 +106,8 @@ def main(train_data,
     
     # Train the classifier and predict
     # TODO optimize parameters of the classifier
-    classifier = OneVsRestClassifier(LinearSVC(random_state=0))
+    classifier = OneVsRestClassifier(LinearSVC(random_state=0), n_jobs=4)
+    # NOTE one could also get the predict prob of each class for each spot predict_proba() 
     predicted = classifier.fit(train_counts, train_labels).predict(test_counts) 
     
     # Compute accuracy
@@ -129,13 +127,25 @@ def main(train_data,
             y = bc[1]
             x_points.append(int(x))
             y_points.append(int(y))
-            filehandler.write(str(label) + "\t" + str(x) + "\t" + str(y) + "\n")
+            filehandler.write("%s\t%s\t%s\n" % (label, x, y))
             
     # Plot the spots with the predicted color on top of the tissue image
     if image is not None and os.path.isfile(image):
         colors = [int(x) for x in predicted]
-        plotSpotsWithImage(x_points, y_points, colors, image,
-                            "computed_classes_tissue.png", alignment)
+        # alignment_matrix will be identity if alignment file is None
+        alignment_matrix = parseAlignmentMatrix(alignment)
+        scatter_plot(x_points=x_points, 
+                     y_points=y_points, 
+                     colors=colors, 
+                     output=os.path.join(outdir,"computed_classes_tissue.png"), 
+                     alignment=alignment_matrix, 
+                     cmap=None, 
+                     title='Computed classes tissue', 
+                     xlabel='X', 
+                     ylabel='Y',
+                     image=image, 
+                     alpha=1.0, 
+                     size=60)
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)

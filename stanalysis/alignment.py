@@ -27,7 +27,7 @@ def parseAlignmentMatrix(alignment_file):
     if alignment_file is None or not os.path.isfile(alignment_file):
         return alignment_matrix
     with open(alignment_file, "r") as filehandler:
-        line = filehandler.readlines()
+        line = filehandler.readline()
         tokens = line.split()
         assert(len(tokens) == 9)
         alignment_matrix[0,0] = float(tokens[0])

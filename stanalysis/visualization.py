@@ -11,7 +11,7 @@ color_map = ["red", "green", "blue", "orange", "cyan", "yellow", "orchid",
              "antiquewhite", "bisque", "black"]
 
 def scatter_plot(x_points, y_points, colors, 
-                 output, alignment, cmap=None, title='Scatter', xlabel='X', 
+                 output, alignment=None, cmap=None, title='Scatter', xlabel='X', 
                  ylabel='Y',image=None, alpha=1.0, size=50):
     """ 
     This function makes a scatter plot of a set of points (x,y). T
@@ -31,14 +31,14 @@ def scatter_plot(x_points, y_points, colors,
     """
     assert(len(x_points) == len(y_points) == len(colors))
     # Plot spots with the color class in the tissue image
-    fig = plt.figure(figsize=(8,8))
+    fig = plt.figure(figsize=(16,16))
     a = fig.add_subplot(111, aspect='equal')
     base_trans = a.transData
-    tr = transforms.Affine2D(matrix = alignment) + base_trans
+    tr = transforms.Affine2D(matrix = alignment) + base_trans if alignment is not None else base_trans
     if cmap is None:
         color_list = set(colors)
-        cmap = color_map[min(color_list)-1:max(color_list)]
-        cmap = ListedColormap(cmap)
+        color_values = color_map[min(color_list)-1:max(color_list)]
+        cmap = ListedColormap(color_values)
     a.scatter(x_points, 
               y_points, 
               c=colors, 
@@ -52,7 +52,9 @@ def scatter_plot(x_points, y_points, colors,
         a.imshow(img)
     a.set_xlabel(xlabel)
     a.set_ylabel(ylabel)
-    a.legend()
+    a.legend([plt.Line2D((0,1),(0,0), color=x) for x in color_values], 
+             color_list, loc="upper right", markerscale=1.0, 
+             ncol=1, scatterpoints=1, fontsize=10)
     a.set_title(title, size=20)
     fig.set_size_inches(16, 16)
     fig.savefig(output, dpi=300)

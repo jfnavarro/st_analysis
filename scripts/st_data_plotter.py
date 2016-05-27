@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 """ Script that creates a quality scatter plot from a ST-data file in data frame format.
-The output will be a .png file with the same name as the input file.
+The output will be a .png file with the same name as the input file if no name if given.
 
 It allows to highlight spots with colors using a file with the following format : 
 
@@ -8,12 +8,13 @@ CLASS_NUMBER X Y
 
 It allows to choose transparency for the data points
 
-It allows to pass an image so the spots are plotted on top of it (an alignment 
+It allows to pass an image so the spots are plotted on top of it (an alignment file
 can be passed along to convert spot coordinates to pixel coordinates)
 
 It allows to normalize the counts using DESeq
 
-It allows to filter out by counts or gene names what spots to plot
+It allows to filter out by counts or gene names (following a reg-exp pattern) 
+what spots to plot
 
 @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
@@ -41,12 +42,15 @@ def main(input_data,
          dot_size,
          normalize_counts,
          filter_genes,
-         highlight_color):
+         outfile):
 
     if not os.path.isfile(input_data):
         sys.stderr.write("Error, input file/s not present or invalid format\n")
         sys.exit(1)
     
+    if not outfile:
+        outfile = "data_plot.png"
+        
     # Extract data frame and normalize it if needed (genes as columns)
     norm_counts_table = pd.read_table(input_data, sep="\t", header=0, index_col=0)
     if normalize_counts:
@@ -64,8 +68,9 @@ def main(input_data,
     else: 
         genes_to_keep = norm_counts_table.columns
         
+    # Compute the expressions for each coordinate
+    # as the sum of all spots that pass the thresholds (Gene and counts)
     expression = np.zeros((35, 35), dtype=np.float)
-    # Compute the expressions for each coordinate (including check for threshold)
     for spot in norm_counts_table.index:
         tokens = spot.split("x")
         x = tokens[0]
@@ -73,21 +78,22 @@ def main(input_data,
         sum_count = sum(count for count in norm_counts_table.loc[spot,genes_to_keep] if count > cutoff)
         expression[x, y] = sum_count                
                      
-    # Parse the clusters colors if needed
+    # Parse the clusters colors if given
     if highlight_barcodes:   
         colors = np.zeros((35,35), dtype=np.int)     
         with open(highlight_barcodes, "r") as filehandler_read:
             for line in filehandler_read.readlines():
                 tokens = line.split()
+                assert(len(tokens) == 3)
                 cluster = int(tokens[0])
                 x = int(tokens[1])
                 y = int(tokens[2])
                 colors[x,y] = cluster
 
     # Create a scatter plot, if highlight_barcodes is given
-    # then plot another scatter plot in the same canvas.
+    # then plot another scatter plot on the same canvas.
     # If image is given plot it as a background
-    fig = plt.figure(figsize=(8,8))
+    fig = plt.figure(figsize=(16,16))
     a = fig.add_subplot(111, aspect='equal')
     alignment_matrix = parseAlignmentMatrix(alignment)
     base_trans = a.transData
@@ -115,8 +121,10 @@ def main(input_data,
                   s=dot_size,
                   transform=tr,
                   alpha=highlight_alpha)
-        
-        # TODO add legend with color labels
+        # plot legend
+        a.legend([plt.Line2D((0,1),(0,0), color=x) for x in cmap],
+                 color_list, loc="upper right", markerscale=1.0,
+                 ncol=1, scatterpoints=1, fontsize=10)
     
     # Plot image as background    
     if image is not None and os.path.isfile(image):
@@ -125,10 +133,9 @@ def main(input_data,
     # General settings and write to file
     a.set_xlabel("X")
     a.set_ylabel("Y")
-    a.legend()
     a.set_title("Scatter", size=20)
     fig.set_size_inches(16, 16)
-    fig.savefig("data_plot.png", dpi=300)
+    fig.savefig(outfile, dpi=300)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
@@ -147,7 +154,7 @@ if __name__ == '__main__':
                         help="The transparency level for the data points, 0 min and 1 max (default: %(default)s)")
     parser.add_argument("--highlight-alpha", type=float, default=1.0, metavar="[FLOAT]", choices=range(0, 1),
                         help="The transparency level for the highlighted barcodes, 0 min and 1 max (default: %(default)s)")
-    parser.add_argument("--dot-size", type=int, default=50, metavar="[INT%", choices=range(10, 100),
+    parser.add_argument("--dot-size", type=int, default=50, metavar="[INT]", choices=range(10, 100),
                         help="The size of the dots (default: %(default)s)")
     parser.add_argument("--normalize-counts", action="store_true", default=False,
                         help="If given the counts in the imput table will be normalized using DESeq")
@@ -156,8 +163,7 @@ if __name__ == '__main__':
                         default=None,
                         type=str,
                         action='append')
-    parser.add_argument("--highlight-color", default="blue", type=str, metavar="[STR]", 
-                        help="Color for the highlighted genes (default: %(default)s)")
+    parser.add_argument("--outfile", type=str, help="Name of the output file")
     args = parser.parse_args()
 
     main(args.input_data,
@@ -170,4 +176,4 @@ if __name__ == '__main__':
          int(args.dot_size),
          args.normalize_counts,
          args.filter_genes,
-         args.highlight_color)
+         args.outfile)

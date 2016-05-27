@@ -23,7 +23,7 @@ import tempfile
 
 def paracluFilter(file_input, file_output, max_cluster_size, 
                   min_density_increase, single_cluster_density):
-    """ A simple wrapper to run paraclu-cut previous sorting
+    """ A simple wrapper to run paraclu-cut previous sorting of the file
     """
     # sort before filter
     temp_filtered = tempfile.mktemp(prefix="st_countClusters_filtered")
