@@ -1,4 +1,4 @@
-# ST Analysis 
+# Spatial Transcriptomics Analysis 
 
 Different scripts for visualization and analysis of single cell data (Mainly Spatial Transcriptomics data)
 
@@ -21,7 +21,7 @@ can readjust the gene counts by running this :
   
 ###To compute ST_TTs
 
-ST_TTs gives means to obtain counts using the Transcription Termination Sites
+The ST_TTs are tags counts obtaiend from the Spatial Transcriptomics data. They give means to obtain counts using the Transcription Termination Sites
 instead of the whole gene locus. This gives higher resolution. 
 
 - Take the bed file from the output of the ST Pipeline and decide how to filter it out 
