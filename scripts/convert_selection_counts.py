@@ -31,7 +31,7 @@ def main(file_selection, bed_file_pipeline, outfile):
         sys.exit(1)
 
     if outfile is None:
-        outfile = "adjusted_" + os.path.basename(file_selection)
+        outfile = "adjusted_{}".format(os.path.basename(file_selection))
 
     # loads all the coordinates from the selection
     coordinates = set()
@@ -49,9 +49,9 @@ def main(file_selection, bed_file_pipeline, outfile):
         for line in filehandler.readlines():
             if line.find("#") != -1:
                 continue
-            assert(len(tokens) == 9)
             tokens = line.split()
-            gene = str(tokens[6])
+            assert(len(tokens) == 9)
+            gene = tokens[6]
             x = int(tokens[7])
             y = int(tokens[8])
             barcodes_genes[(x,y,gene)] += 1
@@ -61,8 +61,7 @@ def main(file_selection, bed_file_pipeline, outfile):
         filehandler_write.write("# gene_name\tx\ty\treads_count\n")
         for (x,y,gene),count in barcodes_genes.iteritems():
             if (x,y) in coordinates:
-                filehandler_write.write("%s\t%s\t%s\t%s\n" % 
-                                        (str(gene), str(x), str(y), str(count)))
+                filehandler_write.write("{0}\t{1}\t{2}\t{3}\n".format(gene, x, y, count))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)

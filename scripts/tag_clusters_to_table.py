@@ -1,14 +1,15 @@
 #! /usr/bin/env python
 """ 
-Script that parses the tab delimited file
-generated from compute_st_tts.py with TTs
-and barcodes to a data frame format like this :
+Scripts that computes tag clusters counts (TTs)
+for ST data. It takes the file generated with compute_st_tts.py
+and compute a matrix of counts by doing intersection of the 
+TTs with the original ST BED file generate with the ST Pipeline.
+The output will look like 
 
-    cluster1.....clusterN
-BC1 
-BC2
+    TT1.....TTN
+XxY 
+XxY
 ...
-BCN
 
 It needs the original BED file with ST data to extract the reads count
 If no output file is given the output will be : output_table_ctts.txt
@@ -27,8 +28,8 @@ def main(input_files, outfile):
         sys.stderr.write("Error, input file not present or invalid format\n")
         sys.exit(1)
 
-    st_bed_file = input_files[0]
-    tag_clusters_file = input_files[1]
+    st_bed_file = input_files[1]
+    tag_clusters_file = input_files[0]
     
     if not os.path.isfile(st_bed_file) or not os.path.isfile(tag_clusters_file):
         sys.stderr.write("Error, input file not present or invalid format\n")
@@ -45,13 +46,13 @@ def main(input_files, outfile):
                 continue
             tokens = line.split()
             assert(len(tokens) == 9)
-            chromosome = str(tokens[0])
+            chromosome = tokens[0]
             start_site = int(tokens[1])
             end_site = int(tokens[2])
-            strand = str(tokens[5])
+            strand = tokens[5]
             # gene = tokens[6]
             x = int(tokens[7])
-            y = str(tokens[8])
+            y = int(tokens[8])
             map_original_clusters[(chromosome,strand)].append((x,y,start_site,end_site))
                             
     # loads all the clusters
@@ -63,9 +64,10 @@ def main(input_files, outfile):
             if line.find("#") != -1:
                 continue
             tokens = line.split()
-            chromosome = str(tokens[0])
+            assert(len(tokens) == 8)
+            chromosome = tokens[0]
             start = int(tokens[2])
-            strand = str(tokens[1])
+            strand = tokens[1]
             end = int(tokens[3])
             # doing a full search of intersections over all barcodes (similar to bed intersect)
             # If we could rely on that no barcodes were missing doing the clustering we could use
@@ -75,7 +77,7 @@ def main(input_files, outfile):
                 if strand == "-": start_orig = (end_orig - 1)
                 if (start_orig >= start and start_orig < end):
                     map_clusters[(x,y,chromosome,strand,start,end)] += 1
-                barcodes.add(x,y) 
+                barcodes.add((x,y)) 
             clusters.add((chromosome,strand,start,end))    
     
     # write cluster count for each barcode 
@@ -83,10 +85,10 @@ def main(input_files, outfile):
         clusters_string = "\t".join("%s:%s-%s,%s" % cluster for cluster in clusters)
         filehandler.write(clusters_string + "\n")
         for x,y in barcodes:
-            filehandler.write("%sx%s" % (x,y))
+            filehandler.write("{0}x{1}".format(x,y))
             for chro,strand,star,end in clusters:
                 count = map_clusters[(x,y,chro,strand,star,end)]
-                filehandler.write("\t" + str(count))
+                filehandler.write("\t{}".format(count))
             filehandler.write("\n")            
             
 if __name__ == '__main__':

@@ -29,14 +29,19 @@ from stanalysis.visualization import scatter_plot
 from stanalysis.alignment import parseAlignmentMatrix
 
 def get_classes_coordinate(class_file):
+    """ Helper function
+    to get a dictionary of spot -> class 
+    from a tab delimited file
+    """
     barcodes_classes = dict()
     with open(class_file, "r") as filehandler:
         for line in filehandler.readlines():
             tokens = line.split()
-            x = int(tokens[1])
-            y = int(tokens[2])
-            class_label = str(tokens[0])
-            barcodes_classes["%sx%s" % (x,y)] = class_label
+            assert(len(tokens) == 3)
+            x = tokens[1]
+            y = tokens[2]
+            class_label = tokens[0]
+            barcodes_classes["{0}x{1}".format(x,y)] = class_label
     return barcodes_classes
                
 def main(train_data, 
@@ -55,7 +60,7 @@ def main(train_data,
     if not outdir or not os.path.isdir(outdir):
         outdir = os.getcwd()
         
-    print "Out folder " + outdir
+    print "Output folder {}".format(outdir)
            
     # loads all the barcodes classes for the training set
     barcodes_classes_train = get_classes_coordinate(classes_train)
@@ -80,18 +85,18 @@ def main(train_data,
     test_data_frame = test_data_frame.drop(indexes_remove_test, axis=0)
     
     # Keep only the record in the training set that intersects with the test set
-    print "Training genes " + str(len(train_genes))
-    print "Test genes " + str(len(test_genes))
+    print "Training genes {}".format(len(train_genes))
+    print "Test genes {}".format(len(test_genes))
     intersect_genes = np.intersect1d(train_genes, test_genes)
-    print "Intersected genes " + str(len(intersect_genes))
+    print "Intersected genes {}".format(len(intersect_genes))
     train_data_frame = train_data_frame.ix[:,intersect_genes]
     test_data_frame = test_data_frame.ix[:,intersect_genes]
     
     train_labels = [barcodes_classes_train[x] for x in list(train_data_frame.index)]
     test_labels = [barcodes_classes_test[x] for x in list(test_data_frame.index)]
     # Classes in test and train must be the same
-    print "Training elements " + str(len(train_labels))
-    print "Test elements " + str(len(test_labels))
+    print "Training elements {}".format(len(train_labels))
+    print "Test elements {}".format(len(test_labels))
     class_labels = sorted(set(train_labels))
     print "Class labels"
     print class_labels
@@ -111,9 +116,9 @@ def main(train_data,
     predicted = classifier.fit(train_counts, train_labels).predict(test_counts) 
     
     # Compute accuracy
-    print("Classification report for classifier %s:\n%s\n"
-      % (classifier, metrics.classification_report(test_labels, predicted)))
-    print("Confusion matrix:\n%s" % metrics.confusion_matrix(test_labels, predicted)) 
+    print("Classification report for classifier {0}:\n{1}\n".
+          format(classifier, metrics.classification_report(test_labels, predicted)))
+    print("Confusion matrix:\n{}".format(metrics.confusion_matrix(test_labels, predicted)))
     
     # Write the spots and their classes to a file
     x_points = list()
@@ -127,7 +132,7 @@ def main(train_data,
             y = bc[1]
             x_points.append(int(x))
             y_points.append(int(y))
-            filehandler.write("%s\t%s\t%s\n" % (label, x, y))
+            filehandler.write("{0}\t{1}\t{2}\n".format(label, x, y))
             
     # Plot the spots with the predicted color on top of the tissue image
     if image is not None and os.path.isfile(image):

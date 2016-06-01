@@ -30,7 +30,7 @@ def main(bed_file, barcode_ids, outfile):
         sys.exit(1)
      
     if not outfile:
-        outfile = "adjusted_" + os.path.basename(bed_file)
+        outfile = "adjusted_{}".format(os.path.basename(bed_file))
            
     # loads all the barcodes
     barcodes = dict()
@@ -46,9 +46,9 @@ def main(bed_file, barcode_ids, outfile):
                 tokens = line.split()
                 bc = tokens[7]
                 x,y = barcodes[bc]
-                filehandler_write.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % 
+                filehandler_write.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\n".format
                                         (tokens[0], tokens[1], tokens[2], tokens[3], 
-                                         tokens[4], tokens[5], tokens[6], str(x), str(y)))
+                                         tokens[4], tokens[5], tokens[6], x, y))
                
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)

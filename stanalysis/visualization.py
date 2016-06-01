@@ -14,12 +14,12 @@ def scatter_plot(x_points, y_points, colors,
                  output, alignment=None, cmap=None, title='Scatter', xlabel='X', 
                  ylabel='Y',image=None, alpha=1.0, size=50):
     """ 
-    This function makes a scatter plot of a set of points (x,y). T
-    he alignment matrix is optional to transform the coordinates
+    This function makes a scatter plot of a set of points (x,y).
+    The alignment matrix is optional to transform the coordinates
     of the points to pixel space.
-    If image is given the image will be set as background.
-    The plot will always used a predefine set of colors
-    The plot will be written to a file
+    If an image is given the image will be set as background.
+    The plot will always use a predefine set of colors.
+    The plot will be written to a file.
     :param x_points: a list of x coordinates
     :param y_points: a list of y coordinates
     :param colors: a color label for each point

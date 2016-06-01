@@ -27,7 +27,7 @@ def main(bed_file, barcodes_files, outfile):
         sys.exit(1)
      
     if not outfile:
-        outfile = "filtered_" + os.path.basename(bed_file)
+        outfile = "filtered_{}".format(os.path.basename(bed_file))
            
     # loads all the coordinates from the ST Viewer selection
     barcodes = set()
@@ -47,8 +47,8 @@ def main(bed_file, barcodes_files, outfile):
             for line in filehandler_read.readlines():
                 if line.find("#") != -1:
                     continue
-                assert(len(tokens) == 9)
                 tokens = line.split()
+                assert(len(tokens) == 9)
                 x = int(tokens[7])
                 y = int(tokens[8])
                 if (x,y) in barcodes:

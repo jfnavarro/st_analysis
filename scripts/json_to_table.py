@@ -23,6 +23,12 @@ The JSON format must be like this :
   },
   ....
   
+The output data frame will be lile 
+    gene  gene ...
+XxY  count  count
+XxY  count  count
+... 
+
 @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
 
@@ -50,7 +56,7 @@ def main(json_file, outfile):
             x = line["x"]
             y = line["y"]
             count = line["hits"]
-            spot = "%sx%s" % (x, y)
+            spot = "{0}x{1}".format(x, y)
             genes_spot_counts[spot][gene] = count
     
     # Obtain a list of the row names (indexes) 
@@ -63,8 +69,7 @@ def main(json_file, outfile):
         
     # Create a data frame (genes as columns, spots as rows)
     counts_table = pd.DataFrame(list_row_values, index=list_indexes)
-    print counts_table.index
-    # Write table to a ile
+    # Write table to a file
     counts_table.to_csv(outfile, sep="\t", na_rep=0)
                
 if __name__ == '__main__':

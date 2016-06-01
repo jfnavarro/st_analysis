@@ -57,7 +57,7 @@ def main(counts_table,
     # How many spots do we keep based on the number of genes expressed?
     min_genes_spot_exp = (counts != 0).sum(axis=1).quantile(MIN_GENES_SPOT_EXP)
     print "Number of expressed genes a spot must have to be kept " \
-    "(1% of total expressed genes) " + str(min_genes_spot_exp)
+    "(1% of total expressed genes) {}".format(min_genes_spot_exp)
     
     # Remove noisy spots  
     counts = counts[(counts != 0).sum(axis=1) >= min_genes_spot_exp]
@@ -89,7 +89,7 @@ def main(counts_table,
     # TODO this could be done based on expression level (keep the highest for instance)
     min_genes_spot_var = norm_counts.var(axis=1).quantile(MIN_GENES_SPOT_VAR)
     print "Min variance a gene must have over all spot " \
-    "to be kept (1% of total variance) " + str(min_genes_spot_var)
+    "to be kept (1% of total variance) {}".format(min_genes_spot_var)
     norm_counts = norm_counts[norm_counts.var(axis=1) >= min_genes_spot_var]
     
     # Spots as rows and genes as columns
@@ -169,7 +169,7 @@ def main(counts_table,
             y = int(tokens[1])
             x_points.append(x)
             y_points.append(y)
-            filehandler.write("%s\t%s\t%s\n" % (str(labels[i]), str(x), str(y)))
+            filehandler.write("{0}\t{1}\t{2}\n".format(labels[i], x, y))
     
     if image is not None and os.path.isfile(image):
         scatter_plot(x_points=x_points, 
@@ -199,7 +199,7 @@ if __name__ == '__main__':
                         type=str, choices=["Hierarchical", "KMeans"],
                         help="What clustering algorithm to use after the dimensionality reduction " \
                         "(Hierarchical - KMeans) (default: %(default)s)")
-    parser.add_argument("--dimensionality-algorithm", default="tSNE", metavar="[STR]", 
+    parser.add_argument("--dimensionality-algorithm", default="ICA", metavar="[STR]", 
                         type=str, choices=["tSNE", "PCA", "ICA", "SPCA"],
                         help="What dimensionality reduction algorithm to use " \
                         "(tSNE - PCA - ICA - SPCA) (default: %(default)s)")

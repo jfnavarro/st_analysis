@@ -40,19 +40,25 @@ def paracluFilter(file_input, file_output, max_cluster_size,
             (stdout, errmsg) = proc.communicate()
         except Exception:
             raise
-                
-    # call paraclu-cut to filter + clusters
+    
+    if not os.path.isfile(temp_filtered):
+        raise RuntimeError("Error sorting..\n{0}\n{1}\n".format(stdout, errmsg))
+                    
+    # call paraclu-cut to filter out the clusters
     with open(file_output, "w") as filehandler:
         args = ['paraclu-cut.sh']
         args += ["-l", max_cluster_size]
         args += ["-d", min_density_increase]
-        args += [file_input]
+        args += [temp_filtered]
         try:
             proc = subprocess.Popen([str(i) for i in args], 
                                     stdout=filehandler, stderr=subprocess.PIPE)
             (stdout, errmsg) = proc.communicate()
         except Exception:
             raise
+    
+    if not os.path.isfile(file_output):
+        raise RuntimeError("Error running paraclu-cut..\n{0}\n{1}\n".format(stdout, errmsg))
                          
 def main(bed_file, min_data_value, disable_filter, 
          max_cluster_size, min_density_increase, output):
@@ -61,7 +67,8 @@ def main(bed_file, min_data_value, disable_filter,
         sys.stderr.write("Error, input file not present or invalid format\n")
         sys.exit(1)
      
-    if output is None: output = "filtered_tag_clusters.bed"
+    if output is None: 
+        output = "filtered_tag_clusters.bed"
          
     # First we parse the BED file to group by chromsome,strand and star_site
     # Input file has the following format (this is the first line)
@@ -74,11 +81,11 @@ def main(bed_file, min_data_value, disable_filter,
                 continue
             tokens = line.split()
             assert(len(tokens) == 9)
-            chromosome = str(tokens[0])
+            chromosome = tokens[0]
             star_site = int(tokens[1])
             end_site = int(tokens[2])
-            strand = str(tokens[5])
-            gene = str(tokens[6])
+            strand = tokens[5]
+            gene = tokens[6]
             # Do not include MALAT1
             if gene.upper() != "ENSMUSG00000092341" and gene.upper() != "MALAT1":
                 # Swap star and end site if the gene is annotated in the negative strand
@@ -93,9 +100,13 @@ def main(bed_file, min_data_value, disable_filter,
             chromosome = key[0]
             strand = key[1]
             star_site = key[2]
-            filehandler.write("%s\t%s\t%s\t%s\n" % (chromosome,str(strand),str(star_site),str(value)))
-    
-    # sort the files
+            filehandler.write("{0}\t{1}\t{2}\t{3}\n".format(chromosome, strand, star_site, value))
+
+    if not os.path.isfile(temp_grouped_reads):
+        sys.stderr.write("Error, no entries found in input file {}".format(bed_file))
+        sys.exit(1)
+        
+    # Sort the grouped entries
     print "Sorting the grouped entries..."
     temp_grouped_reads_sorted = tempfile.mktemp(prefix="st_countClusters_grouped_sorted_reads")
     with open(temp_grouped_reads_sorted, "w") as filehandler:
@@ -109,11 +120,15 @@ def main(bed_file, min_data_value, disable_filter,
                                     stdout=filehandler, stderr=subprocess.PIPE)
             (stdout, errmsg) = proc.communicate()
         except Exception as e:
-            sys.stderr.write("Error, sorting\n")
+            sys.stderr.write("Error sorting\n")
             sys.stderr.write(str(e))
             sys.exit(1)    
     
-    # call paraclu to get clusters
+    if not os.path.isfile(temp_grouped_reads_sorted):
+        sys.stderr.write("Error sorting \n{}\n{}\n".format(stdout, errmsg))
+        sys.exit(1)
+        
+    # call paraclu to compute peak clusters
     print "Making the peaks calling with paraclu..."   
     temp_paraclu = tempfile.mktemp(prefix="st_countClusters_paraclu")
     with open(temp_paraclu, "w") as filehandler:
@@ -125,12 +140,16 @@ def main(bed_file, min_data_value, disable_filter,
                                     stdout=filehandler, stderr=subprocess.PIPE)
             (stdout, errmsg) = proc.communicate()
         except Exception as e:
-            sys.stderr.write("Error, executing paraclu\n")
+            sys.stderr.write("Error executing paraclu\n")
             sys.stderr.write(str(e))
             sys.exit(1)
-            
+      
+    if not os.path.isfile(temp_paraclu):
+        sys.stderr.write("Error executing paraclu \n{}\n{}\n".format(stdout, errmsg))
+        sys.exit(1)
+              
     if not disable_filter:
-        print "Filtering found clusters with paraclu-cut..."
+        print "Filtering computed clusters with paraclu-cut..."
         try:
             paracluFilter(temp_paraclu, output, 
                           max_cluster_size, min_density_increase, False)
@@ -146,7 +165,7 @@ def main(bed_file, min_data_value, disable_filter,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("bed_file", help="BED ST-data file")
-    parser.add_argument("--min-data-value", default=30, metavar="[INT]", type=int, choices=range(1, 999),
+    parser.add_argument("--min-data-value", default=20, metavar="[INT]", type=int, choices=range(1, 999),
                         help="Omits grouped entries whose total count is lower than this (default: %(default)s)")
     parser.add_argument("--disable-filter", action="store_true", 
                         default=False, help="Disable second filter(paraclu-cut)")

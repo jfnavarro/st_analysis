@@ -2,9 +2,17 @@
 """ 
 Script that takes a matrix of counts
 where the columns are genes and the rows
-are BARCODE ids and convert
-the ids to XxY coordinates. For that it also needs
-a file with the barcode ids and the coordinates as
+are BARCODE ids like
+        gene    gene    
+BARCODE
+BARCODE
+
+and convert the ids to XxY coordinates like 
+    gene    gene
+XxY
+XxY
+
+For that it needs a file with the barcode ids and the coordinates as
 
 BARCODE X Y
 
@@ -23,7 +31,7 @@ def main(counts_matrix, barcode_ids, outfile):
         sys.exit(1)
      
     if not outfile:
-        outfile = "filtered_" + os.path.basename(counts_matrix)
+        outfile = "filtered_{}".format(os.path.basename(counts_matrix))
            
     # loads all the barcodes
     barcodes = dict()
@@ -41,7 +49,7 @@ def main(counts_matrix, barcode_ids, outfile):
     # Replace barcode for coordinates
     for bc in column_values:
         (x,y) = barcodes[bc]
-        new_column_values.append(x + "x" + y)
+        new_column_values.append("{0}x{1}".format(x,y))
     # Write table again
     transpose_counts_table.columns = new_column_values
     transpose_counts_table.transpose().to_csv(outfile, sep='\t')
