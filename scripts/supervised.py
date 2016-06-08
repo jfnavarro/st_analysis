@@ -14,6 +14,11 @@ are given the script will compute accuracy of the prediction.
 The script will output the predicted classes and the spots
 plotted on top of an image if the image is given.
 
+The training set can be composed of many datasets
+if they are merged into one where the spots have
+appended the index of the dataset. 
+The test set must be composed of one dataset.
+
 @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
 import argparse
@@ -37,11 +42,10 @@ def get_classes_coordinate(class_file):
     with open(class_file, "r") as filehandler:
         for line in filehandler.readlines():
             tokens = line.split()
-            assert(len(tokens) == 3)
-            x = tokens[1]
-            y = tokens[2]
+            assert(len(tokens) == 2)
+            spot = tokens[1]
             class_label = tokens[0]
-            barcodes_classes["{0}x{1}".format(x,y)] = class_label
+            barcodes_classes[spot] = class_label
     return barcodes_classes
                
 def main(train_data, 
@@ -72,17 +76,11 @@ def main(train_data,
     # spots are rows and genes are columns
     train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0)
     train_genes = list(train_data_frame.columns.values)
-    # keep only the spots that are in both the train/test data and the labels/classes
-    indexes_remove_train = [x for x in list(train_data_frame.index) if x not in barcodes_classes_train]
-    train_data_frame = train_data_frame.drop(indexes_remove_train, axis=0)
     
     # loads the test set
     # spots are rows and genes are columns
     test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0)    
     test_genes = list(test_data_frame.columns.values)
-    # keep only the spots that are in both the train/test data and the labels/classes
-    indexes_remove_test = [x for x in list(test_data_frame.index) if x not in barcodes_classes_test]
-    test_data_frame = test_data_frame.drop(indexes_remove_test, axis=0)
     
     # Keep only the record in the training set that intersects with the test set
     print "Training genes {}".format(len(train_genes))
@@ -120,16 +118,16 @@ def main(train_data,
           format(classifier, metrics.classification_report(test_labels, predicted)))
     print("Confusion matrix:\n{}".format(metrics.confusion_matrix(test_labels, predicted)))
     
-    # Write the spots and their classes to a file
+    # Write the spots and their predicted classes to a file
     x_points = list()
     y_points = list()
     with open(os.path.join(outdir, "predicted_classes.txt"), "w") as filehandler:
         labels = list(test_data_frame.index)
         for i,label in enumerate(predicted):
-            bc = labels[i].split("x")
-            assert(len(bc) == 2)
-            x = bc[0]
-            y = bc[1]
+            tokens = labels[i].split("x")
+            assert(len(tokens) == 2)
+            y = int(tokens[1])
+            x = int(tokens[0].split("_")[1])
             x_points.append(int(x))
             y_points.append(int(y))
             filehandler.write("{0}\t{1}\t{2}\n".format(label, x, y))
@@ -142,7 +140,7 @@ def main(train_data,
         scatter_plot(x_points=x_points, 
                      y_points=y_points, 
                      colors=colors, 
-                     output=os.path.join(outdir,"computed_classes_tissue.png"), 
+                     output=os.path.join(outdir,"predicted_classes_tissue.png"), 
                      alignment=alignment_matrix, 
                      cmap=None, 
                      title='Computed classes tissue', 

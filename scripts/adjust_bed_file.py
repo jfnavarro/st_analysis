@@ -2,17 +2,17 @@
 """ 
 Script that takes a BED file from older
 versions of the ST pipeline and replaces
-the BARCODE field for the x,y coordinates
+the BARCODE field for the x,y coordinates of the array.
 
 Old BED file :
 
 CHROMOSOME START END READ SCORE STRAND GENE BARCODE
 
-New BED file must have the following format
+New BED file must have the following format :
 
 CHROMOSOME START END READ SCORE STRAND GENE X Y
 
-It requires a file with the BARCODE ids and the coordinates as 
+It requires a file with the BARCODE ids and the array coordiantes :
 
 BARCODE X Y
 
@@ -37,6 +37,7 @@ def main(bed_file, barcode_ids, outfile):
     with open(barcode_ids, "r") as filehandler:
         for line in filehandler.readlines():
             tokens = line.split()
+            assert(len(tokens) == 3)
             barcodes[tokens[0]] = (tokens[1],tokens[2])
     
     # Read the bed file and write out the adjusted one

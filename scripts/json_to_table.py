@@ -1,5 +1,4 @@
 #! /usr/bin/env python
-#@Author Jose Fernandez
 """ 
 Script that takes a ST-data file in JSON
 format from the ST Pipeline and converts it
@@ -23,7 +22,7 @@ The JSON format must be like this :
   },
   ....
   
-The output data frame will be lile 
+The output data frame will be like 
     gene  gene ...
 XxY  count  count
 XxY  count  count

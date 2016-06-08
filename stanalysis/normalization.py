@@ -25,7 +25,7 @@ def computeSizeFactors(counts, function=np.median):
     # Geometric means of rows
     loggeomans = np.log(counts).mean(axis=1)
     if np.all(np.isinf(loggeomans)):
-        raise RuntimeError("every gene contains at least one zero, "
+        raise RuntimeError("every gene contains at least one zero, "  \
         "cannot compute log geometric means")
     # Apply to columns
     return counts.apply(lambda x: np.exp(function((np.log(x) - loggeomans)[np.isfinite(loggeomans)])), axis=0)

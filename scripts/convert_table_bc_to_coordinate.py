@@ -41,18 +41,16 @@ def main(counts_matrix, barcode_ids, outfile):
             assert(len(tokens) == 3)
             barcodes[tokens[0]] = (tokens[1],tokens[2])
     
-    # Read the data frame
+    # Read the data frame (barcodes as rows
     counts_table = pd.read_table(counts_matrix, sep="\t", header=0)
-    transpose_counts_table = counts_table.transpose()
-    column_values = list(transpose_counts_table.columns.values)
-    new_column_values = list()
+    new_index_values = list()
     # Replace barcode for coordinates
-    for bc in column_values:
+    for bc in counts_table.index:
         (x,y) = barcodes[bc]
-        new_column_values.append("{0}x{1}".format(x,y))
+        new_index_values.append("{0}x{1}".format(x,y))
     # Write table again
-    transpose_counts_table.columns = new_column_values
-    transpose_counts_table.transpose().to_csv(outfile, sep='\t')
+    counts_table.index = new_index_values
+    counts_table.to_csv(outfile, sep='\t')
                
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
