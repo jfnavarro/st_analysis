@@ -4,9 +4,9 @@ A script that does un-supervised
 classification on single cell data (Mainly used for Spatial Transcriptomics)
 It takes a list of data frames as input and outputs :
 
- - the normalized counts as a data frame for all the datasets 
+ - the normalized counts as a data frame (one for each dataset)
  - a scatter plot with the predicted classes for each spot 
- - a file with the predicted classes for each spot and the spot coordinates
+ - a file with the predicted classes for each spot and the spot coordinates (one for each dataset)
 
 The spots in the output file will have the index of the dataset
 appended. For instance if two datasets are given the indexes will
@@ -110,8 +110,14 @@ def main(counts_table_files,
     
     # Spots as rows and genes as columns
     norm_counts = norm_counts.transpose()
-    # Write normalized and filtered counts to a file
-    norm_counts.to_csv(os.path.join(outdir, "normalized_counts.tsv"), sep="\t")
+    
+    # Write normalized counts to different files
+    tot_spots = norm_counts.index
+    for i in xrange(len(counts_table_files)):
+        spots_to_keep = [spot for spot in tot_spots if spot.startswith("{}_".format(i))]
+        slice_counts = norm_counts.loc[spots_to_keep]
+        slice_counts.index = [spot.split("_")[1] for spot in spots_to_keep]
+        slice_counts.to_csv(os.path.join(outdir, "normalized_counts_{}.tsv".format(i)), sep="\t")
               
     if "tSNE" in dimensionality_algorithm:
         # method = barnes_hut or exact(slower)
@@ -173,20 +179,25 @@ def main(counts_table_files,
     x_points_index = [[] for ele in xrange(len(counts_table_files))]
     y_points_index = [[] for ele in xrange(len(counts_table_files))]
     labels_index = [[] for ele in xrange(len(counts_table_files))]
+    file_writers = [open("computed_classes_{}.txt".format(i),"w") for i in xrange(len(counts_table_files))]
     # Write the coordinates and the label/class the belong to
-    with open(os.path.join(outdir, "computed_classes.txt"), "w") as filehandler:
-        for i,bc in enumerate(norm_counts.index):
-            # bc is XxY_i
-            tokens = bc.split("x")
-            assert(len(tokens) == 2)
-            y = int(tokens[1])
-            x = int(tokens[0].split("_")[1])
-            index = int(tokens[0].split("_")[0])
-            x_points_index[index].append(x)
-            y_points_index[index].append(y)
-            labels_index[index].append(labels[i])
-            filehandler.write("{0}\t{1}\n".format(labels[i], bc))
-    
+    for i,bc in enumerate(norm_counts.index):
+        # bc is i_XxY
+        tokens = bc.split("x")
+        assert(len(tokens) == 2)
+        y = int(tokens[1])
+        x = int(tokens[0].split("_")[1])
+        index = int(tokens[0].split("_")[0])
+        x_points_index[index].append(x)
+        y_points_index[index].append(y)
+        labels_index[index].append(labels[i])
+        file_writers[index].write("{0}\t{1}\n".format(labels[i], "{}x{}".format(x,y)))
+        
+    # Close the files
+    for file_descriptor in file_writers:
+        file_descriptor.close()
+        
+    # Create one image for each dataset
     for i,image in enumerate(image_files) if image_files else []:
         if image is not None and os.path.isfile(image):
             alignment_file = alignment_files[i] if len(alignment_files) >= i else None

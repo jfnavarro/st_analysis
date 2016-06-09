@@ -2,10 +2,10 @@
 """ 
 This script performs a supervised prediction
 using a training set and a test set. 
-The training set will be a data frame
+The training set will be one or more data frames
 with normalized counts from single cell data
-and the test set will also be a data frame with counts.
-A file with class labels for the training set is needed
+and the test set will be a data frame with normalized counts.
+One file or files with class labels for the training set is needed
 so the classifier knows what class each spot(row) in
 the training set belongs to. It will then try
 to predict the classes of the spots(rows) in the 
@@ -13,11 +13,6 @@ test set. If class labels for the test sets
 are given the script will compute accuracy of the prediction.
 The script will output the predicted classes and the spots
 plotted on top of an image if the image is given.
-
-The training set can be composed of many datasets
-if they are merged into one where the spots have
-appended the index of the dataset. 
-The test set must be composed of one dataset.
 
 @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
@@ -56,8 +51,10 @@ def main(train_data,
          alignment, 
          image):
 
-    if not os.path.isfile(train_data) or not os.path.isfile(test_data) \
-    or not os.path.isfile(classes_train) or not os.path.isfile(classes_test):
+    if len(train_data) == 0 or any([not os.path.isfile(f) for f in train_data]) \
+    or len(train_data) != len(classes_train) \
+    or len(classes_train) == 0 or any([not os.path.isfile(f) for f in classes_train]) \
+    or not os.path.isfile(classes_test):
         sys.stderr.write("Error, input file/s not present or invalid format\n")
         sys.exit(1)
      
@@ -66,15 +63,27 @@ def main(train_data,
         
     print "Output folder {}".format(outdir)
            
-    # loads all the barcodes classes for the training set
-    barcodes_classes_train = get_classes_coordinate(classes_train)
-
-    # loads all the barcodes classes for the test set
-    barcodes_classes_test = get_classes_coordinate(classes_test)
+    # loads all the classes for the training set
+    train_labels = list()
+    for labels_file in classes_train:
+        with open(labels_file) as filehandler:
+            for line in filehandler.readlines():
+                train_labels.append(line.split()[0])
+                
+    # loads all the classes for the test set
+    test_labels = list()
+    with open(classes_test) as filehandler:
+        for line in filehandler.readlines():
+            test_labels.append(line.split()[0])
       
     # loads the training set
     # spots are rows and genes are columns
-    train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0)
+    train_data_frame = pd.DataFrame()
+    for i,counts_file in enumerate(train_data):
+        new_counts = pd.read_table(counts_file, sep="\t", header=0, index_col=0)
+        new_counts.index = ["{0}_{1}".format(i, spot) for spot in new_counts.index]
+        train_data_frame = train_data_frame.append(new_counts)
+    train_data_frame.fillna(0.0, inplace=True)
     train_genes = list(train_data_frame.columns.values)
     
     # loads the test set
@@ -90,8 +99,6 @@ def main(train_data,
     train_data_frame = train_data_frame.ix[:,intersect_genes]
     test_data_frame = test_data_frame.ix[:,intersect_genes]
     
-    train_labels = [barcodes_classes_train[x] for x in list(train_data_frame.index)]
-    test_labels = [barcodes_classes_test[x] for x in list(test_data_frame.index)]
     # Classes in test and train must be the same
     print "Training elements {}".format(len(train_labels))
     print "Test elements {}".format(len(test_labels))
@@ -100,7 +107,6 @@ def main(train_data,
     print class_labels
     
     # Keep only 1000 highest scored genes (TODO)
-    
     # Scale spots (columns) against the mean and variance (TODO)
     
     # Get the counts
@@ -127,7 +133,7 @@ def main(train_data,
             tokens = labels[i].split("x")
             assert(len(tokens) == 2)
             y = int(tokens[1])
-            x = int(tokens[0].split("_")[1])
+            x = int(tokens[0])
             x_points.append(int(x))
             y_points.append(int(y))
             filehandler.write("{0}\t{1}\t{2}\n".format(label, x, y))
@@ -152,14 +158,14 @@ def main(train_data,
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--train-data", required=True,
-                        help="The data frame with the normalized counts for training")
+    parser.add_argument("--train-data", required=True, nargs='+', type=str,
+                        help="One or more data frames with normalized counts")
     parser.add_argument("--test-data", required=True,
-                        help="The data frame with the normalized counts for testing")
-    parser.add_argument("--train-classes", required=True,
-                        help="A tab delimited file mapping barcodes to their classes for training")
+                        help="One data frame with normalized counts")
+    parser.add_argument("--train-classes", required=True, nargs='+', type=str,
+                        help="One of more files with the class of each spot in the train data")
     parser.add_argument("--test-classes", default=None,
-                        help="A tab delimited file mapping barcodes to their classes for testing")
+                        help="One file with the class of each spot in the train datag")
     parser.add_argument("--alignment", default=None,
                         help="A file containing the alignment image (array coordinates to pixel coordinates) as a 3x3 matrix")
     parser.add_argument("--image", default=None, 
