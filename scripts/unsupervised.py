@@ -214,7 +214,7 @@ def main(counts_table_files,
                          ylabel='Y',
                          image=image, 
                          alpha=1.0, 
-                         size=60)
+                         size=50)
              
                                 
 if __name__ == '__main__':

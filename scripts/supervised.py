@@ -154,7 +154,7 @@ def main(train_data,
                      ylabel='Y',
                      image=image, 
                      alpha=1.0, 
-                     size=60)
+                     size=50)
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
