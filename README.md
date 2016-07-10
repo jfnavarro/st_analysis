@@ -2,6 +2,12 @@
 
 Different scripts for visualization and analysis of single cell data (Mainly Spatial Transcriptomics data)
 
+To install this packate just clone or download the repository and type:
+
+    python setup.py install
+    
+A bunch of scripts will then be available in your system. 
+
 ###To convert JSON output from the ST Pipeline (older versions) to a data frame
 
     json_to_table.py --json-file file.json --output file_table.tsv
