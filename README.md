@@ -19,9 +19,28 @@ can readjust the gene counts by running this :
 
     convert_selection_counts.py --bed-file stdata.bed --viewer-selection selection.txt --outfile new_selection.txt
   
+###To convert the ST data in matrix format to JSON format
+If you have ST data in matrix (data frame) and you want to convert it to JSON (compatibility
+with older versions of the ST Viewer for example). Then you can use the following script 
+
+    table_to_json.py --data-file stdata.tsv --outfile stdata.json
+    
+###To adjust the spot coordinates to pixel coordinates in a JSON file.
+If have obtained pixel coordiantes for a dataset and you want to update
+the JSON file with the new coordinates you can use the following script :
+
+    adjust_json_coordinates.py --json-file stdata.json --coordinates-file new_coordinates.txt --outfile stdata_aligned.json
+    
+###To convert selections extracted from the ST Viewer to matrix format (data frame)
+Older versions of the ST Viewer export the selections in tab delimited format. 
+To convert this file to a matrix (data frame) you can use the following :
+
+    tab_to_table.py --tab-file selection.txt --outfile selection.tsv
+    
+    
 ###To compute ST_TTs
 
-The ST_TTs are tags counts obtaiend from the Spatial Transcriptomics data. They give means to obtain counts using the Transcription Termination Sites
+The ST_TTs are tags counts obtained from the Spatial Transcriptomics data. They give means to obtain counts using the Transcription Termination Sites
 instead of the whole gene locus. This gives higher resolution. 
 
 - Take the bed file from the output of the ST Pipeline and decide how to filter it out 
@@ -77,7 +96,7 @@ To see how spots cluster together based on their expression profiles you can run
 
     unsupervised.py --counts-table matrix_counts.tsv --normalization DESeq --num-clusters 5 --clustering-algorithm KMeans --dimensionality-algorithm tSNE --alignment alignment_file.txt --image tissue_image.JPG
     
-  The script will generate two plots (scatter plot with the dots colored by their class and the colored spots plotted on top of the tissue image if the tissue image and alignment were given), it will also write the computed classes to file and the normalized counts to a file. 
+  The script will generate two plots (scatter plot with the dots colored by their class and the colored spots plotted on top of the tissue image if the tissue image and alignment were given), it will also write the computed classes to file and the normalized counts to a file. The script has been updated to be able to take as input more than one dataset/alignment/image.
   
   To describe the parameters you can type --help 
   
@@ -124,7 +143,8 @@ of the same tissue. For that you can use the following script :
 
     supervised.py --train-data data_matrix.tsv --test-data data_matrix.tsv --train-casses train_classes.txt --test-classes test_classes.txt --alignment alignment_file.txt --image tissue_image.jpg
     
-  This will generate some statistics, a file with the predicted classes for each spot and a plot of the predicted spots on     top of the tissue image (if the image and the alignment matrix are given). 
+  This will generate some statistics, a file with the predicted classes for each spot and a plot of the predicted spots on     top of the tissue image (if the image and the alignment matrix are given). The script has been updated to be able to take as input more than one dataset/alignment/image for the training data.
+  
   To know more about the parameters you can type --help
   
         supervised.py --help
