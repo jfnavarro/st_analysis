@@ -1,5 +1,6 @@
 #! /usr/bin/env python
-""" Script that creates a quality scatter plot from a ST-data file in data frame format.
+""" Script that creates a quality scatter plot from a ST-data file in data frame format
+(genes as columns and coordinates as rows)
 The output will be a .png file with the same name as the input file if no name if given.
 
 It allows to highlight spots with colors using a file with the following format : 
