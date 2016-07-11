@@ -42,60 +42,6 @@ Older versions of the ST Viewer export the selections in tab delimited format.
 To convert this file to a matrix (data frame) you can use the following :
 
     tab_to_table.py --tab-file selection.txt --outfile selection.tsv
-    
-    
-###To compute ST_TTs
-
-The ST_TTs are tags counts obtained from the Spatial Transcriptomics data. They give means to obtain counts using the Transcription Termination Sites
-instead of the whole gene locus. This gives higher resolution. 
-
-- Take the bed file from the output of the ST Pipeline and decide how to filter it out 
-(remove or not spots outside tissue or use spots from a certain area of the tissue). For
-this you can do :
- 
-        filter_st_data.py --barcodes-files selection.txt stdata.bed
-
-  Where selection.txt is a selection exported from the ST Viewer (can pass more than one)
-  Where stdata.bed is the output from the ST Pipeline in BED format.
-  
-- Compute ST TTs with several values of the min_distance and min_value parameters to generate ST_TTs.
-
-        compute_st_tts.py --min-data-value 30 --max-cluster-size 200 stdata.bed
-  
-    The script will generate a bed file with the computed ST TTs. To know more about the parameters type --help
-    
-        compute_st_tts.py --help
-        
-        Script that takes as input a BED file generated from the ST Pipeline and
-        computes peaks clusters based on the transcription termination site and the
-        strand. It uses paraclu to compute the clusters and paraclu-cut to filter out
-        (optional) The computed ST-TTs are written to a file in BED format. The ST BED
-        file must has the following format: CHROMOSOME START END READ SCORE STRAND
-        GENE X Y @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
-
-        positional arguments:
-            bed_file              BED ST-data file
-
-        optional arguments:
-            -h, --help            show this help message and exit
-            --min-data-value [INT]
-                                  Omits grouped entries whose total count is lower than
-                                  this (default: 30)
-            --disable-filter      Disable second filter(paraclu-cut)
-            --max-cluster-size [INT]
-                                  Discard clusters whose size in positions is bigger
-                                  than this (default: 200)
-            --min-density-increase [INT]
-                                  Discard clusters whose density is lower than this
-            --output OUTPUT       The name and path of the output file (default: None)    
-  
-- Then look in Zenbu or any other genome brower and choose the parameters that fit the best to the data
-  (use clusters_to_igv.py with the output of compute_st_tts.py to convert the output to genome browsers format)
-- Intersect the computed ST TTs with the original counts from the ST Pipeline to build a matrix of counts
-
-        tag_clusters_to_table.py tag_clusters.bed stdata.bed --outfile tag_counts_matrix.tsv
-
-- You can use now the data frame to do clustersing or anything else
 
 ###To do un-supervised learning
 To see how spots cluster together based on their expression profiles you can run : 
