@@ -1,6 +1,6 @@
 # Spatial Transcriptomics Analysis 
 
-Different scripts for visualization and analysis of single cell data (Mainly Spatial Transcriptomics data)
+Different tools for visualization, conversion and analysis of Spatial Transcriptomics data
 
 To install this packate just clone or download the repository and type:
 
