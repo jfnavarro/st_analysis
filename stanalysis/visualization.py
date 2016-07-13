@@ -34,7 +34,11 @@ def scatter_plot(x_points, y_points, colors,
     fig = plt.figure(figsize=(16,16))
     a = fig.add_subplot(111, aspect='equal')
     base_trans = a.transData
-    tr = transforms.Affine2D(matrix = alignment) + base_trans if alignment is not None else base_trans
+    extent_size = (1,33,35,1)
+    # If alignment is None we re-size the image to chip size (1,1,33,35)
+    if alignment is not None:
+        base_trans = transforms.Affine2D(matrix = alignment) + base_trans
+        extent_size = None
     if cmap is None:
         color_list = set(colors)
         color_values = color_map[min(color_list)-1:max(color_list)]
@@ -45,11 +49,11 @@ def scatter_plot(x_points, y_points, colors,
               cmap=cmap, 
               edgecolor="none", 
               s=size, 
-              transform=tr,
+              transform=base_trans,
               alpha=alpha)
     if image is not None and os.path.isfile(image):
         img = plt.imread(image)
-        a.imshow(img)
+        a.imshow(img, extent=(1,33,35,1))
     a.set_xlabel(xlabel)
     a.set_ylabel(ylabel)
     a.legend([plt.Line2D((0,1),(0,0), color=x) for x in color_values], 

@@ -34,7 +34,6 @@ The JSON file must be like :
 import argparse
 import sys
 import os
-from collections import defaultdict
 import json
 
 def main(json_file, coordinates_file, outfile):

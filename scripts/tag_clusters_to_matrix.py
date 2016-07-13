@@ -51,8 +51,8 @@ def main(input_files, outfile):
             end_site = int(tokens[2])
             strand = tokens[5]
             # gene = tokens[6]
-            x = int(tokens[7])
-            y = int(tokens[8])
+            x = float(tokens[7])
+            y = float(tokens[8])
             map_original_clusters[(chromosome,strand)].append((x,y,start_site,end_site))
                             
     # loads all the clusters

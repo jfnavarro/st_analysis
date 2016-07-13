@@ -185,8 +185,8 @@ def main(counts_table_files,
         # bc is i_XxY
         tokens = bc.split("x")
         assert(len(tokens) == 2)
-        y = int(tokens[1])
-        x = int(tokens[0].split("_")[1])
+        y = float(tokens[1])
+        x = float(tokens[0].split("_")[1])
         index = int(tokens[0].split("_")[0])
         x_points_index[index].append(x)
         y_points_index[index].append(y)
@@ -200,7 +200,8 @@ def main(counts_table_files,
     # Create one image for each dataset
     for i,image in enumerate(image_files) if image_files else []:
         if image is not None and os.path.isfile(image):
-            alignment_file = alignment_files[i] if len(alignment_files) >= i else None
+            alignment_file = alignment_files[i] \
+            if alignment_files is not None and len(alignment_files) >= i else None
             # alignment_matrix will be identity if alignment file is None
             alignment_matrix = parseAlignmentMatrix(alignment_file)            
             scatter_plot(x_points=x_points_index[i], 
@@ -214,7 +215,7 @@ def main(counts_table_files,
                          ylabel='Y',
                          image=image, 
                          alpha=1.0, 
-                         size=50)
+                         size=60)
              
                                 
 if __name__ == '__main__':
@@ -236,11 +237,11 @@ if __name__ == '__main__':
                         help="What dimensionality reduction algorithm to use " \
                         "(tSNE - PCA - ICA - SPCA) (default: %(default)s)")
     parser.add_argument("--alignment-files", default=None, nargs='+', type=str,
-                        help="One of moref files containing the alignment maxtris for the images " \
-                        "(array coordinates to pixel coordinates) as a 3x3 matrix")
+                        help="One of more tag delimited files containing and alignment matrix for the images " \
+                        "(array coordinates to pixel coordinates) as a 3x3 matrix in one row")
     parser.add_argument("--image-files", default=None, nargs='+', type=str,
                         help="When given the data will plotted on top of the image, " \
-                        "if the alignment matrix is given the data will be aligned.\n" \
+                        "if the alignment matrix is given the data points will be transformed to pixel coordinates.\n" \
                         "It can be one ore more, ideally one for each input dataset.")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     args = parser.parse_args()

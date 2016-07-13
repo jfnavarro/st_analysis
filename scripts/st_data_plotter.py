@@ -87,8 +87,8 @@ def main(input_data,
                 tokens = line.split()
                 assert(len(tokens) == 3)
                 cluster = int(tokens[0])
-                x = int(tokens[1])
-                y = int(tokens[2])
+                x = float(tokens[1])
+                y = float(tokens[2])
                 colors[x,y] = cluster
 
     # Create a scatter plot, if highlight_barcodes is given
