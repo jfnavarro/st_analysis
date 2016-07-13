@@ -132,8 +132,8 @@ def main(train_data,
         for i,label in enumerate(predicted):
             tokens = labels[i].split("x")
             assert(len(tokens) == 2)
-            y = int(tokens[1])
-            x = int(tokens[0])
+            y = float(tokens[1])
+            x = float(tokens[0])
             x_points.append(int(x))
             y_points.append(int(y))
             filehandler.write("{0}\t{1}\t{2}\n".format(label, x, y))
@@ -170,7 +170,7 @@ if __name__ == '__main__':
                         help="A file containing the alignment image (array coordinates to pixel coordinates) as a 3x3 matrix")
     parser.add_argument("--image", default=None, 
                         help="When given the data will plotted on top of the image, \
-                        if the alignment matrix is given the data will be aligned")
+                        if the alignment matrix is given the data points will be transformed to pixel coordinates")
     parser.add_argument("--outdir", help="Path to output dir")
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
