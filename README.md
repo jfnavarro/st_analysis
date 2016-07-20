@@ -2,11 +2,24 @@
 
 Different tools for visualization, conversion and analysis of Spatial Transcriptomics data
 
+### License
+MIT License, see LICENSE file.
+
+### Authors
+See AUTHORS file.
+
+### Contact
+For bugs, feedback or help you can contact Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
+
+### Installation
+
 To install this packate just clone or download the repository and type:
 
     python setup.py install
     
 A bunch of scripts will then be available in your system. 
+
+## Conversion tools
 
 ###To convert JSON output from the ST Pipeline (older versions) to a matrix format (ST Data format)
 
@@ -42,6 +55,8 @@ Older versions of the ST Viewer export the selections in tab delimited format.
 To convert this file to a matrix (data frame) you can use the following :
 
     tab_to_matrix.py --tab-file selection.txt --outfile selection.tsv
+
+## Analysis tools
 
 ###To do un-supervised learning
 To see how spots cluster together based on their expression profiles you can run : 
