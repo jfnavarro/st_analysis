@@ -11,6 +11,15 @@ See AUTHORS file.
 ### Contact
 For bugs, feedback or help you can contact Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 
+### Note
+The referred matrix format is the ST data format, a matrix of counts where spot coordinates are row names
+and genes are column names.
+
+The scripts that allows you to pass the tissue images can optionally take a 3x3 alignment file. 
+If the images are cropped to exact the array boundaries the alignment file is not needed
+unless you want to plot the image in the original image size. If the image is un-cropped
+then you need the alignment file to convert from spot coordinates to pixel coordinates. 
+
 ### Installation
 
 To install this packate just clone or download the repository and type:
