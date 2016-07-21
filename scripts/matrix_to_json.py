@@ -47,14 +47,14 @@ def main(data_file, outfile):
         outfile = "st_data.json"
     
     # Iterate the table to create JSON records
-    counts_table = pd.read_table(data_file, sep="\t", header=0)
-    spots = counts_table.indexes
+    counts_table = pd.read_table(data_file, sep="\t", header=0, index_col=0)
+    spots = counts_table.index
     genes = counts_table.columns
     list_json = list()
     for spot in spots:
-        spot.split("x")
-        x = spot[0]
-        y = spot[1]
+        tokens = str(spot).split("x")
+        x = tokens[0]
+        y = tokens[1]
         for gene in genes:
             value = counts_table.loc[spot,gene]
             list_json.append({'barcode': "", 'gene': gene, 'x': x, 'y': y, 'hits': value})

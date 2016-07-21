@@ -44,7 +44,7 @@ def main(counts_matrix, coordinates_file, outfile):
             new_coordinates[(old_x, old_y)] = (new_x,new_y)
     
     # Read the data frame (spots as rows)
-    counts_table = pd.read_table(counts_matrix, sep="\t", header=0)
+    counts_table = pd.read_table(counts_matrix, sep="\t", header=0, index_col=0)
     new_index_values = list()
     # Replace spot coordinates and remove row if not present
     for index in counts_table.index:

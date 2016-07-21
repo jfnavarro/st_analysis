@@ -221,7 +221,7 @@ def main(counts_table_files,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--counts-table-files", required=True, nargs='+', type=str,
-                        help="One or more tables with gene counts per feature/spot (genes as columns)")
+                        help="One or more matrices with gene counts per feature/spot (genes as columns)")
     parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
                         type=str, choices=["RAW", "DESeq", "TPM"],
                         help="Normalize the counts using (RAW - DESeq - TPM) (default: %(default)s)")

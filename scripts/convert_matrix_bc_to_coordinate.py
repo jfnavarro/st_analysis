@@ -42,7 +42,7 @@ def main(counts_matrix, barcode_ids, outfile):
             barcodes[tokens[0]] = (tokens[1],tokens[2])
     
     # Read the data frame (barcodes as rows
-    counts_table = pd.read_table(counts_matrix, sep="\t", header=0)
+    counts_table = pd.read_table(counts_matrix, sep="\t", header=0, index_col=0)
     new_index_values = list()
     # Replace barcode for coordinates
     for bc in counts_table.index:
