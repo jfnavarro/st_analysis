@@ -41,7 +41,7 @@ def main(input_data,
          data_alpha,
          highlight_alpha,
          dot_size,
-         normalize_counts,
+         normalization,
          filter_genes,
          outfile):
 
@@ -54,10 +54,24 @@ def main(input_data,
         
     # Extract data frame and normalize it if needed (genes as columns)
     norm_counts_table = pd.read_table(input_data, sep="\t", header=0, index_col=0)
-    if normalize_counts:
-        size_factors = computeSizeFactors(norm_counts_table, function=np.median)
-        norm_counts_table = norm_counts_table.div(size_factors) 
-                          
+
+    # Normalization
+    # Spots are columns and genes are rows
+    norm_counts_table = norm_counts_table.transpose()
+    if normalization in "DESeq":
+        norm_counts_table = computeSizeFactors(norm_counts_table, function=np.median)
+        norm_counts = counts.div(size_factors) 
+    elif normalization in "REL":
+        spots_sum = norm_counts_table.sum(axis=1)
+        norm_counts = norm_counts_table.div(spots_sum) 
+    elif normalization in "RAW":
+        norm_counts_table = norm_counts_table
+    else:
+        sys.stderr.write("Error, incorrect normalization method\n")
+        sys.exit(1)
+     
+    # Genes are columns and spots are rows
+    norm_counts_table = norm_counts_table.transpose()                         
     # Extract the list of the genes that must be shown
     genes_to_keep = list()
     if filter_genes:
@@ -157,8 +171,10 @@ if __name__ == '__main__':
                         help="The transparency level for the highlighted barcodes, 0 min and 1 max (default: %(default)s)")
     parser.add_argument("--dot-size", type=int, default=50, metavar="[INT]", choices=range(10, 100),
                         help="The size of the dots (default: %(default)s)")
-    parser.add_argument("--normalize-counts", action="store_true", default=False,
-                        help="If given the counts in the imput table will be normalized using DESeq")
+    parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
+                        type=str, choices=["RAW", "DESeq", "REL"],
+                        help="Normalize the counts using RAW(absolute counts) , " \
+                        "DESeq or REL(relative counts) (default: %(default)s)")
     parser.add_argument("--filter-genes", help="Regular expression for \
                         gene symbols to filter out. Can be given several times.",
                         default=None,
@@ -175,6 +191,6 @@ if __name__ == '__main__':
          float(args.data_alpha),
          float(args.highlight_alpha),
          int(args.dot_size),
-         args.normalize_counts,
+         args.normalization,
          args.filter_genes,
          args.outfile)

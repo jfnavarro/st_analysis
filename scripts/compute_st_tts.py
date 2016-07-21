@@ -107,8 +107,8 @@ def main(bed_file, min_data_value, disable_filter,
         sys.exit(1)
         
     # Sort the grouped entries
-    print "Sorting the grouped entries..."
     temp_grouped_reads_sorted = tempfile.mktemp(prefix="st_countClusters_grouped_sorted_reads")
+    print "Sorting the grouped entries to {}".format(temp_grouped_reads_sorted)
     with open(temp_grouped_reads_sorted, "w") as filehandler:
         args = ['sort']
         args += ["-k1,1"]
@@ -128,9 +128,9 @@ def main(bed_file, min_data_value, disable_filter,
         sys.stderr.write("Error sorting \n{}\n{}\n".format(stdout, errmsg))
         sys.exit(1)
         
-    # call paraclu to compute peak clusters
-    print "Making the peaks calling with paraclu..."   
+    # call paraclu to compute peak clusters  
     temp_paraclu = tempfile.mktemp(prefix="st_countClusters_paraclu")
+    print "Making the peaks calling with paraclu to {}".format(temp_paraclu)
     with open(temp_paraclu, "w") as filehandler:
         args = ['paraclu']
         args += [min_data_value]
