@@ -164,7 +164,8 @@ def main(train_data,
                      size=50)
                 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--train-data", required=True, nargs='+', type=str,
                         help="One or more data frames with normalized counts")
     parser.add_argument("--test-data", required=True,

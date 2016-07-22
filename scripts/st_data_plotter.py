@@ -153,7 +153,8 @@ def main(input_data,
     fig.savefig(outfile, dpi=300)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("input_data", 
                         help="A data frame with counts from ST data (genes as columns)")
     parser.add_argument("--image", default=None, 

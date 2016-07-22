@@ -92,7 +92,8 @@ def main(input_files, outfile):
             filehandler.write("\n")            
             
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('input_files', nargs=2, 
                         help="The tab delimited file containing the tag clusters and the ST original BED file")
     parser.add_argument("--outfile", default=None, help="Name of the output file")

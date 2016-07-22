@@ -55,7 +55,8 @@ def main(bed_file, barcodes_files, outfile):
                     filehandler_write.write(line)
                     
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("bed_file", 
                         help="Tab delimited file containing the ST data in BED format")
     parser.add_argument("--outfile", help="Name of the output file")

@@ -53,7 +53,8 @@ def main(counts_matrix, barcode_ids, outfile):
     counts_table.to_csv(outfile, sep='\t')
                
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--counts-matrix", required=True,
                         help="Matrix with gene counts (genes as columns)")
     parser.add_argument("--outfile", help="Name of the output file")

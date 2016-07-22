@@ -64,7 +64,8 @@ def main(data_file, outfile):
         json.dump(list_json, json_handler, indent=2, separators=(",",": "))  
                      
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--data-file",  required=True,
                         help="ST data file in table format")
     parser.add_argument("--outfile", default=None, help="Name of the output file")

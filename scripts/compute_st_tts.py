@@ -163,7 +163,8 @@ def main(bed_file, min_data_value, disable_filter,
     print "DONE!"
             
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("bed_file", help="BED ST-data file")
     parser.add_argument("--min-data-value", default=20, metavar="[INT]", type=int, choices=range(1, 999),
                         help="Omits grouped entries whose total count is lower than this (default: %(default)s)")
