@@ -57,7 +57,8 @@ def main(data_file, outfile):
         y = float(tokens[1])
         for gene in genes:
             value = counts_table.loc[spot,gene]
-            list_json.append({'barcode': "", 'gene': gene, 'x': x, 'y': y, 'hits': value})
+            if value != 0:
+                list_json.append({'barcode': "", 'gene': gene, 'x': x, 'y': y, 'hits': value})
   
     # Write JSON records to file
     with open(outfile, "w") as json_handler:
