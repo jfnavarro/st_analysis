@@ -92,7 +92,7 @@ def main(counts_table_files,
         size_factors = computeSizeFactors(counts, function=np.median)
         norm_counts = counts.div(size_factors) 
     elif normalization in "REL":
-        spots_sum = counts.sum(axis=1)
+        spots_sum = counts.sum(axis=0)
         norm_counts = counts.div(spots_sum) 
     elif normalization in "RAW":
         norm_counts = counts
@@ -180,7 +180,7 @@ def main(counts_table_files,
                  ylabel='Y',
                  image=None, 
                  alpha=1.0, 
-                 size=50)
+                 size=70)
     
     # Write the spots and their classes to a file
     assert(len(labels) == len(norm_counts.index))
@@ -224,7 +224,7 @@ def main(counts_table_files,
                          ylabel='Y',
                          image=image, 
                          alpha=1.0, 
-                         size=50)
+                         size=70)
              
                                 
 if __name__ == '__main__':
@@ -235,7 +235,7 @@ if __name__ == '__main__':
     parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
                         type=str, choices=["RAW", "DESeq", "REL"],
                         help="Normalize the counts using RAW(absolute counts) , " \
-                        "DESeq or REL(relative counts) (default: %(default)s)")
+                        "DESeq or REL(relative counts, each gene count divided by the total count of its spot) (default: %(default)s)")
     parser.add_argument("--num-clusters", default=3, metavar="[INT]", type=int, choices=range(2, 10),
                         help="The number of clusters/regions expected to be found. (default: %(default)s)")
     parser.add_argument("--num-exp-genes", default=2, metavar="[INT]", type=int, choices=range(0, 100),
@@ -253,7 +253,7 @@ if __name__ == '__main__':
                         help="What dimensionality reduction algorithm to use " \
                         "(tSNE - PCA - ICA - SPCA) (default: %(default)s)")
     parser.add_argument("--use-log-scale", action="store_true", default=False,
-                        help="Use log values in the dimensionality reduction step.")
+                        help="Use log values in the dimensionality reduction step")
     parser.add_argument("--alignment-files", default=None, nargs='+', type=str,
                         help="One or more tab delimited files containing and alignment matrix for the images " \
                         "(array coordinates to pixel coordinates) as a 3x3 matrix in one row.\n" \
