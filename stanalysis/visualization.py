@@ -12,7 +12,7 @@ color_map = ["red", "green", "blue", "orange", "cyan", "yellow", "orchid",
 
 def scatter_plot(x_points, y_points, colors, 
                  output, alignment=None, cmap=None, title='Scatter', xlabel='X', 
-                 ylabel='Y',image=None, alpha=1.0, size=50):
+                 ylabel='Y', image=None, alpha=1.0, size=50):
     """ 
     This function makes a scatter plot of a set of points (x,y).
     The alignment matrix is optional to transform the coordinates
