@@ -2,16 +2,22 @@
 """ 
 This script performs a supervised prediction
 using a training set and a test set. 
+
 The training set will be one or more matrices of
 with counts (genes as columns and spots as rows)
 and the test set will be one matrix of counts.
+
 One file or files with class labels for the training set is needed
 so the classifier knows what class each spot(row) in
 the training set belongs to, the file should
-be tab delimited (1st column row name, 2nd column the class/label). 
+be tab delimited :
+
+CLASS_NUMBER SPOT_NAME(as it in the matrix)
+
 It will then try to predict the classes of the spots(rows) in the 
 test set. If class labels for the test sets
 are given the script will compute accuracy of the prediction.
+
 The script will output the predicted classes and the spots
 plotted on top of an image if the image is given.
 
