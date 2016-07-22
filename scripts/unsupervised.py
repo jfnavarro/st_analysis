@@ -62,8 +62,8 @@ def main(counts_table_files,
     if outdir is None: 
         outdir = os.getcwd()
        
-    num_exp_genes = num_exp_genes / 100
-    num_genes_keep = num_genes_keep / 100
+    num_exp_genes = num_exp_genes / 100.0
+    num_genes_keep = num_genes_keep / 100.0
     
     # Spots are rows and genes are columns
     # Merge all the datasets into one and append the dataset name to each row
