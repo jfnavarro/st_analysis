@@ -1,6 +1,8 @@
 #! /usr/bin/env python
-""" Script that creates a quality scatter plot from a ST-data file in data frame format
+""" 
+Script that creates a quality scatter plot from a ST-data file in matrix format
 (genes as columns and coordinates as rows)
+
 The output will be a .png file with the same name as the input file if no name if given.
 
 It allows to highlight spots with colors using a file with the following format : 
@@ -12,7 +14,7 @@ It allows to choose transparency for the data points
 It allows to pass an image so the spots are plotted on top of it (an alignment file
 can be passed along to convert spot coordinates to pixel coordinates)
 
-It allows to normalize the counts using DESeq
+It allows to normalize the counts different algorithms
 
 It allows to filter out by counts or gene names (following a reg-exp pattern) 
 what spots to plot
@@ -158,14 +160,17 @@ if __name__ == '__main__':
     parser.add_argument("input_data", 
                         help="A data frame with counts from ST data (genes as columns)")
     parser.add_argument("--image", default=None, 
-                        help="When given the data will plotted on top of the image, \
-                        if the alignment matrix is given the data will be aligned")
+                        help="When given the data will plotted on top of the image, " \
+                        "if the alignment matrix is given the data will be aligned, otherwise it is assumed " \
+                        "that the image is cropped to the array boundaries")
     parser.add_argument("--cutoff", help="Do not include genes below this reads cut off (default: %(default)s)",
                         type=float, default=0.0, metavar="[FLOAT]", choices=range(0, 100))
     parser.add_argument("--highlight-spots", default=None,
                         help="A file containing spots (x,y) and the class/label they belong to\n CLASS_NUMBER X Y")
     parser.add_argument("--alignment", default=None,
-                        help="A file containing the alignment image (array coordinates to pixel coordinates) as a 3x3 matrix")
+                        help="A file containing the alignment image (array coordinates to pixel coordinates) " \
+                        "as a 3x3 matrix in a tab delimited format. Only useful if the image given is not cropped " \
+                        "to the array boundaries of you want to plot the image in original size")
     parser.add_argument("--data-alpha", type=float, default=1.0, metavar="[FLOAT]", choices=range(0, 1),
                         help="The transparency level for the data points, 0 min and 1 max (default: %(default)s)")
     parser.add_argument("--highlight-alpha", type=float, default=1.0, metavar="[FLOAT]", choices=range(0, 1),

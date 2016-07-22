@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+# -*- coding: utf-8 -*-
 """
 A script that does unsupervised
 classification on single cell data (Mainly used for Spatial Transcriptomics)
@@ -15,8 +16,8 @@ be (1 and 2).
 The user can select what clustering algorithm to use
 and what dimensionality reduction technique to use. 
 
-Noisy spots (very few genes expressed) are removed.
-Noisy genes (expressed in very few spots) are removed.
+Noisy spots (very few genes expressed) are removed using a parameter.
+Noisy genes (expressed in very few spots) are removed using a parameter.
 
 The user can optionally give a list of images
 and image alignments to plot the predicted classes
@@ -40,8 +41,6 @@ from stanalysis.visualization import scatter_plot
 from stanalysis.normalization import computeSizeFactors
 from stanalysis.alignment import parseAlignmentMatrix
 
-MIN_GENES_SPOT_EXP = 0.3
-MIN_GENES_SPOT_VAR = 0.5
 DIMENSIONS = 2
 
 def main(counts_table_files, 
@@ -50,6 +49,8 @@ def main(counts_table_files,
          clustering_algorithm, 
          dimensionality_algorithm,
          use_log_scale,
+         num_exp_genes, 
+         num_genes_keep,
          outdir,
          alignment_files, 
          image_files):
@@ -61,6 +62,9 @@ def main(counts_table_files,
     if outdir is None: 
         outdir = os.getcwd()
        
+    num_exp_genes = num_exp_genes / 100
+    num_genes_keep = num_genes_keep / 100
+    
     # Spots are rows and genes are columns
     # Merge all the datasets into one and append the dataset name to each row
     index_to_spots = [[] for ele in xrange(len(counts_table_files))]
@@ -74,9 +78,9 @@ def main(counts_table_files,
     counts.fillna(0.0, inplace=True)
     
     # How many spots do we keep based on the number of genes expressed?
-    min_genes_spot_exp = round((counts != 0).sum(axis=1).quantile(MIN_GENES_SPOT_EXP))
+    min_genes_spot_exp = round((counts != 0).sum(axis=1).quantile(num_exp_genes))
     print "Number of expressed genes a spot must have to be kept " \
-    "({0}% of total expressed genes) {1}".format(MIN_GENES_SPOT_EXP, min_genes_spot_exp)
+    "({0}% of total expressed genes) {1}".format(num_exp_genes, min_genes_spot_exp)
     # Remove noisy spots  
     counts = counts[(counts != 0).sum(axis=1) >= min_genes_spot_exp]
     
@@ -103,9 +107,9 @@ def main(counts_table_files,
     
     # Keep only the genes with higher over-all expression
     # NOTE: this could be changed so to keep the genes with the highest variance
-    min_genes_spot_var = norm_counts.sum(axis=1).quantile(MIN_GENES_SPOT_VAR)
+    min_genes_spot_var = norm_counts.sum(axis=1).quantile(num_genes_keep)
     print "Min normalized expression a gene must have over all spot " \
-    "to be kept ({0}% of total) {1}".format(MIN_GENES_SPOT_VAR, min_genes_spot_var)
+    "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_var)
     norm_counts = norm_counts[norm_counts.sum(axis=1) >= min_genes_spot_var]
     
     # Spots as rows and genes as columns
@@ -234,6 +238,12 @@ if __name__ == '__main__':
                         "DESeq or REL(relative counts) (default: %(default)s)")
     parser.add_argument("--num-clusters", default=3, metavar="[INT]", type=int, choices=range(2, 10),
                         help="The number of clusters/regions expected to be found. (default: %(default)s)")
+    parser.add_argument("--num-exp-genes", default=2, metavar="[INT]", type=int, choices=range(0, 100),
+                        help="The percentage of number of expressed genes ( != 0 ) a spot " \
+                        "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
+    parser.add_argument("--num-genes-keep", default=3, metavar="[INT]", type=int, choices=range(0, 100),
+                        help="The percentage of top expressed genes to keep from the expression distribution of all the genes " \
+                        "accross all the spots (default: %(default)s)")
     parser.add_argument("--clustering-algorithm", default="KMeans", metavar="[STR]", 
                         type=str, choices=["Hierarchical", "KMeans"],
                         help="What clustering algorithm to use after the dimensionality reduction " \
@@ -257,5 +267,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args.counts_table_files, args.normalization, int(args.num_clusters), 
          args.clustering_algorithm, args.dimensionality_algorithm, args.use_log_scale,
-         args.outdir, args.alignment_files, args.image_files)
+         args.num_exp_genes, args.num_genes_keep, args.outdir, 
+         args.alignment_files, args.image_files)
 
