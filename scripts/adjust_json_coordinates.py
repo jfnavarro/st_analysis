@@ -1,31 +1,32 @@
 #! /usr/bin/env python
+# -*- coding: utf-8 -*-
 """ 
 Script that takes a ST-data file in JSON
 format from the ST Pipeline and generates
-a new JSON file with the pixel image coordinates instead
-of array coordinates. For this a tab delimited
-file with the following format is needed:
+a new JSON file with new coordinates. 
 
-array_x array_y pixel_x pixel_y
+For this a tab delimited file with the following format is needed:
+
+    old_x old_y old_x old_y
 
 The JSON file must be like :
 
-[
-  {
-    "y": 25,
-    "x": 31,
-    "hits": 1,
-    "barcode": "GATCGCTGAAAGGATAGA",
-    "gene": "ENSMUSG00000041378"
-  },
-  {
-    "y": 23,
-    "x": 13,
-    "hits": 4,
-    "barcode": "TGTTCCGATGGGAGAAGC",
-    "gene": "ENSMUSG00000001227"
-  },
-  ....
+    [
+      {
+        "y": 25,
+        "x": 31,
+        "hits": 1,
+        "barcode": "GATCGCTGAAAGGATAGA",
+        "gene": "ENSMUSG00000041378"
+      },
+      {
+        "y": 23,
+        "x": 13,
+        "hits": 4,
+        "barcode": "TGTTCCGATGGGAGAAGC",
+        "gene": "ENSMUSG00000001227"
+      },
+     ....
   
 
 @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
@@ -75,7 +76,8 @@ def main(json_file, coordinates_file, outfile):
         json.dump(adjusted_list, filehandler, indent=2, separators=(',', ': '))  
                
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, 
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--json-file",  required=True,
                         help="ST data file in JSON format")
     parser.add_argument("--coordinates-file",  required=True,

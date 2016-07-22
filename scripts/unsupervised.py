@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 """
-A script that does un-supervised
+A script that does unsupervised
 classification on single cell data (Mainly used for Spatial Transcriptomics)
 It takes a list of data frames as input and outputs :
 
- - the normalized counts as a data frame (one for each dataset)
+ - the normalized/filtered counts as matrix (one for each dataset)
  - a scatter plot with the predicted classes for each spot 
  - a file with the predicted classes for each spot and the spot coordinates (one for each dataset)
 
@@ -14,6 +14,9 @@ be (1 and 2).
 
 The user can select what clustering algorithm to use
 and what dimensionality reduction technique to use. 
+
+Noisy spots (very few genes expressed) are removed.
+Noisy genes (expressed in very few spots) are removed.
 
 The user can optionally give a list of images
 and image alignments to plot the predicted classes
@@ -37,10 +40,8 @@ from stanalysis.visualization import scatter_plot
 from stanalysis.normalization import computeSizeFactors
 from stanalysis.alignment import parseAlignmentMatrix
 
-MIN_GENES_SPOT_EXP = 0.1
-MIN_GENES_SPOT_VAR = 0.2
-MIN_FEATURES_GENE = 10
-MIN_EXPRESION = 2
+MIN_GENES_SPOT_EXP = 0.3
+MIN_GENES_SPOT_VAR = 0.5
 DIMENSIONS = 2
 
 def main(counts_table_files, 
@@ -48,6 +49,7 @@ def main(counts_table_files,
          num_clusters, 
          clustering_algorithm, 
          dimensionality_algorithm,
+         use_log_scale,
          outdir,
          alignment_files, 
          image_files):
@@ -60,6 +62,7 @@ def main(counts_table_files,
         outdir = os.getcwd()
        
     # Spots are rows and genes are columns
+    # Merge all the datasets into one and append the dataset name to each row
     index_to_spots = [[] for ele in xrange(len(counts_table_files))]
     counts = pd.DataFrame()
     for i,counts_file in enumerate(counts_table_files):
@@ -73,44 +76,41 @@ def main(counts_table_files,
     # How many spots do we keep based on the number of genes expressed?
     min_genes_spot_exp = round((counts != 0).sum(axis=1).quantile(MIN_GENES_SPOT_EXP))
     print "Number of expressed genes a spot must have to be kept " \
-    "(1% of total expressed genes) {}".format(min_genes_spot_exp)
-    
+    "({0}% of total expressed genes) {1}".format(MIN_GENES_SPOT_EXP, min_genes_spot_exp)
     # Remove noisy spots  
     counts = counts[(counts != 0).sum(axis=1) >= min_genes_spot_exp]
+    
     # Spots are columns and genes are rows
     counts = counts.transpose()
-    # Remove noisy genes
-    counts = counts[(counts >= MIN_EXPRESION).sum(axis=1) >= MIN_FEATURES_GENE]
     
     # Normalization
     if normalization in "DESeq":
         size_factors = computeSizeFactors(counts, function=np.median)
         norm_counts = counts.div(size_factors) 
-    elif normalization in "TPM":
-        #    feature.sums = apply(exp.values, 2, sum)
-        #    norm.counts = (t(t(exp.values) / feature.sums)*1e6) + 1
+    elif normalization in "REL":
         spots_sum = counts.sum(axis=1)
-        norm_counts = ((counts.transpose().div(spots_sum)) * 1e6).transpose()
+        norm_counts = counts.div(spots_sum) 
     elif normalization in "RAW":
         norm_counts = counts
     else:
         sys.stderr.write("Error, incorrect normalization method\n")
         sys.exit(1)
-    
+        
+    # This could be another normalization option
     # Scale spots (columns) against the mean and variance
     #norm_counts = pd.DataFrame(data=scale(norm_counts, axis=1, with_mean=True, with_std=True), 
     #                           index=norm_counts.index, columns=norm_counts.columns)
     
-    # Keep only the genes with higher over-all variance
-    # NOTE: this could be done to keep the genes with the highest counts
-    min_genes_spot_var = norm_counts.var(axis=1).quantile(MIN_GENES_SPOT_VAR)
-    print "Min variance a gene must have over all spot " \
-    "to be kept ({0}% of total) {1}".format(MIN_GENES_SPOT_VAR,min_genes_spot_var)
-    norm_counts = norm_counts[norm_counts.var(axis=1) >= min_genes_spot_var]
+    # Keep only the genes with higher over-all expression
+    # NOTE: this could be changed so to keep the genes with the highest variance
+    min_genes_spot_var = norm_counts.sum(axis=1).quantile(MIN_GENES_SPOT_VAR)
+    print "Min normalized expression a gene must have over all spot " \
+    "to be kept ({0}% of total) {1}".format(MIN_GENES_SPOT_VAR, min_genes_spot_var)
+    norm_counts = norm_counts[norm_counts.sum(axis=1) >= min_genes_spot_var]
     
     # Spots as rows and genes as columns
     norm_counts = norm_counts.transpose()
-    
+        
     # Write normalized counts to different files
     tot_spots = norm_counts.index
     for i in xrange(len(counts_table_files)):
@@ -142,8 +142,12 @@ def main(counts_table_files,
         sys.stderr.write("Error, incorrect dimensionality reduction method\n")
         sys.exit(1)
     
-    # Use log2 counts if we do not center the data
-    reduced_data = decomp_model.fit_transform(np.log2(norm_counts + 1))
+    
+    if use_log_scale:
+        print "Using log counts"
+        norm_counts = np.log2(norm_counts + 1)    
+    # Perform dimensionality reduction, outputs a bunch of 2D coordinates
+    reduced_data = decomp_model.fit_transform(norm_counts)
     
     # Do clustering of the dimensionality reduced coordinates
     if "KMeans" in clustering_algorithm:
@@ -156,6 +160,7 @@ def main(counts_table_files,
         sys.stderr.write("Error, incorrect clustering method\n")
         sys.exit(1)
 
+    # Obtain predicted classes for each spot
     labels = clustering.fit_predict(reduced_data)
     if 0 in labels: labels = labels + 1
     
@@ -171,7 +176,7 @@ def main(counts_table_files,
                  ylabel='Y',
                  image=None, 
                  alpha=1.0, 
-                 size=80)
+                 size=50)
     
     # Write the spots and their classes to a file
     assert(len(labels) == len(norm_counts.index))
@@ -215,19 +220,20 @@ def main(counts_table_files,
                          ylabel='Y',
                          image=image, 
                          alpha=1.0, 
-                         size=60)
+                         size=50)
              
                                 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--counts-table-files", required=True, nargs='+', type=str,
                         help="One or more matrices with gene counts per feature/spot (genes as columns)")
     parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
-                        type=str, choices=["RAW", "DESeq", "TPM"],
-                        help="Normalize the counts using (RAW - DESeq - TPM) (default: %(default)s)")
+                        type=str, choices=["RAW", "DESeq", "REL"],
+                        help="Normalize the counts using RAW(absolute counts) , " \
+                        "DESeq or REL(relative counts) (default: %(default)s)")
     parser.add_argument("--num-clusters", default=3, metavar="[INT]", type=int, choices=range(2, 10),
-                        help="If given the number of clusters will be adjusted. " \
-                        "Otherwise they will be pre-computed (default: %(default)s)")
+                        help="The number of clusters/regions expected to be found. (default: %(default)s)")
     parser.add_argument("--clustering-algorithm", default="KMeans", metavar="[STR]", 
                         type=str, choices=["Hierarchical", "KMeans"],
                         help="What clustering algorithm to use after the dimensionality reduction " \
@@ -236,16 +242,20 @@ if __name__ == '__main__':
                         type=str, choices=["tSNE", "PCA", "ICA", "SPCA"],
                         help="What dimensionality reduction algorithm to use " \
                         "(tSNE - PCA - ICA - SPCA) (default: %(default)s)")
+    parser.add_argument("--use-log-scale", action="store_true", default=False,
+                        help="Use log values in the dimensionality reduction step.")
     parser.add_argument("--alignment-files", default=None, nargs='+', type=str,
-                        help="One of more tag delimited files containing and alignment matrix for the images " \
-                        "(array coordinates to pixel coordinates) as a 3x3 matrix in one row")
+                        help="One or more tab delimited files containing and alignment matrix for the images " \
+                        "(array coordinates to pixel coordinates) as a 3x3 matrix in one row.\n" \
+                        "Only useful is the image has extra borders, for instance not cropped to the array corners" \
+                        "or if you want the keep the original image size in the plots.")
     parser.add_argument("--image-files", default=None, nargs='+', type=str,
                         help="When given the data will plotted on top of the image, " \
-                        "if the alignment matrix is given the data points will be transformed to pixel coordinates.\n" \
-                        "It can be one ore more, ideally one for each input dataset.")
+                        "It can be one ore more, ideally one for each input dataset\n " \
+                        "It desirable that the image is cropped to the array corners otherwise an alignment file is needed")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     args = parser.parse_args()
     main(args.counts_table_files, args.normalization, int(args.num_clusters), 
-         args.clustering_algorithm, args.dimensionality_algorithm,
+         args.clustering_algorithm, args.dimensionality_algorithm, args.use_log_scale,
          args.outdir, args.alignment_files, args.image_files)
 

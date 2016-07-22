@@ -59,7 +59,8 @@ def main(tab_file, outfile):
     counts_table.to_csv(outfile, sep="\t", na_rep=0)
                
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--tab-file",  required=True,
                         help="ST data file in TAB format")
     parser.add_argument("--outfile", default=None, help="Name of the output file")

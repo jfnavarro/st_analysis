@@ -107,8 +107,8 @@ def main(bed_file, min_data_value, disable_filter,
         sys.exit(1)
         
     # Sort the grouped entries
-    print "Sorting the grouped entries..."
     temp_grouped_reads_sorted = tempfile.mktemp(prefix="st_countClusters_grouped_sorted_reads")
+    print "Sorting the grouped entries to {}".format(temp_grouped_reads_sorted)
     with open(temp_grouped_reads_sorted, "w") as filehandler:
         args = ['sort']
         args += ["-k1,1"]
@@ -128,9 +128,9 @@ def main(bed_file, min_data_value, disable_filter,
         sys.stderr.write("Error sorting \n{}\n{}\n".format(stdout, errmsg))
         sys.exit(1)
         
-    # call paraclu to compute peak clusters
-    print "Making the peaks calling with paraclu..."   
+    # call paraclu to compute peak clusters  
     temp_paraclu = tempfile.mktemp(prefix="st_countClusters_paraclu")
+    print "Making the peaks calling with paraclu to {}".format(temp_paraclu)
     with open(temp_paraclu, "w") as filehandler:
         args = ['paraclu']
         args += [min_data_value]
@@ -163,7 +163,8 @@ def main(bed_file, min_data_value, disable_filter,
     print "DONE!"
             
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("bed_file", help="BED ST-data file")
     parser.add_argument("--min-data-value", default=20, metavar="[INT]", type=int, choices=range(1, 999),
                         help="Omits grouped entries whose total count is lower than this (default: %(default)s)")

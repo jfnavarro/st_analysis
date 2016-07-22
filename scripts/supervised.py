@@ -2,13 +2,14 @@
 """ 
 This script performs a supervised prediction
 using a training set and a test set. 
-The training set will be one or more data frames
-with normalized counts from single cell data
-and the test set will be a data frame with normalized counts.
+The training set will be one or more matrices of
+with counts (genes as columns and spots as rows)
+and the test set will be one matrix of counts.
 One file or files with class labels for the training set is needed
 so the classifier knows what class each spot(row) in
-the training set belongs to. It will then try
-to predict the classes of the spots(rows) in the 
+the training set belongs to, the file should
+be tab delimited (1st column row name, 2nd column the class/label). 
+It will then try to predict the classes of the spots(rows) in the 
 test set. If class labels for the test sets
 are given the script will compute accuracy of the prediction.
 The script will output the predicted classes and the spots
@@ -46,7 +47,8 @@ def get_classes_coordinate(class_file):
 def main(train_data, 
          test_data, 
          classes_train, 
-         classes_test, 
+         classes_test,
+         use_log_scale,
          outdir,
          alignment, 
          image):
@@ -113,6 +115,11 @@ def main(train_data,
     test_counts = test_data_frame.values # Assume they are normalized
     train_counts = train_data_frame.values # Assume they are normalized
     
+    # Log the counts
+    if use_log_scale:
+        train_counts = np.log2(train_counts + 1)
+        test_counts = np.log2(test_counts + 1)
+        
     # Train the classifier and predict
     # TODO optimize parameters of the classifier
     classifier = OneVsRestClassifier(LinearSVC(random_state=0), n_jobs=4)
@@ -157,7 +164,8 @@ def main(train_data,
                      size=50)
                 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--train-data", required=True, nargs='+', type=str,
                         help="One or more data frames with normalized counts")
     parser.add_argument("--test-data", required=True,
@@ -165,15 +173,20 @@ if __name__ == '__main__':
     parser.add_argument("--train-classes", required=True, nargs='+', type=str,
                         help="One of more files with the class of each spot in the train data")
     parser.add_argument("--test-classes", default=None,
-                        help="One file with the class of each spot in the train datag")
+                        help="One file with the class of each spot in the train data")
+    parser.add_argument("--use-log-scale", action="store_true", default=False,
+                        help="Use log values for the counts.")
     parser.add_argument("--alignment", default=None,
-                        help="A file containing the alignment image (array coordinates to pixel coordinates) as a 3x3 matrix")
+                        help="A file containing the alignment image " \
+                        "(array coordinates to pixel coordinates) as a 3x3 matrix in tab delimited format\n" \
+                        "This is only useful if you want to plot the image in original size or the image " \
+                        "is not cropped to the array boundaries")
     parser.add_argument("--image", default=None, 
                         help="When given the data will plotted on top of the image, \
                         if the alignment matrix is given the data points will be transformed to pixel coordinates")
     parser.add_argument("--outdir", help="Path to output dir")
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
-         args.test_classes, args.outdir, 
+         args.test_classes, args.use_log_scale, args.outdir, 
          args.alignment, args.image)
 

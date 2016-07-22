@@ -64,7 +64,8 @@ def main(file_selection, bed_file_pipeline, outfile):
                 filehandler_write.write("{0}\t{1}\t{2}\t{3}\n".format(gene, x, y, count))
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--viewer-selection", required=True,
                         help="A selection made in the ST Viewer")
     parser.add_argument("--bed-file", required=True,

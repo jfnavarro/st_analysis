@@ -52,7 +52,8 @@ def main(bed_file, barcode_ids, outfile):
                                          tokens[4], tokens[5], tokens[6], x, y))
                
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--bed-file", required=True,
                         help="BED file from the ST Pipeline (older versions with barcode tag instead of x and y)")
     parser.add_argument("--outfile", help="Name of the output file")
