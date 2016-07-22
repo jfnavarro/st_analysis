@@ -53,8 +53,8 @@ def main(data_file, outfile):
     list_json = list()
     for spot in spots:
         tokens = str(spot).split("x")
-        x = tokens[0]
-        y = tokens[1]
+        x = float(tokens[0])
+        y = float(tokens[1])
         for gene in genes:
             value = counts_table.loc[spot,gene]
             list_json.append({'barcode': "", 'gene': gene, 'x': x, 'y': y, 'hits': value})
