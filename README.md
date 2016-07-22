@@ -26,7 +26,9 @@ To install this packate just clone or download the repository and type:
 
     python setup.py install
     
-A bunch of scripts will then be available in your system. 
+A bunch of scripts will then be available in your system.
+Note that you can always type name_script.py --help to get more information
+about how the script works.
 
 ## Conversion tools
 
