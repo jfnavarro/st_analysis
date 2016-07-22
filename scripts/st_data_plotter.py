@@ -64,7 +64,7 @@ def main(input_data,
         norm_counts_table = computeSizeFactors(norm_counts_table, function=np.median)
         norm_counts = counts.div(size_factors) 
     elif normalization in "REL":
-        spots_sum = norm_counts_table.sum(axis=1)
+        spots_sum = norm_counts_table.sum(axis=0)
         norm_counts = norm_counts_table.div(spots_sum) 
     elif normalization in "RAW":
         norm_counts_table = norm_counts_table
