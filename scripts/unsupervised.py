@@ -238,10 +238,10 @@ if __name__ == '__main__':
                         "DESeq or REL(relative counts, each gene count divided by the total count of its spot) (default: %(default)s)")
     parser.add_argument("--num-clusters", default=3, metavar="[INT]", type=int, choices=range(2, 10),
                         help="The number of clusters/regions expected to be found. (default: %(default)s)")
-    parser.add_argument("--num-exp-genes", default=2, metavar="[INT]", type=int, choices=range(0, 100),
+    parser.add_argument("--num-exp-genes", default=10, metavar="[INT]", type=int, choices=range(0, 100),
                         help="The percentage of number of expressed genes ( != 0 ) a spot " \
                         "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
-    parser.add_argument("--num-genes-keep", default=3, metavar="[INT]", type=int, choices=range(0, 100),
+    parser.add_argument("--num-genes-keep", default=40, metavar="[INT]", type=int, choices=range(0, 100),
                         help="The percentage of top expressed genes to keep from the expression distribution of all the genes " \
                         "accross all the spots (default: %(default)s)")
     parser.add_argument("--clustering-algorithm", default="KMeans", metavar="[STR]", 

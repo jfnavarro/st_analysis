@@ -46,17 +46,18 @@ def main(counts_matrix, coordinates_file, outfile):
     # Read the data frame (spots as rows)
     counts_table = pd.read_table(counts_matrix, sep="\t", header=0, index_col=0)
     new_index_values = list()
+
     # Replace spot coordinates and remove row if not present
     for index in counts_table.index:
         tokens = index.split("x")
         x = int(tokens[0])
         y = int(tokens[1])
         try:
-            (new_x, new_y) = new_coordinates[bc]
+            (new_x, new_y) = new_coordinates[(x,y)]
             new_index_values.append("{0}x{1}".format(new_x,new_y))
         except KeyError:
-            counts_table.drop(index)
-            
+            counts_table.drop(index, inplace=True)
+
     # Write table again
     counts_table.index = new_index_values
     counts_table.to_csv(outfile, sep='\t')
