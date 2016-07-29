@@ -59,11 +59,23 @@ with older versions of the ST Viewer for example). Then you can use the followin
 
     matrix_to_json.py --data-file stdata.tsv --outfile stdata.json
     
-###To adjust the spot coordinates to pixel coordinates in a JSON file.
-If you have obtained pixel coordiantes for a dataset and you want to update
-the JSON file with the new coordinates you can use the following script :
+###To adjust the spot coordinates to new coordinates in a ST BED file.
+For instance to adjust for printing errors or to convert to pixel coordinates
+(spots not found in the coordinates files will be discarded). You can use the following script:
 
-    adjust_json_coordinates.py --json-file stdata.json --coordinates-file new_coordinates.txt --outfile stdata_aligned.json
+    adjust_bed_coordinates.py --coordinates-file coordinates.txt --outfile new_stdata.bed stdata.bed
+    
+###To adjust the spot coordinates to new coordinates in a ST Data in matrix format.
+For instance to adjust for printing errors or to convert to pixel coordinates
+(spots not found in the coordinates files will be discarded). You can use the following script:
+
+    adjust_matrix_coordinates.py --coordinates-file coordinates.txt --outfile new_stdata.tsv --counts-matrix stdata.tsv
+
+###To adjust the spot coordinates to pixel coordinates in a JSON file.
+For instance to adjust for printing errors or to convert to pixel coordinates
+(spots not found in the coordinates files will be discarded). You can use the following script:
+
+    adjust_json_coordinates.py --json-file stdata.json --coordinates-file new_coordinates.txt --outfile new_stdata.json
     
 ###To convert selections extracted from the ST Viewer to matrix format (ST data format)
 Older versions of the ST Viewer export the selections in tab delimited format. 
