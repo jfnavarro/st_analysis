@@ -108,7 +108,7 @@ def main(counts_table_files,
     # Keep only the genes with higher over-all expression
     # NOTE: this could be changed so to keep the genes with the highest variance
     min_genes_spot_var = norm_counts.sum(axis=1).quantile(num_genes_keep)
-    print "Min normalized expression a gene must have over all spot " \
+    print "Min normalized expression a gene must have over all spots " \
     "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_var)
     norm_counts = norm_counts[norm_counts.sum(axis=1) >= min_genes_spot_var]
     

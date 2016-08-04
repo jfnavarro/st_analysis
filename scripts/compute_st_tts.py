@@ -86,11 +86,9 @@ def main(bed_file, min_data_value, disable_filter,
             end_site = int(tokens[2])
             strand = tokens[5]
             gene = tokens[6]
-            # Do not include MALAT1
-            if gene.upper() != "ENSMUSG00000092341" and gene.upper() != "MALAT1":
-                # Swap star and end site if the gene is annotated in the negative strand
-                if strand == "-": star_site = end_site
-                map_reads[(chromosome,strand,star_site)] += 1
+            # Swap star and end site if the gene is annotated in the negative strand
+            if strand == "-": star_site = end_site
+            map_reads[(chromosome,strand,star_site)] += 1
      
     print "Writing grouped entries to a temp file..."   
     temp_grouped_reads = tempfile.mktemp(prefix="st_countClusters_grouped_reads")
