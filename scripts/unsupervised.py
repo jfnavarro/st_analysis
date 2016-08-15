@@ -49,6 +49,7 @@ def main(counts_table_files,
          clustering_algorithm, 
          dimensionality_algorithm,
          use_log_scale,
+         apply_sample_normalization,
          num_exp_genes, 
          num_genes_keep,
          outdir,
@@ -66,17 +67,21 @@ def main(counts_table_files,
     num_genes_keep = num_genes_keep / 100.0
     
     # Spots are rows and genes are columns
-    # Merge all the datasets into one and append the dataset name to each row
+    # Merge all the datasets into one and append the dataset index to each row
     index_to_spots = [[] for ele in xrange(len(counts_table_files))]
     counts = pd.DataFrame()
+    sample_counts = dict()
     for i,counts_file in enumerate(counts_table_files):
         new_counts = pd.read_table(counts_file, sep="\t", header=0, index_col=0)
         new_spots = ["{0}_{1}".format(i, spot) for spot in new_counts.index]
         new_counts.index = new_spots
         counts = counts.append(new_counts)
         index_to_spots[i].append(new_spots)
+        if apply_sample_normalization:
+            # Total sum of each gene for each sample
+            sample_counts[i] = new_counts.sum(axis=0).values
     counts.fillna(0.0, inplace=True)
-    
+             
     # How many spots do we keep based on the number of genes expressed?
     min_genes_spot_exp = round((counts != 0).sum(axis=1).quantile(num_exp_genes))
     print "Number of expressed genes a spot must have to be kept " \
@@ -84,6 +89,25 @@ def main(counts_table_files,
     # Remove noisy spots  
     counts = counts[(counts != 0).sum(axis=1) >= min_genes_spot_exp]
     
+    # Per sample normalization
+    if apply_sample_normalization:
+        per_sample_factors = pd.DataFrame(index=sample_counts.keys(), columns=counts.columns)
+        for key,value in sample_counts.iteritems():
+            per_sample_factors.loc[key] = value
+        # Spots are columns and genes are rows
+        per_sample_factors = per_sample_factors.transpose()
+        per_sample_size_factors = computeSizeFactors(per_sample_factors, function=np.median)
+        print per_sample_size_factors
+        # Now use the factors per sample to normalize genes in each sample
+        # one factor per sample so we divide every gene count of each sample by its factor
+        for spot in counts.index:
+            # bc is i_XxY
+            tokens = spot.split("x")
+            assert(len(tokens) == 2)
+            index = int(tokens[0].split("_")[0])
+            factor = per_sample_size_factors.ix[index]
+            counts.loc[spot] = counts.loc[spot] / factor
+            
     # Spots are columns and genes are rows
     counts = counts.transpose()
     
@@ -99,11 +123,6 @@ def main(counts_table_files,
     else:
         sys.stderr.write("Error, incorrect normalization method\n")
         sys.exit(1)
-        
-    # This could be another normalization option
-    # Scale spots (columns) against the mean and variance
-    #norm_counts = pd.DataFrame(data=scale(norm_counts, axis=1, with_mean=True, with_std=True), 
-    #                           index=norm_counts.index, columns=norm_counts.columns)
     
     # Keep only the genes with higher over-all expression
     # NOTE: this could be changed so to keep the genes with the highest variance
@@ -111,10 +130,10 @@ def main(counts_table_files,
     print "Min normalized expression a gene must have over all spots " \
     "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_var)
     norm_counts = norm_counts[norm_counts.sum(axis=1) >= min_genes_spot_var]
-    
+        
     # Spots as rows and genes as columns
     norm_counts = norm_counts.transpose()
-        
+    
     # Write normalized counts to different files
     tot_spots = norm_counts.index
     for i in xrange(len(counts_table_files)):
@@ -224,7 +243,7 @@ def main(counts_table_files,
                          ylabel='Y',
                          image=image, 
                          alpha=1.0, 
-                         size=70)
+                         size=80)
              
                                 
 if __name__ == '__main__':
@@ -254,6 +273,9 @@ if __name__ == '__main__':
                         "(tSNE - PCA - ICA - SPCA) (default: %(default)s)")
     parser.add_argument("--use-log-scale", action="store_true", default=False,
                         help="Use log values in the dimensionality reduction step")
+    parser.add_argument("--normalize-samples", action="store_true", default=False,
+                        help="When multiple datasets given this option computes normalization " \
+                        "factors for each gene using DESeq on the different samples")
     parser.add_argument("--alignment-files", default=None, nargs='+', type=str,
                         help="One or more tab delimited files containing and alignment matrix for the images " \
                         "(array coordinates to pixel coordinates) as a 3x3 matrix in one row.\n" \
@@ -267,6 +289,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args.counts_table_files, args.normalization, int(args.num_clusters), 
          args.clustering_algorithm, args.dimensionality_algorithm, args.use_log_scale,
-         args.num_exp_genes, args.num_genes_keep, args.outdir, 
+         args.normalize_samples, args.num_exp_genes, args.num_genes_keep, args.outdir, 
          args.alignment_files, args.image_files)
 
