@@ -37,11 +37,10 @@ from sklearn.decomposition import PCA, FastICA, SparsePCA
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
 #from sklearn.preprocessing import scale
-from stanalysis.visualization import scatter_plot
-from stanalysis.normalization import computeSizeFactors
+from stanalysis.visualization import scatter_plot, scatter_plot3d, histogram
+from stanalysis.normalization import *
 from stanalysis.alignment import parseAlignmentMatrix
-
-DIMENSIONS = 2
+import matplotlib.pyplot as plt
 
 def main(counts_table_files, 
          normalization, 
@@ -54,14 +53,24 @@ def main(counts_table_files,
          num_genes_keep,
          outdir,
          alignment_files, 
-         image_files):
+         image_files,
+         num_dimensions):
 
     if len(counts_table_files) == 0 or any([not os.path.isfile(f) for f in counts_table_files]):
         sys.stderr.write("Error, input file/s not present or invalid format\n")
         sys.exit(1)
-            
-    if outdir is None: 
+    
+    if image_files is not None and len(image_files) > 0 and len(image_files) != len(counts_table_files):
+        sys.stderr.write("Error, the number of images given as input is not the same as the number of datasets\n")
+        sys.exit(1)           
+   
+    if alignment_files is not None and len(alignment_files) > 0 and len(alignment_files) != len(image_files):
+        sys.stderr.write("Error, the number of alignments given as input is not the same as the number of images\n")
+        sys.exit(1)   
+                 
+    if outdir is None or not os.path.isdir(outdir): 
         outdir = os.getcwd()
+    outdir = os.path.abspath(outdir)
        
     num_exp_genes = num_exp_genes / 100.0
     num_genes_keep = num_genes_keep / 100.0
@@ -73,31 +82,48 @@ def main(counts_table_files,
     sample_counts = dict()
     for i,counts_file in enumerate(counts_table_files):
         new_counts = pd.read_table(counts_file, sep="\t", header=0, index_col=0)
+        print "Processing dataset {} ...".format(counts_file)
+        num_genes = len(new_counts.columns)
+        num_spots = len(new_counts.index)
+        total_reads = new_counts.sum().sum()
+        print "Contains {} genes, {} spots and {} total counts".format(num_genes, num_spots, total_reads)
+        histogram(x_points=new_counts.sum(axis=1).values,
+                  output=os.path.join(outdir, "hist_reads_{}.png".format(i)))
+        histogram(x_points=(new_counts != 0).sum(axis=1).values, 
+                  output=os.path.join(outdir, "hist_genes_{}.png".format(i)))
+        # How many spots do we keep based on the number of genes expressed?
+        min_genes_spot_exp = round((new_counts != 0).sum(axis=1).quantile(num_exp_genes))
+        print "Number of expressed genes a spot must have to be kept " \
+        "({0}% of total expressed genes) {1}".format(num_exp_genes, min_genes_spot_exp)
+        # Remove noisy spots  
+        new_counts = new_counts[(new_counts != 0).sum(axis=1) >= min_genes_spot_exp]
+        print "Dropped {} spots".format(num_spots - len(new_counts.index))
+        # Append dataset index to the spots (indexes)
         new_spots = ["{0}_{1}".format(i, spot) for spot in new_counts.index]
         new_counts.index = new_spots
         counts = counts.append(new_counts)
-        index_to_spots[i].append(new_spots)
         if apply_sample_normalization:
             # Total sum of each gene for each sample
-            sample_counts[i] = new_counts.sum(axis=0).values
+            sample_counts[i] = new_counts.sum(axis=0)
+    # Replace Nan and Inf by zeroes
+    counts.replace([np.inf, -np.inf], np.nan)
     counts.fillna(0.0, inplace=True)
-             
-    # How many spots do we keep based on the number of genes expressed?
-    min_genes_spot_exp = round((counts != 0).sum(axis=1).quantile(num_exp_genes))
-    print "Number of expressed genes a spot must have to be kept " \
-    "({0}% of total expressed genes) {1}".format(num_exp_genes, min_genes_spot_exp)
-    # Remove noisy spots  
-    counts = counts[(counts != 0).sum(axis=1) >= min_genes_spot_exp]
+    
+    # Write aggregated matrix to file
+    counts.to_csv(os.path.join(outdir, "aggregated_counts.tsv"), sep="\t")
     
     # Per sample normalization
     if apply_sample_normalization:
+        print "Computing per sample normalization..."
         per_sample_factors = pd.DataFrame(index=sample_counts.keys(), columns=counts.columns)
         for key,value in sample_counts.iteritems():
             per_sample_factors.loc[key] = value
+        # Replace Nan and Inf by zeroes
+        per_sample_factors.replace([np.inf, -np.inf], np.nan)
+        per_sample_factors.fillna(0.0, inplace=True)
         # Spots are columns and genes are rows
         per_sample_factors = per_sample_factors.transpose()
-        per_sample_size_factors = computeSizeFactors(per_sample_factors, function=np.median)
-        print per_sample_size_factors
+        per_sample_size_factors = computeSizeFactors(per_sample_factors)
         # Now use the factors per sample to normalize genes in each sample
         # one factor per sample so we divide every gene count of each sample by its factor
         for spot in counts.index:
@@ -105,16 +131,28 @@ def main(counts_table_files,
             tokens = spot.split("x")
             assert(len(tokens) == 2)
             index = int(tokens[0].split("_")[0])
-            factor = per_sample_size_factors.ix[index]
+            factor = per_sample_size_factors[index]
+            #TODO this line fails sometimes, it seems to be a bug in Pandas for very big matrices
             counts.loc[spot] = counts.loc[spot] / factor
-            
+        # Replace Nan and Inf by zeroes
+        counts.replace([np.inf, -np.inf], np.nan)
+        counts.fillna(0.0, inplace=True)
+        
     # Spots are columns and genes are rows
     counts = counts.transpose()
-    
-    # Normalization
+
+    print "Computing per spot normalization..." 
+    # Per spot normalization
     if normalization in "DESeq":
-        size_factors = computeSizeFactors(counts, function=np.median)
-        norm_counts = counts.div(size_factors) 
+        size_factors = computeSizeFactors(counts)
+        norm_counts = counts.div(size_factors)
+    elif normalization in "DESeq2":
+        size_factors = computeSizeFactorsLinear(counts)
+        norm_counts = counts.div(size_factors)
+    elif normalization in "DESeq2Log":
+        norm_counts = computeDESeq2LogTransform(counts)
+    elif normalization in "EdgeR":
+        norm_counts = computeEdgeRNormalization(counts)
     elif normalization in "REL":
         spots_sum = counts.sum(axis=0)
         norm_counts = counts.div(spots_sum) 
@@ -124,13 +162,15 @@ def main(counts_table_files,
         sys.stderr.write("Error, incorrect normalization method\n")
         sys.exit(1)
     
-    # Keep only the genes with higher over-all expression
-    # NOTE: this could be changed so to keep the genes with the highest variance
-    min_genes_spot_var = norm_counts.sum(axis=1).quantile(num_genes_keep)
-    print "Min normalized expression a gene must have over all spots " \
+    # Keep only the genes with higher over-all variance
+    # NOTE: this could be changed so to keep the genes with the highest expression
+    min_genes_spot_var = norm_counts.var(axis=1).quantile(num_genes_keep)
+    num_genes = len(norm_counts.index)
+    print "Min normalized variance a gene must have over all spots " \
     "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_var)
-    norm_counts = norm_counts[norm_counts.sum(axis=1) >= min_genes_spot_var]
-        
+    norm_counts = norm_counts[norm_counts.var(axis=1) >= min_genes_spot_var]
+    print "Dropped {} genes".format(num_genes - len(norm_counts.index))
+    
     # Spots as rows and genes as columns
     norm_counts = norm_counts.transpose()
     
@@ -148,27 +188,28 @@ def main(counts_table_files,
         # random_state = None or number
         # metric = euclidean or any other
         # n_components = 2 is default
-        decomp_model = TSNE(n_components=DIMENSIONS, random_state=None, perplexity=5,
+        decomp_model = TSNE(n_components=num_dimensions, random_state=None, perplexity=5,
                             early_exaggeration=4.0, learning_rate=1000, n_iter=1000,
                             n_iter_without_progress=30, metric="euclidean", init="pca",
-                            method="barnes_hut", angle=0.0)
+                            method="exact", angle=0.5, verbose=0)
     elif "PCA" in dimensionality_algorithm:
         # n_components = None, number of mle to estimate optimal
-        decomp_model = PCA(n_components=DIMENSIONS, whiten=True, copy=True)
+        decomp_model = PCA(n_components=num_dimensions, whiten=True, copy=True)
     elif "ICA" in dimensionality_algorithm:
-        decomp_model = FastICA(n_components=DIMENSIONS, 
+        decomp_model = FastICA(n_components=num_dimensions, 
                                algorithm='parallel', whiten=True,
                                fun='logcosh', w_init=None, random_state=None)
     elif "SPCA" in dimensionality_algorithm:
-        decomp_model = SparsePCA(n_components=DIMENSIONS, alpha=1)
+        decomp_model = SparsePCA(n_components=num_dimensions, alpha=1)
     else:
         sys.stderr.write("Error, incorrect dimensionality reduction method\n")
         sys.exit(1)
     
-    
     if use_log_scale:
-        print "Using log counts"
-        norm_counts = np.log2(norm_counts + 1)    
+        print "Using pseudo-log counts log2(counts + 0.1)"
+        norm_counts = np.log2(norm_counts + 0.1)  
+     
+    print "Performing dimensionality reduction..."    
     # Perform dimensionality reduction, outputs a bunch of 2D coordinates
     reduced_data = decomp_model.fit_transform(norm_counts)
     
@@ -183,23 +224,48 @@ def main(counts_table_files,
         sys.stderr.write("Error, incorrect clustering method\n")
         sys.exit(1)
 
+    print "Performing clustering..."  
     # Obtain predicted classes for each spot
     labels = clustering.fit_predict(reduced_data)
     if 0 in labels: labels = labels + 1
     
+    # Compute a color_label based on the RGB representation of the 3D dimensionality reduced
+    if num_dimensions == 3:
+        labels_colors = list()
+        x_max = max(reduced_data[:,0])
+        x_min = min(reduced_data[:,0])
+        y_max = max(reduced_data[:,1])
+        y_min = min(reduced_data[:,1])
+        z_max = max(reduced_data[:,2])
+        z_min = min(reduced_data[:,2])
+        def linear_conv(old, min, max, new_min, new_max):
+            return ((old - min) / (max - min)) * ((new_max - new_min) + new_min)
+        for x,y,z in zip(reduced_data[:,0], reduced_data[:,1], reduced_data[:,2]):
+            r = linear_conv(x, x_min, x_max, 0.0, 1.0)
+            g = linear_conv(y, y_min, y_max, 0.0, 1.0)
+            b = linear_conv(z, z_min, z_max, 0.0, 1.0)
+            labels_colors.append((r,g,b))
+
+    print "Generating plots..." 
+     
     # Plot the clustered spots with the class color
-    scatter_plot(x_points=reduced_data[:,0], 
-                 y_points=reduced_data[:,1], 
-                 colors=labels, 
-                 output=os.path.join(outdir,"computed_classes.png"), 
-                 alignment=None, 
-                 cmap=None, 
-                 title='Computed classes', 
-                 xlabel='X', 
-                 ylabel='Y',
-                 image=None, 
-                 alpha=1.0, 
-                 size=70)
+    if num_dimensions == 3:
+        scatter_plot3d(x_points=reduced_data[:,0], 
+                       y_points=reduced_data[:,1],
+                       z_points=reduced_data[:,2],
+                       colors=labels, 
+                       output=os.path.join(outdir,"computed_classes.png"), 
+                       title='Computed classes', 
+                       alpha=1.0, 
+                       size=70)
+    else:
+        scatter_plot(x_points=reduced_data[:,0], 
+                     y_points=reduced_data[:,1],
+                     colors=labels, 
+                     output=os.path.join(outdir,"computed_classes.png"), 
+                     title='Computed classes', 
+                     alpha=1.0, 
+                     size=70)        
     
     # Write the spots and their classes to a file
     assert(len(labels) == len(norm_counts.index))
@@ -207,7 +273,9 @@ def main(counts_table_files,
     x_points_index = [[] for ele in xrange(len(counts_table_files))]
     y_points_index = [[] for ele in xrange(len(counts_table_files))]
     labels_index = [[] for ele in xrange(len(counts_table_files))]
-    file_writers = [open("computed_classes_{}.txt".format(i),"w") for i in xrange(len(counts_table_files))]
+    if num_dimensions == 3:
+        labels_color_index = [[] for ele in xrange(len(counts_table_files))]
+    file_writers = [open(os.path.join(outdir,"computed_classes_{}.txt".format(i)),"w") for i in xrange(len(counts_table_files))]
     # Write the coordinates and the label/class the belong to
     for i,bc in enumerate(norm_counts.index):
         # bc is i_XxY
@@ -219,6 +287,8 @@ def main(counts_table_files,
         x_points_index[index].append(x)
         y_points_index[index].append(y)
         labels_index[index].append(labels[i])
+        if num_dimensions == 3:
+            labels_color_index[index].append(labels_colors[i])
         file_writers[index].write("{0}\t{1}\n".format(labels[i], "{}x{}".format(x,y)))
         
     # Close the files
@@ -233,7 +303,7 @@ def main(counts_table_files,
             # alignment_matrix will be identity if alignment file is None
             alignment_matrix = parseAlignmentMatrix(alignment_file)            
             scatter_plot(x_points=x_points_index[i], 
-                         y_points=y_points_index[i], 
+                         y_points=y_points_index[i],
                          colors=labels_index[i], 
                          output=os.path.join(outdir,"computed_classes_tissue_{}.png".format(i)), 
                          alignment=alignment_matrix, 
@@ -243,7 +313,20 @@ def main(counts_table_files,
                          ylabel='Y',
                          image=image, 
                          alpha=1.0, 
-                         size=80)
+                         size=100)
+            if num_dimensions == 3:
+                scatter_plot(x_points=x_points_index[i], 
+                             y_points=y_points_index[i],
+                             colors=labels_color_index[i], 
+                             output=os.path.join(outdir,"dimensionality_color_tissue_{}.png".format(i)), 
+                             alignment=alignment_matrix, 
+                             cmap=plt.get_cmap("hsv"), 
+                             title='Dimensionality color tissue', 
+                             xlabel='X', 
+                             ylabel='Y',
+                             image=image, 
+                             alpha=1.0, 
+                             size=100)
              
                                 
 if __name__ == '__main__':
@@ -252,22 +335,23 @@ if __name__ == '__main__':
     parser.add_argument("--counts-table-files", required=True, nargs='+', type=str,
                         help="One or more matrices with gene counts per feature/spot (genes as columns)")
     parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
-                        type=str, choices=["RAW", "DESeq", "REL"],
+                        type=str, choices=["RAW", "DESeq", "DESeq2", "DESeq2Log", "EdgeR", "REL"],
                         help="Normalize the counts using RAW(absolute counts) , " \
-                        "DESeq or REL(relative counts, each gene count divided by the total count of its spot) (default: %(default)s)")
+                        "DESeq, DESeq2, DESeq2Log, EdgeR and " \
+                        "REL(relative counts, each gene count divided by the total count of its spot) (default: %(default)s)")
     parser.add_argument("--num-clusters", default=3, metavar="[INT]", type=int, choices=range(2, 10),
                         help="The number of clusters/regions expected to be found. (default: %(default)s)")
     parser.add_argument("--num-exp-genes", default=10, metavar="[INT]", type=int, choices=range(0, 100),
                         help="The percentage of number of expressed genes ( != 0 ) a spot " \
                         "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
-    parser.add_argument("--num-genes-keep", default=40, metavar="[INT]", type=int, choices=range(0, 100),
-                        help="The percentage of top expressed genes to keep from the expression distribution of all the genes " \
-                        "accross all the spots (default: %(default)s)")
-    parser.add_argument("--clustering-algorithm", default="KMeans", metavar="[STR]", 
+    parser.add_argument("--num-genes-keep", default=20, metavar="[INT]", type=int, choices=range(0, 100),
+                        help="The percentage of top variance genes to discard from the variance distribution of all the genes " \
+                        "across all the spots (default: %(default)s)")
+    parser.add_argument("--clustering", default="KMeans", metavar="[STR]", 
                         type=str, choices=["Hierarchical", "KMeans"],
                         help="What clustering algorithm to use after the dimensionality reduction " \
                         "(Hierarchical - KMeans) (default: %(default)s)")
-    parser.add_argument("--dimensionality-algorithm", default="ICA", metavar="[STR]", 
+    parser.add_argument("--dimensionality", default="ICA", metavar="[STR]", 
                         type=str, choices=["tSNE", "PCA", "ICA", "SPCA"],
                         help="What dimensionality reduction algorithm to use " \
                         "(tSNE - PCA - ICA - SPCA) (default: %(default)s)")
@@ -285,10 +369,12 @@ if __name__ == '__main__':
                         help="When given the data will plotted on top of the image, " \
                         "It can be one ore more, ideally one for each input dataset\n " \
                         "It desirable that the image is cropped to the array corners otherwise an alignment file is needed")
+    parser.add_argument("--num-dimensions", default=3, metavar="[INT]", type=int, choices=[2,3],
+                        help="The number of dimensions to use in the dimensionality reduction (2 or 3). (default: %(default)s)")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     args = parser.parse_args()
     main(args.counts_table_files, args.normalization, int(args.num_clusters), 
-         args.clustering_algorithm, args.dimensionality_algorithm, args.use_log_scale,
+         args.clustering, args.dimensionality, args.use_log_scale,
          args.normalize_samples, args.num_exp_genes, args.num_genes_keep, args.outdir, 
-         args.alignment_files, args.image_files)
+         args.alignment_files, args.image_files, args.num_dimensions)
 

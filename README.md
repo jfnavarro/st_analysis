@@ -88,22 +88,22 @@ To convert this file to a matrix (data frame) you can use the following :
 ###To do un-supervised learning
 To see how spots cluster together based on their expression profiles you can run : 
 
-    unsupervised.py --counts-table-files matrix_counts.tsv --normalization DESeq --num-clusters 5 --clustering-algorithm KMeans --dimensionality-algorithm tSNE --alignment-files alignment_file.txt --image-files tissue_image.JPG
+    unsupervised.py --counts-table-files matrix_counts.tsv --normalization DESeq --num-clusters 5 --clustering KMeans --dimensionality tSNE --image-files tissue_image.JPG
     
   The script can be given one or serveral datasets (matrices with counts). It will perform dimesionality reduction
-  and then cluster the spots together based the dimesionality reduced coordiantes. 
+  and then cluster the spots together based the dimesionality reduced coordinates. 
   It generates a scatter plot of the clusters. It also generates an image for
   each dataset of the predicted classes on top of the tissue image (tissue image for each dataset must be given and optionally 
   an alignment file to convert to pixel coordiantes)
   
-  To describe the parameters you can type --help 
+  To know more about the parameters you can type --help 
 
 ###To do supervised learning
 You can train a classifier with the expression profiles of a set of spots
 where you know the class (cell type) and then predict on a new dataset
 of the same tissue. For that you can use the following script :
 
-    supervised.py --train-data data_matrix.tsv --test-data data_matrix.tsv --train-casses train_classes.txt --test-classes test_classes.txt --alignment alignment_file.txt --image tissue_image.jpg
+    supervised.py --train-data data_matrix.tsv --test-data data_matrix.tsv --train-casses train_classes.txt --test-classes test_classes.txt --image tissue_image.jpg
     
   This will generate some statistics, a file with the predicted classes for each spot and a plot of the predicted spots on top of the tissue image (if the image and the alignment matrix are given). The script has been updated to be able to take as input more than one dataset/alignment/image for the training data.
   

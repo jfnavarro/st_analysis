@@ -16,13 +16,13 @@ with io.open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
   name = 'stanalysis',
-  version = "0.1.6",
+  version = "0.1.7",
   description = __doc__.split("\n", 1)[0],
   long_description = long_description,
   keywords = 'rna-seq analysis spatial transcriptomics toolkit',
   author = 'Jose Fernandez Navarro',
   author_email = 'jose.fernandez.navarro@scilifelab.se',
-  license = 'BSD',
+  license = 'MIT',
   packages = find_packages(),
   include_package_data = False,
   package_data = {'': ['RELEASE-VERSION']},
@@ -34,7 +34,8 @@ setup(
     'numpy',
     'pandas',
     'sklearn',
-    'matplotlib'
+    'matplotlib',
+    'rpy2'
   ],
   #test_suite = 'tests',
   scripts = glob.glob('scripts/*.py'),
@@ -43,7 +44,7 @@ setup(
     'Intended Audience :: Science/Research',
     'Topic :: Software Development',
     'Topic :: Scientific/Engineering :: Bio-Informatics',
-    'License :: BSD:: Copyright Jose Fernandez Navarro, KTH, KI',
+    'License :: MIT:: Copyright Jose Fernandez Navarro',
     'Programming Language :: Python :: 2.7',
     'Environment :: Console',
   ],

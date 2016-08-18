@@ -37,8 +37,8 @@ def main(bed_file, barcodes_files, outfile):
                 if line.find("#") == -1:
                     tokens = line.split()
                     assert(len(tokens) == 4)
-                    x = int(tokens[1])
-                    y = int(tokens[2])
+                    x = float(tokens[1])
+                    y = float(tokens[2])
                     barcodes.add((x,y))
         
     # Writes entries that contain a coordinate in the previous list
@@ -49,8 +49,8 @@ def main(bed_file, barcodes_files, outfile):
                     continue
                 tokens = line.split()
                 assert(len(tokens) == 9)
-                x = int(tokens[7])
-                y = int(tokens[8])
+                x = float(tokens[7])
+                y = float(tokens[8])
                 if (x,y) in barcodes:
                     filehandler_write.write(line)
                     
