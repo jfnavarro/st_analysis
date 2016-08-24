@@ -42,6 +42,9 @@ from stanalysis.normalization import *
 from stanalysis.alignment import parseAlignmentMatrix
 import matplotlib.pyplot as plt
 
+MIN_FEATURES_GENE = 10
+MIN_EXPRESION = 2
+
 def main(counts_table_files, 
          normalization, 
          num_clusters, 
@@ -76,8 +79,6 @@ def main(counts_table_files,
     num_genes_keep = num_genes_keep / 100.0
     
     # Spots are rows and genes are columns
-    # Merge all the datasets into one and append the dataset index to each row
-    index_to_spots = [[] for ele in xrange(len(counts_table_files))]
     counts = pd.DataFrame()
     sample_counts = dict()
     for i,counts_file in enumerate(counts_table_files):
@@ -91,13 +92,19 @@ def main(counts_table_files,
                   output=os.path.join(outdir, "hist_reads_{}.png".format(i)))
         histogram(x_points=(new_counts != 0).sum(axis=1).values, 
                   output=os.path.join(outdir, "hist_genes_{}.png".format(i)))
+        
         # How many spots do we keep based on the number of genes expressed?
         min_genes_spot_exp = round((new_counts != 0).sum(axis=1).quantile(num_exp_genes))
         print "Number of expressed genes a spot must have to be kept " \
         "({0}% of total expressed genes) {1}".format(num_exp_genes, min_genes_spot_exp)
-        # Remove noisy spots  
-        new_counts = new_counts[(new_counts != 0).sum(axis=1) >= min_genes_spot_exp]
+        new_counts = new_counts.ix[(new_counts != 0).sum(axis=1) >= min_genes_spot_exp,:]
         print "Dropped {} spots".format(num_spots - len(new_counts.index))
+            
+        # Remove noisy genes
+        print "Removing poorly expressed genes (over all spots)"
+        new_counts = new_counts.ix[:,(new_counts >= MIN_EXPRESION).sum(axis=0) >= MIN_FEATURES_GENE]
+        print "Dropped {} genes".format(num_genes - len(new_counts.columns))
+    
         # Append dataset index to the spots (indexes)
         new_spots = ["{0}_{1}".format(i, spot) for spot in new_counts.index]
         new_counts.index = new_spots
@@ -111,51 +118,59 @@ def main(counts_table_files,
     
     # Write aggregated matrix to file
     counts.to_csv(os.path.join(outdir, "aggregated_counts.tsv"), sep="\t")
-    
+               
     # Per sample normalization
     if apply_sample_normalization:
         print "Computing per sample normalization..."
+        # First build up a data frame with the accumulated gene counts for
+        # each sample
         per_sample_factors = pd.DataFrame(index=sample_counts.keys(), columns=counts.columns)
         for key,value in sample_counts.iteritems():
             per_sample_factors.loc[key] = value
         # Replace Nan and Inf by zeroes
         per_sample_factors.replace([np.inf, -np.inf], np.nan)
         per_sample_factors.fillna(0.0, inplace=True)
+        
         # Spots are columns and genes are rows
         per_sample_factors = per_sample_factors.transpose()
+        
+        # Compute normalization factors for each dataset(sample) using DESeq 
         per_sample_size_factors = computeSizeFactors(per_sample_factors)
+        
         # Now use the factors per sample to normalize genes in each sample
         # one factor per sample so we divide every gene count of each sample by its factor
         for spot in counts.index:
-            # bc is i_XxY
+            # spot is i_XxY
             tokens = spot.split("x")
             assert(len(tokens) == 2)
             index = int(tokens[0].split("_")[0])
             factor = per_sample_size_factors[index]
-            #TODO this line fails sometimes, it seems to be a bug in Pandas for very big matrices
             counts.loc[spot] = counts.loc[spot] / factor
+            
         # Replace Nan and Inf by zeroes
         counts.replace([np.inf, -np.inf], np.nan)
         counts.fillna(0.0, inplace=True)
         
     # Spots are columns and genes are rows
     counts = counts.transpose()
-
+    
     print "Computing per spot normalization..." 
     # Per spot normalization
     if normalization in "DESeq":
         size_factors = computeSizeFactors(counts)
-        norm_counts = counts.div(size_factors)
+        norm_counts = counts / size_factors
     elif normalization in "DESeq2":
         size_factors = computeSizeFactorsLinear(counts)
-        norm_counts = counts.div(size_factors)
+        norm_counts = counts / size_factors
     elif normalization in "DESeq2Log":
         norm_counts = computeDESeq2LogTransform(counts)
     elif normalization in "EdgeR":
-        norm_counts = computeEdgeRNormalization(counts)
+        size_factors = computeEdgeRNormalization(counts)
+        # An alternative is to multiply by 10e6
+        norm_counts = (counts / size_factors) * np.mean(size_factors)
     elif normalization in "REL":
         spots_sum = counts.sum(axis=0)
-        norm_counts = counts.div(spots_sum) 
+        norm_counts = counts / spots_sum
     elif normalization in "RAW":
         norm_counts = counts
     else:
@@ -206,8 +221,8 @@ def main(counts_table_files,
         sys.exit(1)
     
     if use_log_scale:
-        print "Using pseudo-log counts log2(counts + 0.1)"
-        norm_counts = np.log2(norm_counts + 0.1)  
+        print "Using pseudo-log counts log2(counts + 1)"
+        norm_counts = np.log2(norm_counts + 1)  
      
     print "Performing dimensionality reduction..."    
     # Perform dimensionality reduction, outputs a bunch of 2D coordinates

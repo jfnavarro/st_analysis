@@ -61,8 +61,7 @@ def computeEdgeRNormalization(counts):
     y = edger.calcNormFactors(dge)
     y = edger.estimateCommonDisp(y)
     mult = r.get('*')
-    normalized = mult(y[0], y[1][2])
-    pandas_count = pd.DataFrame(np.matrix(normalized), columns=normalized.colnames, index=normalized.rownames)
+    dds = mult(y[1][1], y[1][2])
+    pandas_sf = pandas2ri.ri2py(dds)
     pandas2ri.deactivate()
-    # EdgeR transposes the matrix of counts
-    return pandas_count.transpose()
+    return pandas_sf
