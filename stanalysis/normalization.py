@@ -13,7 +13,8 @@ def RimportLibrary(lib_name):
         biocinstaller = rpackages.importr("BiocInstaller")
         biocinstaller.biocLite(lib_name)
     return rpackages.importr(lib_name)
-     
+
+    
 def computeSizeFactors(counts):
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)

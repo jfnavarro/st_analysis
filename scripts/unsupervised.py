@@ -92,18 +92,6 @@ def main(counts_table_files,
                   output=os.path.join(outdir, "hist_reads_{}.png".format(i)))
         histogram(x_points=(new_counts != 0).sum(axis=1).values, 
                   output=os.path.join(outdir, "hist_genes_{}.png".format(i)))
-        
-        # How many spots do we keep based on the number of genes expressed?
-        min_genes_spot_exp = round((new_counts != 0).sum(axis=1).quantile(num_exp_genes))
-        print "Number of expressed genes a spot must have to be kept " \
-        "({0}% of total expressed genes) {1}".format(num_exp_genes, min_genes_spot_exp)
-        new_counts = new_counts.ix[(new_counts != 0).sum(axis=1) >= min_genes_spot_exp,:]
-        print "Dropped {} spots".format(num_spots - len(new_counts.index))
-            
-        # Remove noisy genes
-        print "Removing poorly expressed genes (over all spots)"
-        new_counts = new_counts.ix[:,(new_counts >= MIN_EXPRESION).sum(axis=0) >= MIN_FEATURES_GENE]
-        print "Dropped {} genes".format(num_genes - len(new_counts.columns))
     
         # Append dataset index to the spots (indexes)
         new_spots = ["{0}_{1}".format(i, spot) for spot in new_counts.index]
@@ -150,10 +138,25 @@ def main(counts_table_files,
         # Replace Nan and Inf by zeroes
         counts.replace([np.inf, -np.inf], np.nan)
         counts.fillna(0.0, inplace=True)
-        
+
+    # How many spots do we keep based on the number of genes expressed?
+    num_spots = len(counts.index)
+    num_genes = len(counts.columns)
+    min_genes_spot_exp = round((counts != 0).sum(axis=1).quantile(num_exp_genes))
+    print "Number of expressed genes a spot must have to be kept " \
+    "(1% of total expressed genes) {}".format(min_genes_spot_exp)
+    counts = counts[(counts != 0).sum(axis=1) >= min_genes_spot_exp]
+    print "Dropped {} spots".format(num_spots - len(counts.index))
+          
     # Spots are columns and genes are rows
     counts = counts.transpose()
-    
+  
+    # Remove noisy genes
+    print "Removing genes that are expressed in less than {} " \
+    "spots with a count of at least {}".format(MIN_FEATURES_GENE, MIN_EXPRESION)
+    counts = counts[(counts >= MIN_EXPRESION).sum(axis=1) >= MIN_FEATURES_GENE]
+    print "Dropped {} genes".format(num_genes - len(counts.index))
+      
     print "Computing per spot normalization..." 
     # Per spot normalization
     if normalization in "DESeq":
