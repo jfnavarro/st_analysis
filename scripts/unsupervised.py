@@ -42,9 +42,11 @@ from stanalysis.normalization import *
 from stanalysis.alignment import parseAlignmentMatrix
 import matplotlib.pyplot as plt
 
-MIN_FEATURES_GENE = 10
 MIN_EXPRESION = 2
 
+def linear_conv(old, min, max, new_min, new_max):
+    return ((old - min) / (max - min)) * ((new_max - new_min) + new_min)
+        
 def main(counts_table_files, 
          normalization, 
          num_clusters, 
@@ -104,11 +106,12 @@ def main(counts_table_files,
     counts.replace([np.inf, -np.inf], np.nan)
     counts.fillna(0.0, inplace=True)
     
-    # Write aggregated matrix to file
-    counts.to_csv(os.path.join(outdir, "aggregated_counts.tsv"), sep="\t")
+    if len(counts_table_files) > 1:
+        # Write aggregated matrix to file
+        counts.to_csv(os.path.join(outdir, "aggregated_counts.tsv"), sep="\t")
                
     # Per sample normalization
-    if apply_sample_normalization:
+    if apply_sample_normalization and len(counts_table_files) > 1:
         print "Computing per sample normalization..."
         # First build up a data frame with the accumulated gene counts for
         # each sample
@@ -152,9 +155,10 @@ def main(counts_table_files,
     counts = counts.transpose()
   
     # Remove noisy genes
+    min_features_gene = round(len(counts.columns) * 0.01) 
     print "Removing genes that are expressed in less than {} " \
-    "spots with a count of at least {}".format(MIN_FEATURES_GENE, MIN_EXPRESION)
-    counts = counts[(counts >= MIN_EXPRESION).sum(axis=1) >= MIN_FEATURES_GENE]
+    "spots with a count of at least {}".format(min_features_gene, MIN_EXPRESION)
+    counts = counts[(counts >= MIN_EXPRESION).sum(axis=1) >= min_features_gene]
     print "Dropped {} genes".format(num_genes - len(counts.index))
       
     print "Computing per spot normalization..." 
@@ -248,21 +252,19 @@ def main(counts_table_files,
     if 0 in labels: labels = labels + 1
     
     # Compute a color_label based on the RGB representation of the 3D dimensionality reduced
+    labels_colors = list()
+    x_max = max(reduced_data[:,0])
+    x_min = min(reduced_data[:,0])
+    y_max = max(reduced_data[:,1])
+    y_min = min(reduced_data[:,1])
     if num_dimensions == 3:
-        labels_colors = list()
-        x_max = max(reduced_data[:,0])
-        x_min = min(reduced_data[:,0])
-        y_max = max(reduced_data[:,1])
-        y_min = min(reduced_data[:,1])
         z_max = max(reduced_data[:,2])
         z_min = min(reduced_data[:,2])
-        def linear_conv(old, min, max, new_min, new_max):
-            return ((old - min) / (max - min)) * ((new_max - new_min) + new_min)
-        for x,y,z in zip(reduced_data[:,0], reduced_data[:,1], reduced_data[:,2]):
-            r = linear_conv(x, x_min, x_max, 0.0, 1.0)
-            g = linear_conv(y, y_min, y_max, 0.0, 1.0)
-            b = linear_conv(z, z_min, z_max, 0.0, 1.0)
-            labels_colors.append((r,g,b))
+    for x,y,z in zip(reduced_data[:,0], reduced_data[:,1], reduced_data[:,2]):
+        r = linear_conv(x, x_min, x_max, 0.0, 1.0)
+        g = linear_conv(y, y_min, y_max, 0.0, 1.0)
+        b = linear_conv(z, z_min, z_max, 0.0, 1.0) if num_dimensions == 3 else 1.0
+        labels_colors.append((r,g,b))
 
     print "Generating plots..." 
      
@@ -305,8 +307,7 @@ def main(counts_table_files,
         x_points_index[index].append(x)
         y_points_index[index].append(y)
         labels_index[index].append(labels[i])
-        if num_dimensions == 3:
-            labels_color_index[index].append(labels_colors[i])
+        labels_color_index[index].append(labels_colors[i])
         file_writers[index].write("{0}\t{1}\n".format(labels[i], "{}x{}".format(x,y)))
         
     # Close the files
@@ -332,19 +333,18 @@ def main(counts_table_files,
                          image=image, 
                          alpha=1.0, 
                          size=100)
-            if num_dimensions == 3:
-                scatter_plot(x_points=x_points_index[i], 
-                             y_points=y_points_index[i],
-                             colors=labels_color_index[i], 
-                             output=os.path.join(outdir,"dimensionality_color_tissue_{}.png".format(i)), 
-                             alignment=alignment_matrix, 
-                             cmap=plt.get_cmap("hsv"), 
-                             title='Dimensionality color tissue', 
-                             xlabel='X', 
-                             ylabel='Y',
-                             image=image, 
-                             alpha=1.0, 
-                             size=100)
+            scatter_plot(x_points=x_points_index[i], 
+                        y_points=y_points_index[i],
+                        colors=labels_color_index[i], 
+                        output=os.path.join(outdir,"dimensionality_color_tissue_{}.png".format(i)), 
+                        alignment=alignment_matrix, 
+                        cmap=plt.get_cmap("hsv"), 
+                        title='Dimensionality color tissue', 
+                        xlabel='X', 
+                        ylabel='Y',
+                        image=image, 
+                        alpha=1.0, 
+                        size=100)
              
                                 
 if __name__ == '__main__':

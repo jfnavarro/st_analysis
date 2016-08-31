@@ -24,13 +24,9 @@ what spots to plot
 
 import argparse
 import re
-import matplotlib
-from matplotlib import transforms
 from matplotlib import pyplot as plt
-from stanalysis.alignment import parseAlignmentMatrix
-from stanalysis.visualization import color_map
+from stanalysis.visualization import scatter_plot
 from stanalysis.normalization import computeSizeFactors
-import numpy as np
 import pandas as pd
 import os
 import sys
@@ -61,11 +57,11 @@ def main(input_data,
     # Spots are columns and genes are rows
     norm_counts_table = norm_counts_table.transpose()
     if normalization in "DESeq":
-        norm_counts_table = computeSizeFactors(norm_counts_table, function=np.median)
-        norm_counts = counts.div(size_factors) 
+        size_factors = computeSizeFactors(norm_counts_table)
+        norm_counts_table = norm_counts_table.div(size_factors) 
     elif normalization in "REL":
         spots_sum = norm_counts_table.sum(axis=0)
-        norm_counts = norm_counts_table.div(spots_sum) 
+        norm_counts_table = norm_counts_table.div(spots_sum) 
     elif normalization in "RAW":
         norm_counts_table = norm_counts_table
     else:
@@ -85,74 +81,53 @@ def main(input_data,
     else: 
         genes_to_keep = norm_counts_table.columns
         
-    # Compute the expressions for each coordinate
+    # Compute the expressions for each spot
     # as the sum of all spots that pass the thresholds (Gene and counts)
-    expression = np.zeros((35, 35), dtype=np.float)
+    x_points = list()
+    y_points = list()
+    values = list()
     for spot in norm_counts_table.index:
         tokens = spot.split("x")
-        x = tokens[0]
-        y = tokens[1]
-        sum_count = sum(count for count in norm_counts_table.loc[spot,genes_to_keep] if count > cutoff)
-        expression[x, y] = sum_count                
+        assert(len(tokens) == 2)
+        x_points.append(float(tokens[0]))
+        y_points.append(float(tokens[1]))
+        values.append(sum(count for count in norm_counts_table.loc[spot,genes_to_keep] if count > cutoff))           
                      
-    # Parse the clusters colors if given
-    if highlight_barcodes:   
-        colors = np.zeros((35,35), dtype=np.int)     
+    # Parse the clusters colors if given for each spot
+    colors = list()
+    if highlight_barcodes: 
         with open(highlight_barcodes, "r") as filehandler_read:
             for line in filehandler_read.readlines():
                 tokens = line.split()
-                assert(len(tokens) == 3)
-                cluster = int(tokens[0])
-                x = float(tokens[1])
-                y = float(tokens[2])
-                colors[x,y] = cluster
+                assert(len(tokens) == 2 or len(tokens) ==3)
+                colors.append(int(tokens[0]))
+    
+    if len(colors) != len(values):
+        sys.stderr.write("Error, the list of spots to highlight does not match the input data\n")
+        sys.exit(1)        
 
     # Create a scatter plot, if highlight_barcodes is given
     # then plot another scatter plot on the same canvas.
     # If image is given plot it as a background
-    fig = plt.figure(figsize=(16,16))
-    a = fig.add_subplot(111, aspect='equal')
-    alignment_matrix = parseAlignmentMatrix(alignment)
-    base_trans = a.transData
-    tr = transforms.Affine2D(matrix = alignment_matrix) + base_trans
-    # First scatter plot
-    x, y = expression.nonzero()
-    a.scatter(x, 
-              y, 
-              c=expression[x, y], 
-              cmap=plt.get_cmap("YlOrBr"), 
-              edgecolor="none", 
-              s=dot_size, 
-              transform=tr,
-              alpha=data_alpha)
-    # Second scatter plot
+    color = values
+    cmap = plt.get_cmap("YlOrBr")
+    alpha = data_alpha
     if highlight_barcodes:
-        x2, y2 = colors.nonzero()
-        colors_second = colors[x2, y2]
-        color_list = set(colors[x2,y2].tolist())
-        cmap = color_map[min(color_list)-1:max(color_list)]
-        a.scatter(x2, y2,
-                  c=colors_second,
-                  cmap=matplotlib.colors.ListedColormap(cmap),
-                  edgecolor="none",
-                  s=dot_size,
-                  transform=tr,
-                  alpha=highlight_alpha)
-        # plot legend
-        a.legend([plt.Line2D((0,1),(0,0), color=x) for x in cmap],
-                 color_list, loc="upper right", markerscale=1.0,
-                 ncol=1, scatterpoints=1, fontsize=10)
-    
-    # Plot image as background    
-    if image is not None and os.path.isfile(image):
-        img = plt.imread(image)
-        a.imshow(img)
-    # General settings and write to file
-    a.set_xlabel("X")
-    a.set_ylabel("Y")
-    a.set_title("Scatter", size=20)
-    fig.set_size_inches(16, 16)
-    fig.savefig(outfile, dpi=300)
+        color = colors
+        cmap = None
+        alpha = highlight_alpha
+    scatter_plot(x_points=x_points,
+                 y_points=y_points,
+                 colors=color,
+                 output=outfile,
+                 alignment=alignment,
+                 cmap=cmap,
+                 title='ST Data scatter',
+                 xlabel='X',
+                 ylabel='Y',
+                 image=image,
+                 alpha=alpha,
+                 size=dot_size)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
@@ -163,7 +138,7 @@ if __name__ == '__main__':
                         help="When given the data will plotted on top of the image, " \
                         "if the alignment matrix is given the data will be aligned, otherwise it is assumed " \
                         "that the image is cropped to the array boundaries")
-    parser.add_argument("--cutoff", help="Do not include genes below this reads cut off (default: %(default)s)",
+    parser.add_argument("--cutoff", help="Do not include genes below this reads cut off per spot (default: %(default)s)",
                         type=float, default=0.0, metavar="[FLOAT]", choices=range(0, 100))
     parser.add_argument("--highlight-spots", default=None,
                         help="A file containing spots (x,y) and the class/label they belong to\n CLASS_NUMBER X Y")
@@ -171,13 +146,13 @@ if __name__ == '__main__':
                         help="A file containing the alignment image (array coordinates to pixel coordinates) " \
                         "as a 3x3 matrix in a tab delimited format. Only useful if the image given is not cropped " \
                         "to the array boundaries of you want to plot the image in original size")
-    parser.add_argument("--data-alpha", type=float, default=1.0, metavar="[FLOAT]", choices=range(0, 1),
+    parser.add_argument("--data-alpha", type=float, default=1.0, metavar="[FLOAT]",
                         help="The transparency level for the data points, 0 min and 1 max (default: %(default)s)")
-    parser.add_argument("--highlight-alpha", type=float, default=1.0, metavar="[FLOAT]", choices=range(0, 1),
+    parser.add_argument("--highlight-alpha", type=float, default=1.0, metavar="[FLOAT]",
                         help="The transparency level for the highlighted barcodes, 0 min and 1 max (default: %(default)s)")
-    parser.add_argument("--dot-size", type=int, default=50, metavar="[INT]", choices=range(10, 100),
+    parser.add_argument("--dot-size", type=int, default=50, metavar="[INT]", choices=range(10, 101),
                         help="The size of the dots (default: %(default)s)")
-    parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
+    parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, choices=["RAW", "DESeq", "REL"],
                         help="Normalize the counts using RAW(absolute counts) , " \
                         "DESeq or REL(relative counts) (default: %(default)s)")
