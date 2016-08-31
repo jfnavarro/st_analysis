@@ -257,10 +257,14 @@ def main(counts_table_files,
     x_min = min(reduced_data[:,0])
     y_max = max(reduced_data[:,1])
     y_min = min(reduced_data[:,1])
+    x_p = reduced_data[:,0]
+    y_p = reduced_data[:,1]
+    z_p = y_p
     if num_dimensions == 3:
+        z_p = reduced_data[:,3]
         z_max = max(reduced_data[:,2])
         z_min = min(reduced_data[:,2])
-    for x,y,z in zip(reduced_data[:,0], reduced_data[:,1], reduced_data[:,2]):
+    for x,y,z in zip(x_p,y_p,z_p):
         r = linear_conv(x, x_min, x_max, 0.0, 1.0)
         g = linear_conv(y, y_min, y_max, 0.0, 1.0)
         b = linear_conv(z, z_min, z_max, 0.0, 1.0) if num_dimensions == 3 else 1.0
@@ -293,8 +297,7 @@ def main(counts_table_files,
     x_points_index = [[] for ele in xrange(len(counts_table_files))]
     y_points_index = [[] for ele in xrange(len(counts_table_files))]
     labels_index = [[] for ele in xrange(len(counts_table_files))]
-    if num_dimensions == 3:
-        labels_color_index = [[] for ele in xrange(len(counts_table_files))]
+    labels_color_index = [[] for ele in xrange(len(counts_table_files))]
     file_writers = [open(os.path.join(outdir,"computed_classes_{}.txt".format(i)),"w") for i in xrange(len(counts_table_files))]
     # Write the coordinates and the label/class the belong to
     for i,bc in enumerate(norm_counts.index):
