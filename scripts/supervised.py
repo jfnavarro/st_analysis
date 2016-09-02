@@ -34,6 +34,7 @@ from sklearn import metrics
 from sklearn.multiclass import OneVsRestClassifier
 from stanalysis.visualization import scatter_plot
 from stanalysis.alignment import parseAlignmentMatrix
+from cProfile import label
 
 def get_classes_coordinate(class_file):
     """ Helper function
@@ -70,19 +71,6 @@ def main(train_data,
         outdir = os.getcwd()
         
     print "Output folder {}".format(outdir)
-           
-    # loads all the classes for the training set
-    train_labels = list()
-    for labels_file in classes_train:
-        with open(labels_file) as filehandler:
-            for line in filehandler.readlines():
-                train_labels.append(line.split()[0])
-                
-    # loads all the classes for the test set
-    test_labels = list()
-    with open(classes_test) as filehandler:
-        for line in filehandler.readlines():
-            test_labels.append(line.split()[0])
       
     # loads the training set
     # spots are rows and genes are columns
@@ -94,11 +82,39 @@ def main(train_data,
     train_data_frame.fillna(0.0, inplace=True)
     train_genes = list(train_data_frame.columns.values)
     
+    # loads all the classes for the training set
+    train_labels = list()
+    for labels_file in classes_train:
+        with open(labels_file) as filehandler:
+            for line in filehandler.readlines():
+                train_labels.append(line.split()[0])
+    assert(len(train_labels) == len(train_data_frame))       
+         
     # loads the test set
     # spots are rows and genes are columns
     test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0)    
     test_genes = list(test_data_frame.columns.values)
     
+    # loads all the classes for the test set
+    # filter out labels whose barcode is not present and
+    # also make sure that the order of the labels is the same in the data frame
+    test_labels = list()
+    if classes_test is not None:
+        spot_label = dict()
+        with open(classes_test) as filehandler:
+            for line in filehandler.readlines():
+                tokens = line.split()
+                spot = tokens[1]
+                label = tokens[0]
+                spot_label[spot] = label      
+        for spot in test_data_frame.index:
+            try:
+                test_labels.append(spot_label[spot])
+            except KeyError:
+                test_data_frame.drop(spot, axis=0, inplace=True)
+        assert(len(test_labels) == len(test_data_frame))  
+      
+          
     # Keep only the record in the training set that intersects with the test set
     print "Training genes {}".format(len(train_genes))
     print "Test genes {}".format(len(test_genes))
@@ -133,9 +149,10 @@ def main(train_data,
     predicted = classifier.fit(train_counts, train_labels).predict(test_counts) 
     
     # Compute accuracy
-    print("Classification report for classifier {0}:\n{1}\n".
-          format(classifier, metrics.classification_report(test_labels, predicted)))
-    print("Confusion matrix:\n{}".format(metrics.confusion_matrix(test_labels, predicted)))
+    if classes_test is not None:
+        print("Classification report for classifier {0}:\n{1}\n".
+              format(classifier, metrics.classification_report(test_labels, predicted)))
+        print("Confusion matrix:\n{}".format(metrics.confusion_matrix(test_labels, predicted)))
     
     # Write the spots and their predicted classes to a file
     x_points = list()
@@ -147,8 +164,8 @@ def main(train_data,
             assert(len(tokens) == 2)
             y = float(tokens[1])
             x = float(tokens[0])
-            x_points.append(int(x))
-            y_points.append(int(y))
+            x_points.append(x)
+            y_points.append(y)
             filehandler.write("{0}\t{1}\t{2}\n".format(label, x, y))
             
     # Plot the spots with the predicted color on top of the tissue image
@@ -167,7 +184,7 @@ def main(train_data,
                      ylabel='Y',
                      image=image, 
                      alpha=1.0, 
-                     size=50)
+                     size=100)
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
