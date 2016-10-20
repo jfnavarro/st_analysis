@@ -1,5 +1,7 @@
 """ 
-Alignment functions for the st analysis package
+Alignment functions for the ST Analysis packages.
+Aligment refers to the matrix that transforms
+spots in array coordinates to image pixel coordinates.
 """
 import numpy as np
 import os

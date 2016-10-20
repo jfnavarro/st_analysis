@@ -7,7 +7,7 @@ The output will be a .png file with the same name as the input file if no name i
 
 It allows to highlight spots with colors using a file with the following format : 
 
-CLASS_NUMBER X Y
+CLASS_NUMBER XxY
 
 It allows to choose transparency for the data points
 
@@ -26,7 +26,7 @@ import argparse
 import re
 from matplotlib import pyplot as plt
 from stanalysis.visualization import scatter_plot
-from stanalysis.normalization import computeSizeFactors
+from stanalysis.preprocessing import *
 import pandas as pd
 import os
 import sys
@@ -54,22 +54,8 @@ def main(input_data,
     norm_counts_table = pd.read_table(input_data, sep="\t", header=0, index_col=0)
 
     # Normalization
-    # Spots are columns and genes are rows
-    norm_counts_table = norm_counts_table.transpose()
-    if normalization in "DESeq":
-        size_factors = computeSizeFactors(norm_counts_table)
-        norm_counts_table = norm_counts_table.div(size_factors) 
-    elif normalization in "REL":
-        spots_sum = norm_counts_table.sum(axis=0)
-        norm_counts_table = norm_counts_table.div(spots_sum) 
-    elif normalization in "RAW":
-        norm_counts_table = norm_counts_table
-    else:
-        sys.stderr.write("Error, incorrect normalization method\n")
-        sys.exit(1)
-     
-    # Genes are columns and spots are rows
-    norm_counts_table = norm_counts_table.transpose()                         
+    norm_counts_table = normalize_data(norm_counts_table, normalization)
+                         
     # Extract the list of the genes that must be shown
     genes_to_keep = list()
     if filter_genes:
@@ -91,7 +77,8 @@ def main(input_data,
         assert(len(tokens) == 2)
         x_points.append(float(tokens[0]))
         y_points.append(float(tokens[1]))
-        values.append(sum(count for count in norm_counts_table.loc[spot,genes_to_keep] if count > cutoff))           
+        values.append(sum(count for count in 
+                          norm_counts_table.loc[spot,genes_to_keep] if count > cutoff))           
                      
     # Parse the clusters colors if given for each spot
     colors = list()
@@ -152,10 +139,11 @@ if __name__ == '__main__':
                         help="The transparency level for the highlighted barcodes, 0 min and 1 max (default: %(default)s)")
     parser.add_argument("--dot-size", type=int, default=50, metavar="[INT]", choices=range(10, 101),
                         help="The size of the dots (default: %(default)s)")
-    parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
-                        type=str, choices=["RAW", "DESeq", "REL"],
+    parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
+                        type=str, choices=["RAW", "DESeq", "DESeq2", "DESeq2Log", "EdgeR", "REL"],
                         help="Normalize the counts using RAW(absolute counts) , " \
-                        "DESeq or REL(relative counts) (default: %(default)s)")
+                        "DESeq, DESeq2, DESeq2Log, EdgeR and " \
+                        "REL(relative counts, each gene count divided by the total count of its spot) (default: %(default)s)")
     parser.add_argument("--filter-genes", help="Regular expression for \
                         gene symbols to filter out. Can be given several times.",
                         default=None,

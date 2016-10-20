@@ -29,6 +29,7 @@ import os
 import numpy as np
 import pandas as pd
 #from sklearn.feature_selection import VarianceThreshold
+from stanalysis.preprocessing import *
 from sklearn.svm import LinearSVC
 from sklearn import metrics
 from sklearn.multiclass import OneVsRestClassifier
@@ -58,7 +59,10 @@ def main(train_data,
          use_log_scale,
          outdir,
          alignment, 
-         image):
+         image,
+         normalization,
+         num_exp_genes,
+         num_genes_keep):
 
     if len(train_data) == 0 or any([not os.path.isfile(f) for f in train_data]) \
     or len(train_data) != len(classes_train) \
@@ -71,15 +75,9 @@ def main(train_data,
         outdir = os.getcwd()
         
     print "Output folder {}".format(outdir)
-      
-    # loads the training set
-    # spots are rows and genes are columns
-    train_data_frame = pd.DataFrame()
-    for i,counts_file in enumerate(train_data):
-        new_counts = pd.read_table(counts_file, sep="\t", header=0, index_col=0)
-        new_counts.index = ["{0}_{1}".format(i, spot) for spot in new_counts.index]
-        train_data_frame = train_data_frame.append(new_counts)
-    train_data_frame.fillna(0.0, inplace=True)
+  
+    # Merge input train datasets (Spots are rows and genes are columns)
+    train_data_frame = aggregate_datatasets(counts_table_files)
     train_genes = list(train_data_frame.columns.values)
     
     # loads all the classes for the training set
@@ -169,22 +167,21 @@ def main(train_data,
             filehandler.write("{0}\t{1}\t{2}\n".format(label, x, y))
             
     # Plot the spots with the predicted color on top of the tissue image
-    if image is not None and os.path.isfile(image):
-        colors = [int(x) for x in predicted]
-        # alignment_matrix will be identity if alignment file is None
-        alignment_matrix = parseAlignmentMatrix(alignment)
-        scatter_plot(x_points=x_points, 
-                     y_points=y_points, 
-                     colors=colors, 
-                     output=os.path.join(outdir,"predicted_classes_tissue.png"), 
-                     alignment=alignment_matrix, 
-                     cmap=None, 
-                     title='Computed classes tissue', 
-                     xlabel='X', 
-                     ylabel='Y',
-                     image=image, 
-                     alpha=1.0, 
-                     size=100)
+    colors = [int(x) for x in predicted]
+    # alignment_matrix will be identity if alignment file is None
+    alignment_matrix = parseAlignmentMatrix(alignment)
+    scatter_plot(x_points=x_points, 
+                 y_points=y_points, 
+                 colors=colors, 
+                 output=os.path.join(outdir,"predicted_classes_tissue.png"), 
+                 alignment=alignment_matrix, 
+                 cmap=None, 
+                 title='Computed classes tissue', 
+                 xlabel='X', 
+                 ylabel='Y',
+                 image=image, 
+                 alpha=1.0, 
+                 size=200)
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
@@ -207,9 +204,21 @@ if __name__ == '__main__':
     parser.add_argument("--image", default=None, 
                         help="When given the data will plotted on top of the image, \
                         if the alignment matrix is given the data points will be transformed to pixel coordinates")
+    parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
+                        type=str, choices=["RAW", "DESeq", "DESeq2", "DESeq2Log", "EdgeR", "REL"],
+                        help="Normalize the counts using RAW(absolute counts) , " \
+                        "DESeq, DESeq2, DESeq2Log, EdgeR and " \
+                        "REL(relative counts, each gene count divided by the total count of its spot) (default: %(default)s)")
+    parser.add_argument("--num-exp-genes", default=10, metavar="[INT]", type=int, choices=range(0, 100),
+                        help="The percentage of number of expressed genes ( != 0 ) a spot " \
+                        "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
+    parser.add_argument("--num-genes-keep", default=20, metavar="[INT]", type=int, choices=range(0, 100),
+                        help="The percentage of top genes to discard from the distribution of all the genes " \
+                        "across all the spots (default: %(default)s)")
     parser.add_argument("--outdir", help="Path to output dir")
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
          args.test_classes, args.use_log_scale, args.outdir, 
-         args.alignment, args.image)
+         args.alignment, args.image, args.normalization, 
+         args.num_exp_genes, args.num_genes_keep)
 
