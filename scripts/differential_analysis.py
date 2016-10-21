@@ -30,6 +30,7 @@ import os
 import numpy as np
 import pandas as pd
 from stanalysis.normalization import RimportLibrary
+from stanalysis.visualization import scatter_plot
 import rpy2.robjects.packages as rpackages
 import rpy2.robjects as robjects
 from rpy2.robjects import pandas2ri, r, globalenv
@@ -50,6 +51,10 @@ def get_classes_coordinate(class_file):
     return barcodes_classes
    
 def dea(counts, conds):
+    """Makes a call to DESeq2 to
+    perform D.E.A. in the given
+    counts matrix with the given conditions
+    """
     pandas2ri.activate()
     deseq2 = RimportLibrary("DESeq2")
     r("suppressMessages(library(DESeq2))")
@@ -60,13 +65,12 @@ def dea(counts, conds):
     dds = r.DESeqDataSetFromMatrix(countData=r_counts, colData=cond, design=design)
     dds = r.DESeq(dds)
     results = r.results(dds)
-    #pandas_results = pandas2ri.ri2py(results)
     results = pandas2ri.ri2py_dataframe(r['as.data.frame'](results))
     results.index = counts.index
     # Return the DESeq2 DEA results object
     pandas2ri.deactivate()
     return results
-            
+              
 def main(input_data, data_classes, conditions_tuples, outdir):
 
     if not os.path.isfile(input_data) or not os.path.isfile(data_classes) \
@@ -112,9 +116,17 @@ def main(input_data, data_classes, conditions_tuples, outdir):
             except KeyError:
                 sub_counts.drop(spot, axis=1, inplace=True)
         # Make the DEA call
-        print "Doing DEA for the conditions {}".format(cond)
-        dea_results = dea(sub_counts, conds)        
-        print dea_results
+        print "Doing DEA for the conditions {} ...".format(cond)
+        dea_results = dea(sub_counts, conds)
+        dea_results.sort_values(by=["pvalue"], ascending=True, inplace=True, axis=0)
+        print "Writing results to output..."
+        dea_results.to_csv(os.path.join(outdir, "dea_results_{}.tsv".format(cond)), sep="\t")
+        # Volcano plot
+        print "Generating plots..."
+        scatter_plot(dea_results["log2FoldChange"], -np.log10(dea_results["pvalue"]),
+                     xlabel="Log2FoldChange", ylabel="-log10(pvalue)", 
+                     title="Volcano plot", colors=[2], 
+                     output=os.path.join(outdir, "volcano_{}.png".format(cond)))
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,

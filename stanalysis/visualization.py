@@ -69,7 +69,6 @@ def scatter_plot3d(x_points, y_points, z_points, colors,
     :param size: the size of the dots
     :raises: RuntimeError
     """
-    assert(len(x_points) == len(y_points) == len(z_points) == len(colors))
     # Plot spots with the color class in the tissue image
     fig = plt.figure(figsize=(16,16))
     a = fig.add_subplot(111, projection="3d")
@@ -121,7 +120,6 @@ def scatter_plot(x_points, y_points, colors, output,
     :param size: the size of the dots
     :raises: RuntimeError
     """
-    assert(len(x_points) == len(y_points) == len(colors))
     # Plot spots with the color class in the tissue image
     fig = plt.figure(figsize=(16,16))
     a = fig.add_subplot(111, aspect='equal')

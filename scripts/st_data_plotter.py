@@ -89,9 +89,9 @@ def main(input_data,
                 assert(len(tokens) == 2 or len(tokens) ==3)
                 colors.append(int(tokens[0]))
     
-    if len(colors) != len(values):
-        sys.stderr.write("Error, the list of spots to highlight does not match the input data\n")
-        sys.exit(1)        
+        if len(colors) != len(values):
+            sys.stderr.write("Error, the list of spots to highlight does not match the input data\n")
+            sys.exit(1)        
 
     # Create a scatter plot, if highlight_barcodes is given
     # then plot another scatter plot on the same canvas.
@@ -137,7 +137,7 @@ if __name__ == '__main__':
                         help="The transparency level for the data points, 0 min and 1 max (default: %(default)s)")
     parser.add_argument("--highlight-alpha", type=float, default=1.0, metavar="[FLOAT]",
                         help="The transparency level for the highlighted barcodes, 0 min and 1 max (default: %(default)s)")
-    parser.add_argument("--dot-size", type=int, default=50, metavar="[INT]", choices=range(10, 101),
+    parser.add_argument("--dot-size", type=int, default=100, metavar="[INT]", choices=range(10, 500),
                         help="The size of the dots (default: %(default)s)")
     parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
                         type=str, choices=["RAW", "DESeq", "DESeq2", "DESeq2Log", "EdgeR", "REL"],
