@@ -125,8 +125,7 @@ def main(input_data, data_classes, conditions_tuples, outdir):
         print "Generating plots..."
         scatter_plot(dea_results["log2FoldChange"], -np.log10(dea_results["pvalue"]),
                      xlabel="Log2FoldChange", ylabel="-log10(pvalue)", 
-                     title="Volcano plot", colors=[2], 
-                     output=os.path.join(outdir, "volcano_{}.png".format(cond)))
+                     title="Volcano plot", output=os.path.join(outdir, "volcano_{}.png".format(cond)))
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,

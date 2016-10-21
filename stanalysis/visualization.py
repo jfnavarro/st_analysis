@@ -73,10 +73,12 @@ def scatter_plot3d(x_points, y_points, z_points, colors,
     fig = plt.figure(figsize=(16,16))
     a = fig.add_subplot(111, projection="3d")
     color_values = None
-    if cmap is None:
+    if cmap is None and colors is not None:
         color_list = set(colors)
         color_values = [color_map[i] for i in color_list]
         cmap = ListedColormap(color_values)
+    else:
+        colors = "blue"
     a.scatter(x_points, 
               y_points,
               z_points,
@@ -130,10 +132,12 @@ def scatter_plot(x_points, y_points, colors, output,
         base_trans = transforms.Affine2D(matrix = alignment) + base_trans
         extent_size = None
     color_values = None
-    if cmap is None:
+    if cmap is None and colors is not None:
         color_list = set(colors)
         color_values = [color_map[i] for i in color_list]
         cmap = ListedColormap(color_values)
+    else:
+        colors = "blue"
     a.scatter(x_points, 
               y_points,  
               c=colors, 
