@@ -26,6 +26,7 @@ a11 a12 a13 a21 a22 a23 a31 a32 a33
 
 ### Installation
 
+Note that the st_analysis package requires R installed in your system.
 To install this packate just clone or download the repository and type:
 
     python setup.py install
@@ -82,13 +83,17 @@ Older versions of the ST Viewer export the selections in tab delimited format.
 To convert this file to a matrix (data frame) you can use the following :
 
     tab_to_matrix.py --tab-file selection.txt --outfile selection.tsv
+    
+###To remove genes(columns) for the ST Data file in matrix format
+
+    remove_genes_matrix.py --counts-matrix stadata.tsv --ref-exp Malat* --outfile stdata2.tsv
 
 ## Analysis tools
 
 ###To do un-supervised learning
 To see how spots cluster together based on their expression profiles you can run : 
 
-    unsupervised.py --counts-table-files matrix_counts.tsv --normalization DESeq --num-clusters 5 --clustering KMeans --dimensionality tSNE --image-files tissue_image.JPG
+    unsupervised.py --counts-table-files matrix_counts.tsv --normalization DESeq --num-clusters 5 --clustering KMeans --dimensionality tSNE --image-files tissue_image.JPG --use-log-scale 
     
   The script can be given one or serveral datasets (matrices with counts). It will perform dimesionality reduction
   and then cluster the spots together based the dimesionality reduced coordinates. 
@@ -110,7 +115,6 @@ of the same tissue. For that you can use the following script :
   To know more about the parameters you can type --help
 
 ###To visualize ST data (output from the ST Pipeline) 
-
 Use the script st_data_plotter.py. It can plot ST data, it can use
 filters (counts or genes) it can highlight spots with reg. expressions
 of genes and it can highlight spots by giving a file with spot coordinates
@@ -120,3 +124,12 @@ the a tissue image and an alignment matrix. A example run would be :
     st_data_plotter.py --cutoff 2 --filter-genes Actb* --image tissue_image.jpg --alignment alignment_file.txt data_matrix.tsv
     
   This will generate a scatter plot of the expression of the spots that contain a gene Actb and with higher expression than 2 and it will use the tissue image as background. You could optionally pass a list of spots with their classes (Generated with unsupervised.py) to highlight spots in the scatter plot. More info if you type --help
+  
+###To perform Differential Expression Analysis (DEA)
+You can perform a D.E.A using the output from unsupervised.py and a list of groups to where the D.E.A will be performed.
+The scripts generates different plots and the list of D.E genes in a text file. Basically the script
+needs a matrix of counts with ST data (genes as columns), a tab delimited file with two columns where
+the first column is a class and the second is a spot and finally the list of comparisions to be made
+from the classes present in the data (for example: 1-2 1-5)
+
+    differential_analysis.py --input-data stdata.tsv --data-classes spot_classes.txt --condition-tuples 1-2 1-3

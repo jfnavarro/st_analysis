@@ -16,11 +16,22 @@ color_map = ["red", "green", "blue", "orange", "cyan", "yellow", "orchid",
 
 def histogram(x_points, output, title="Histogram", xlabel="X",
               nbins=50, normed=1, color="blue", alpha=1.0):
-
+    """ This function generates a simple density histogram
+    with the points given as input.
+    :param x_points: a list of x coordinates
+    :param title: the title for the plot
+    :param xlabel: the name of the X label
+    :param output: the name/path of the output file
+    :param alpha: the alpha transparency level for the histogram
+    :param nbins: the number of bings for the histogram
+    :param normed: the normalization factor
+    :param color: the color for the histogram
+    """
     fig = plt.figure()
 
     # the histogram of the data
-    n, bins, patches = plt.hist(x_points, bins=nbins, normed=normed, facecolor=color, alpha=alpha)
+    n, bins, patches = plt.hist(x_points, bins=nbins, 
+                                normed=normed, facecolor=color, alpha=alpha)
     
     mean = np.mean(x_points)
     std_dev = np.std(x_points)
@@ -58,15 +69,16 @@ def scatter_plot3d(x_points, y_points, z_points, colors,
     :param size: the size of the dots
     :raises: RuntimeError
     """
-    assert(len(x_points) == len(y_points) == len(z_points) == len(colors))
     # Plot spots with the color class in the tissue image
     fig = plt.figure(figsize=(16,16))
     a = fig.add_subplot(111, projection="3d")
     color_values = None
-    if cmap is None:
+    if cmap is None and colors is not None:
         color_list = set(colors)
         color_values = [color_map[i] for i in color_list]
         cmap = ListedColormap(color_values)
+    else:
+        colors = "blue"
     a.scatter(x_points, 
               y_points,
               z_points,
@@ -110,7 +122,6 @@ def scatter_plot(x_points, y_points, colors, output,
     :param size: the size of the dots
     :raises: RuntimeError
     """
-    assert(len(x_points) == len(y_points) == len(colors))
     # Plot spots with the color class in the tissue image
     fig = plt.figure(figsize=(16,16))
     a = fig.add_subplot(111, aspect='equal')
@@ -121,10 +132,12 @@ def scatter_plot(x_points, y_points, colors, output,
         base_trans = transforms.Affine2D(matrix = alignment) + base_trans
         extent_size = None
     color_values = None
-    if cmap is None:
+    if cmap is None and colors is not None:
         color_list = set(colors)
         color_values = [color_map[i] for i in color_list]
         cmap = ListedColormap(color_values)
+    else:
+        colors = "blue"
     a.scatter(x_points, 
               y_points,  
               c=colors, 

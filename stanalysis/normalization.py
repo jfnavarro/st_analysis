@@ -8,14 +8,21 @@ from rpy2.robjects import pandas2ri, r, globalenv
 base = rpackages.importr("base")
 
 def RimportLibrary(lib_name):
+    """ Helper function to import R libraries
+    using the rpy2 binder
+    """
     if not rpackages.isinstalled(lib_name):
         base.source("http://www.bioconductor.org/biocLite.R")
         biocinstaller = rpackages.importr("BiocInstaller")
         biocinstaller.biocLite(lib_name)
     return rpackages.importr(lib_name)
 
-    
 def computeSizeFactors(counts):
+    """ Computes size factors using DESeq
+    for the counts matrix given as input (Genes as index
+    and spots as rows). Returns the computed size factors
+    as a Pandas object.
+    """
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
     deseq = RimportLibrary("DESeq")
@@ -25,6 +32,11 @@ def computeSizeFactors(counts):
     return pandas_sf
 
 def computeSizeFactorsLinear(counts):
+    """ Computes size factors using DESeq2
+    for the counts matrix given as input (Genes as index
+    and spots as rows). Returns the computed size factors
+    as a Pandas object.
+    """
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
     deseq2 = RimportLibrary("DESeq2")
@@ -39,6 +51,11 @@ def computeSizeFactorsLinear(counts):
     return pandas_sf
 
 def computeDESeq2LogTransform(counts):
+    """ Computes size factors using DESeq2 Log transform
+    for the counts matrix given as input (Genes as index
+    and spots as rows). Returns the normalized counts matrix
+    as a Pandas data frame.
+    """
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
     deseq2 = RimportLibrary("DESeq2")
@@ -49,11 +66,17 @@ def computeDESeq2LogTransform(counts):
     dds = deseq2.DESeqDataSetFromMatrix(countData=r_counts, colData=cond, design=design)
     logs = deseq2.rlog(dds, blind=True, fitType="mean")
     logs_count = gr.assay(logs)
-    pandas_count = pd.DataFrame(np.matrix(logs_count), columns=logs_count.colnames, index=logs_count.rownames)
+    pandas_count = pd.DataFrame(np.matrix(logs_count), 
+                                columns=logs_count.colnames, index=logs_count.rownames)
     pandas2ri.deactivate()
     return pandas_count
             
 def computeEdgeRNormalization(counts):
+    """ Computes size factors using EdgeR
+    for the counts matrix given as input (Genes as index
+    and spots as rows). Returns the computed size factors
+    as a Pandas object.
+    """
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
     edger = RimportLibrary("edgeR")
