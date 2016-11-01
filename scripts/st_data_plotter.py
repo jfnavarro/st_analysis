@@ -144,8 +144,7 @@ if __name__ == '__main__':
                         help="Normalize the counts using RAW(absolute counts) , " \
                         "DESeq, DESeq2, DESeq2Log, EdgeR and " \
                         "REL(relative counts, each gene count divided by the total count of its spot) (default: %(default)s)")
-    parser.add_argument("--filter-genes", help="Regular expression for \
-                        gene symbols to filter out. Can be given several times.",
+    parser.add_argument("--show-genes", help="Regular expression for gene symbols to be shown",
                         default=None,
                         type=str,
                         action='append')
