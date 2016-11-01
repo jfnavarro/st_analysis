@@ -164,9 +164,9 @@ def main(counts_table_files,
     y_min = min(reduced_data[:,1])
     x_p = reduced_data[:,0]
     y_p = reduced_data[:,1]
-    z_p = y_p
+    z_p = None
     if num_dimensions == 3:
-        z_p = reduced_data[:,3]
+        z_p = reduced_data[:,2]
         z_max = max(reduced_data[:,2])
         z_min = min(reduced_data[:,2])
     for x,y,z in zip(x_p,y_p,z_p):
