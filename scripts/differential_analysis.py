@@ -123,8 +123,9 @@ def main(input_data, data_classes, conditions_tuples, outdir):
         dea_results.to_csv(os.path.join(outdir, "dea_results_{}.tsv".format(cond)), sep="\t")
         # Volcano plot
         print "Generating plots..."
+        # TODO add colors according to differently expressed or not
         scatter_plot(dea_results["log2FoldChange"], -np.log10(dea_results["pvalue"]),
-                     xlabel="Log2FoldChange", ylabel="-log10(pvalue)", 
+                     xlabel="Log2FoldChange", ylabel="-log10(pvalue)", colors=None,
                      title="Volcano plot", output=os.path.join(outdir, "volcano_{}.png".format(cond)))
                 
 if __name__ == '__main__':
