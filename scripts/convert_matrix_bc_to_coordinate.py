@@ -3,6 +3,7 @@
 Script that takes a matrix of counts
 where the columns are genes and the rows
 are BARCODE ids like
+
         gene    gene    
 BARCODE
 BARCODE
