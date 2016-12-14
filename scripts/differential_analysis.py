@@ -68,7 +68,7 @@ def dea(counts, conds, size_factors=None):
         dds = r.DESeq(dds)
     else:
         assign_sf = r["sizeFactors<-"]
-        dds = assign_sf(dds, size_factors)
+        dds = assign_sf(object=dds, value=robjects.FloatVector(size_factors))
         dds = r.estimateDispersions(dds)
         dds = r.nbinomWaldTest(dds)
     results = r.results(dds, alpha=0.05)
