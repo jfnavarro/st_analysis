@@ -16,7 +16,7 @@ file is a tab delimited file like this:
 CLASS SPOT 
 
 The script also requires a 
-list of classes to perform differential expression
+list of classes/groups to perform differential expression
 analysis. For example 1-2 or 1-3, etc..
 
 The script will output the list of up-regulated and down-regulated
@@ -31,6 +31,7 @@ import numpy as np
 import pandas as pd
 from stanalysis.normalization import RimportLibrary
 from stanalysis.visualization import scatter_plot
+from stanalysis.normalization import *
 import rpy2.robjects.packages as rpackages
 import rpy2.robjects as robjects
 from rpy2.robjects import pandas2ri, r, globalenv
@@ -50,7 +51,7 @@ def get_classes_coordinate(class_file):
             barcodes_classes[spot] = class_label
     return barcodes_classes
    
-def dea(counts, conds):
+def dea(counts, conds, size_factors=None):
     """Makes a call to DESeq2 to
     perform D.E.A. in the given
     counts matrix with the given conditions
@@ -63,15 +64,21 @@ def dea(counts, conds):
     cond = robjects.DataFrame({"conditions": robjects.StrVector(conds)})
     design = r('formula(~ conditions)')
     dds = r.DESeqDataSetFromMatrix(countData=r_counts, colData=cond, design=design)
-    dds = r.DESeq(dds)
-    results = r.results(dds)
+    if size_factors is None:
+        dds = r.DESeq(dds)
+    else:
+        assign_sf = r["sizeFactors<-"]
+        dds = assign_sf(object=dds, value=robjects.FloatVector(size_factors))
+        dds = r.estimateDispersions(dds)
+        dds = r.nbinomWaldTest(dds)
+    results = r.results(dds, alpha=0.05)
     results = pandas2ri.ri2py_dataframe(r['as.data.frame'](results))
     results.index = counts.index
     # Return the DESeq2 DEA results object
     pandas2ri.deactivate()
     return results
               
-def main(input_data, data_classes, conditions_tuples, outdir):
+def main(input_data, data_classes, conditions_tuples, outdir, fdr, normalization):
 
     if not os.path.isfile(input_data) or not os.path.isfile(data_classes) \
     or len(conditions_tuples) < 1:
@@ -94,7 +101,23 @@ def main(input_data, data_classes, conditions_tuples, outdir):
             assert(len(tokens) == 2)
             spot_classes[tokens[1]] = str(tokens[0])
     assert(len(spot_classes) == len(counts.index))       
-         
+     
+    # Spots as columns and genes as rows
+    counts = counts.transpose()
+    # Per spot normalization
+    if normalization in "DESeq":
+        size_factors = None
+    elif normalization in "EdgeR":
+        size_factors = computeEdgeRNormalization(counts)
+    elif normalization in "TMM":
+        size_factors = computeTMMFactors(counts)
+    elif normalization in "DESeq+1":
+        size_factors = computeSizeFactors(counts + 1)
+    elif normalization in "Scran":
+        size_factors = computeSumFactors(counts)  
+    else:
+        raise RunTimeError("Error, incorrect normalization method\n")
+        
     # Iterate the conditions
     for cond in conditions_tuples:
         tokens = cond.split("-")
@@ -102,9 +125,7 @@ def main(input_data, data_classes, conditions_tuples, outdir):
         a = str(tokens[0])
         b = str(tokens[1])
         conds = list()
-        # Genes as rows
-        sub_counts = counts.transpose()
-        for spot in sub_counts.columns:
+        for spot in counts.columns:
             try:
                 spot_class = spot_classes[spot]
                 if spot_class in [a,b]:
@@ -112,20 +133,21 @@ def main(input_data, data_classes, conditions_tuples, outdir):
                 elif b == "REST":
                     conds.append(b)
                 else:
-                    sub_counts.drop(spot, axis=1, inplace=True)
+                    counts.drop(spot, axis=1, inplace=True)
             except KeyError:
-                sub_counts.drop(spot, axis=1, inplace=True)
+                counts.drop(spot, axis=1, inplace=True)
         # Make the DEA call
         print "Doing DEA for the conditions {} ...".format(cond)
-        dea_results = dea(sub_counts, conds)
-        dea_results.sort_values(by=["pvalue"], ascending=True, inplace=True, axis=0)
+        dea_results = dea(counts, conds, size_factors)
+        dea_results.sort_values(by=["padj"], ascending=True, inplace=True, axis=0)
         print "Writing results to output..."
         dea_results.to_csv(os.path.join(outdir, "dea_results_{}.tsv".format(cond)), sep="\t")
         # Volcano plot
         print "Generating plots..."
-        # TODO add colors according to differently expressed or not (needs a p-value parameter)
+        # Add colors according to differently expressed or not (needs a p-value parameter)
+        colors = ["blue" if p <= fdr else "red" for p in dea_results["padj"]]
         scatter_plot(dea_results["log2FoldChange"], -np.log10(dea_results["pvalue"]),
-                     xlabel="Log2FoldChange", ylabel="-log10(pvalue)", colors=None,
+                     xlabel="Log2FoldChange", ylabel="-log10(pvalue)", colors=colors,
                      title="Volcano plot", output=os.path.join(outdir, "volcano_{}.png".format(cond)))
                 
 if __name__ == '__main__':
@@ -136,11 +158,21 @@ if __name__ == '__main__':
     parser.add_argument("--data-classes", required=True,
                         help="A tab delimited file with the classes mapping to the spots " \
                         "(Class first column and spot second column)")
+    parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
+                        type=str, choices=["DESeq", "TMM", "DESeq+1", "Scran"],
+                        help="Normalize the counts using:\n" \
+                        "DESeq = DESeq::estimateSizeFactors()\n" \
+                        "DESeq+1 = DESeq::estimateSizeFactors() + 1\n" \
+                        "EdgeR = EdgeR RLE\n" \
+                        "TMM = TMM with raw counts\n" \
+                        "Scran = Deconvolution Sum Factors\n" \
+                        "(default: %(default)s)")
     parser.add_argument("--conditions-tuples", required=True, nargs='+', type=str,
                         help="One of more tuples that represent what classes will be compared for DEA, " \
                         "for example 1-2 1-3 2-REST")
+    parser.add_argument("--fdr", type=float, default=0.05,
+                        help="The FDR minimum confidence threshold (default: %(default)s)")
     parser.add_argument("--outdir", help="Path to output dir")
     args = parser.parse_args()
-    main(args.input_data, args.data_classes, args.conditions_tuples, args.outdir)
-
-
+    main(args.input_data, args.data_classes, args.conditions_tuples, 
+         args.outdir, args.fdr, args.normalization)

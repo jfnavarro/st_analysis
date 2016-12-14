@@ -18,6 +18,8 @@ It will then try to predict the classes of the spots(rows) in the
 test set. If class labels for the test sets
 are given the script will compute accuracy of the prediction.
 
+The script assumes that the counts are already normalized.
+
 The script will output the predicted classes and the spots
 plotted on top of an image if the image is given.
 
@@ -59,10 +61,7 @@ def main(train_data,
          use_log_scale,
          outdir,
          alignment, 
-         image,
-         normalization,
-         num_exp_genes,
-         num_genes_keep):
+         image):
 
     if len(train_data) == 0 or any([not os.path.isfile(f) for f in train_data]) \
     or len(train_data) != len(classes_train) \
@@ -77,7 +76,7 @@ def main(train_data,
     print "Output folder {}".format(outdir)
   
     # Merge input train datasets (Spots are rows and genes are columns)
-    train_data_frame = aggregate_datatasets(counts_table_files)
+    train_data_frame = aggregate_datatasets(train_data)
     train_genes = list(train_data_frame.columns.values)
     
     # loads all the classes for the training set
@@ -204,21 +203,9 @@ if __name__ == '__main__':
     parser.add_argument("--image", default=None, 
                         help="When given the data will plotted on top of the image, \
                         if the alignment matrix is given the data points will be transformed to pixel coordinates")
-    parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
-                        type=str, choices=["RAW", "DESeq", "DESeq2", "DESeq2Log", "EdgeR", "REL"],
-                        help="Normalize the counts using RAW(absolute counts) , " \
-                        "DESeq, DESeq2, DESeq2Log, EdgeR and " \
-                        "REL(relative counts, each gene count divided by the total count of its spot) (default: %(default)s)")
-    parser.add_argument("--num-exp-genes", default=10, metavar="[INT]", type=int, choices=range(0, 100),
-                        help="The percentage of number of expressed genes ( != 0 ) a spot " \
-                        "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
-    parser.add_argument("--num-genes-keep", default=20, metavar="[INT]", type=int, choices=range(0, 100),
-                        help="The percentage of top genes to discard from the distribution of all the genes " \
-                        "across all the spots (default: %(default)s)")
     parser.add_argument("--outdir", help="Path to output dir")
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
          args.test_classes, args.use_log_scale, args.outdir, 
-         args.alignment, args.image, args.normalization, 
-         args.num_exp_genes, args.num_genes_keep)
+         args.alignment, args.image)
 

@@ -85,7 +85,7 @@ def main(bed_file, min_data_value, disable_filter,
             star_site = int(tokens[1])
             end_site = int(tokens[2])
             strand = tokens[5]
-            gene = tokens[6]
+            #gene = tokens[6]
             # Swap star and end site if the gene is annotated in the negative strand
             if strand == "-": star_site = end_site
             map_reads[(chromosome,strand,star_site)] += 1

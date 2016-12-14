@@ -40,18 +40,41 @@ from sklearn.cluster import AgglomerativeClustering
 from stanalysis.visualization import scatter_plot, scatter_plot3d, histogram
 from stanalysis.preprocessing import *
 from stanalysis.alignment import parseAlignmentMatrix
+from stanalysis.normalization import RimportLibrary
 import matplotlib.pyplot as plt
+import rpy2.robjects.packages as rpackages
+from rpy2.robjects import pandas2ri, r, globalenv
+base = rpackages.importr("base")
 
 def linear_conv(old, min, max, new_min, new_max):
     return ((old - min) / (max - min)) * ((new_max - new_min) + new_min)
-        
+    
+def Rtsne(counts, dimensions):
+    """Performs dimensionality reduction
+    using the R package Rtsne"""
+    pandas2ri.activate()
+    r_counts = pandas2ri.py2ri(counts)
+    tsne = RimportLibrary("Rtsne")    
+    as_matrix = r["as.matrix"]
+    tsne_out = tsne.Rtsne(as_matrix(counts), 
+                          dims=dimensions, 
+                          theta=0.5, 
+                          check_duplicates=False, 
+                          pca=True, 
+                          initial_dims=50, 
+                          perplexity=30, 
+                          max_iter=1000, 
+                          verbose=False)
+    pandas_tsne_out = pandas2ri.ri2py(tsne_out.rx2('Y'))
+    pandas2ri.deactivate()
+    return pandas_tsne_out
+  
 def main(counts_table_files, 
          normalization, 
          num_clusters, 
          clustering_algorithm, 
          dimensionality_algorithm,
          use_log_scale,
-         apply_sample_normalization,
          num_exp_genes, 
          num_genes_keep,
          outdir,
@@ -87,11 +110,6 @@ def main(counts_table_files,
     
     # Merge input datasets (Spots are rows and genes are columns)
     counts = aggregate_datatasets(counts_table_files)
-               
-    # Per sample normalization (Spots are rows and genes are columns)
-    if apply_sample_normalization and len(counts_table_files) > 1:
-        print "Computing per sample normalization..."
-        counts = normalize_samples(counts)
 
     # Remove noisy spots and genes (Spots are rows and genes are columns)
     counts = remove_noise(counts, num_exp_genes)
@@ -102,20 +120,26 @@ def main(counts_table_files,
     # Normalize data
     print "Computing per spot normalization..." 
     norm_counts = normalize_data(counts, normalization)
+   
+    # Write normalized filtered counts to a file (for downstream analysis)
+    counts.to_csv(os.path.join(outdir, "aggregated_filtered_norm_counts.tsv"), sep="\t")
     
     # Keep top genes (variance or expressed)
     norm_counts = keep_top_genes(norm_counts, num_genes_keep, criteria=top_genes_criteria)
-              
+         
+    if use_log_scale:
+        print "Using pseudo-log counts log2(counts + 1)"
+        norm_counts = np.log2(norm_counts + 1)  
+      
+    print "Performing dimensionality reduction..."   
+           
     if "tSNE" in dimensionality_algorithm:
-        # method = barnes_hut or exact(slower)
-        # init = pca or random
-        # random_state = None or number
-        # metric = euclidean or any other
-        # n_components = 2 is default
-        decomp_model = TSNE(n_components=num_dimensions, random_state=None, perplexity=30,
-                            early_exaggeration=4.0, learning_rate=1000, n_iter=1000,
-                            n_iter_without_progress=30, metric="euclidean", init="pca",
-                            method="exact", angle=0.5, verbose=0)
+        #decomp_model = TSNE(n_components=num_dimensions, random_state=None, perplexity=30,
+        #                    early_exaggeration=4.0, learning_rate=1000, n_iter=1000,
+        #                    n_iter_without_progress=30, metric="euclidean", init="pca",
+        #                    method="exact", angle=0.5, verbose=0)
+        #NOTE the Scipy tsne seems buggy so we use the R one instead
+        reduced_data = Rtsne(norm_counts, num_dimensions)
     elif "PCA" in dimensionality_algorithm:
         # n_components = None, number of mle to estimate optimal
         decomp_model = PCA(n_components=num_dimensions, whiten=True, copy=True)
@@ -128,14 +152,10 @@ def main(counts_table_files,
     else:
         sys.stderr.write("Error, incorrect dimensionality reduction method\n")
         sys.exit(1)
-    
-    if use_log_scale:
-        print "Using pseudo-log counts log2(counts + 1)"
-        norm_counts = np.log2(norm_counts + 1)  
      
-    print "Performing dimensionality reduction..."    
-    # Perform dimensionality reduction, outputs a bunch of 2D coordinates
-    reduced_data = decomp_model.fit_transform(norm_counts)
+    if not "tSNE" in dimensionality_algorithm:
+        # Perform dimensionality reduction, outputs a bunch of 2D/3D coordinates
+        reduced_data = decomp_model.fit_transform(norm_counts)
     
     # Do clustering of the dimensionality reduced coordinates
     if "KMeans" in clustering_algorithm:
@@ -259,10 +279,18 @@ if __name__ == '__main__':
     parser.add_argument("--counts-table-files", required=True, nargs='+', type=str,
                         help="One or more matrices with gene counts per feature/spot (genes as columns)")
     parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
-                        type=str, choices=["RAW", "DESeq", "DESeq2", "DESeq2Log", "EdgeR", "REL"],
-                        help="Normalize the counts using RAW(absolute counts) , " \
-                        "DESeq, DESeq2, DESeq2Log, EdgeR and " \
-                        "REL(relative counts, each gene count divided by the total count of its spot) (default: %(default)s)")
+                        type=str, choices=["RAW", "DESeq", "DESeq2", "DESeq2Log", "EdgeR", "REL", "TMM", "DESeq+1", "Scran"],
+                        help="Normalize the counts using:\n" \
+                        "RAW = absolute counts\n" \
+                        "DESeq = DESeq::estimateSizeFactors()\n" \
+                        "DESeq+1 = DESeq::estimateSizeFactors() + 1\n" \
+                        "DESeq2 = DESeq2::estimateSizeFactors(linear=TRUE)\n" \
+                        "DESeq2Log = DESeq2::rlog()\n" \
+                        "EdgeR = EdgeR RLE\n" \
+                        "TMM = TMM with raw counts\n" \
+                        "Scran = Deconvolution Sum Factors\n" \
+                        "REL = Each gene count divided by the total count of its spot)\n" \
+                        "(default: %(default)s)")
     parser.add_argument("--num-clusters", default=3, metavar="[INT]", type=int, choices=range(2, 10),
                         help="The number of clusters/regions expected to be found. (default: %(default)s)")
     parser.add_argument("--num-exp-genes", default=10, metavar="[INT]", type=int, choices=range(0, 100),
@@ -281,9 +309,6 @@ if __name__ == '__main__':
                         "(tSNE - PCA - ICA - SPCA) (default: %(default)s)")
     parser.add_argument("--use-log-scale", action="store_true", default=False,
                         help="Use log values in the dimensionality reduction step")
-    parser.add_argument("--normalize-samples", action="store_true", default=False,
-                        help="When multiple datasets given this option computes normalization " \
-                        "factors for each gene using DESeq on the different samples")
     parser.add_argument("--alignment-files", default=None, nargs='+', type=str,
                         help="One or more tab delimited files containing and alignment matrix for the images " \
                         "(array coordinates to pixel coordinates) as a 3x3 matrix in one row.\n" \
@@ -306,7 +331,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args.counts_table_files, args.normalization, int(args.num_clusters), 
          args.clustering, args.dimensionality, args.use_log_scale,
-         args.normalize_samples, args.num_exp_genes, args.num_genes_keep, args.outdir, 
+         args.num_exp_genes, args.num_genes_keep, args.outdir, 
          args.alignment_files, args.image_files, args.num_dimensions, args.spot_size,
          args.top_genes_criteria)
 

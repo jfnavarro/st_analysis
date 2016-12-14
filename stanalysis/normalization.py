@@ -17,6 +17,34 @@ def RimportLibrary(lib_name):
         biocinstaller.biocLite(lib_name)
     return rpackages.importr(lib_name)
 
+def computeTMMFactors(counts):
+    """ Compute normalization factors
+    using the TMM method
+    described in Merioni et al.
+    Returns the computed size factors as a Pandas object."""
+    pandas2ri.activate()
+    r_counts = pandas2ri.py2ri(counts)
+    scran = RimportLibrary("scran")
+    as_matrix = r["as.matrix"]
+    dds = scran.calcNormFactors(as_matrix(r_counts)) * r.colSums(counts)
+    pandas_sf = pandas2ri.ri2py(dds)
+    pandas2ri.deactivate()
+    return pandas_sf
+
+def computeSumFactors(counts):
+    """ Compute normalization factors
+    using the deconvolution method
+    described in Merioni et al.
+    Returns the computed size factors as a Pandas object."""
+    pandas2ri.activate()
+    r_counts = pandas2ri.py2ri(counts)
+    scran = RimportLibrary("scran")
+    as_matrix = r["as.matrix"]
+    dds = scran.computeSumFactors(as_matrix(r_counts))
+    pandas_sf = pandas2ri.ri2py(dds)
+    pandas2ri.deactivate()
+    return pandas_sf
+
 def computeSizeFactors(counts):
     """ Computes size factors using DESeq
     for the counts matrix given as input (Genes as index
@@ -27,6 +55,22 @@ def computeSizeFactors(counts):
     r_counts = pandas2ri.py2ri(counts)
     deseq = RimportLibrary("DESeq")
     dds = deseq.estimateSizeFactorsForMatrix(r_counts)
+    pandas_sf = pandas2ri.ri2py(dds)
+    pandas2ri.deactivate()
+    return pandas_sf
+
+def computeSizeFactorsSizeAdjusted(counts):
+    """ Computes size factors using DESeq
+    for the counts matrix given as input (Genes as index
+    and spots as rows) the counts are library size adjusted. 
+    Returns the computed size factors as a Pandas object.
+    """
+    pandas2ri.activate()
+    r_counts = pandas2ri.py2ri(counts)
+    deseq = RimportLibrary("DESeq")
+    lib_size = r.colSums(r_counts)
+    adjust_r_counts = r.t(r.t(r_counts) + lib_size / r.mean(lib_size))
+    dds = deseq.estimateSizeFactorsForMatrix(adjust_r_counts)
     pandas_sf = pandas2ri.ri2py(dds)
     pandas2ri.deactivate()
     return pandas_sf

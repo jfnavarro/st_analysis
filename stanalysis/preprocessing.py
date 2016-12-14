@@ -61,7 +61,7 @@ def remove_noise(counts, num_exp_genes):
     num_genes = len(counts.columns)
     min_genes_spot_exp = round((counts != 0).sum(axis=1).quantile(num_exp_genes))
     print "Number of expressed genes a spot must have to be kept " \
-    "(1% of total expressed genes) {}".format(min_genes_spot_exp)
+    "({}% of total expressed genes) {}".format(num_exp_genes,min_genes_spot_exp)
     counts = counts[(counts != 0).sum(axis=1) >= min_genes_spot_exp]
     print "Dropped {} spots".format(num_spots - len(counts.index))
           
@@ -113,7 +113,7 @@ def normalize_data(counts, normalization):
     different methods.
     :param counts: a Pandas data frame with the counts
     :param normalization: the normalization method to use 
-    (DESeq, DESeq2, DESeq2Log, EdgeR, REL, RAW)
+    (DESeq, DESeq2, DESeq2Log, EdgeR, REL, RAW, TMM, DESeq+1, Scran)
     :return: a Pandas data frame with the normalized counts
     """
     # Spots as columns and genes as rows
@@ -136,6 +136,15 @@ def normalize_data(counts, normalization):
         norm_counts = counts / spots_sum
     elif normalization in "RAW":
         norm_counts = counts
+    elif normalization in "TMM":
+        tmm_factors = computeTMMFactors(counts)
+        norm_counts = counts / tmm_factors
+    elif normalization in "DESeq+1":
+        size_factors = computeSizeFactors(counts + 1)
+        norm_counts = counts / size_factors   
+    elif normalization in "Scran":
+        sum_factors = computeSumFactors(counts)
+        norm_counts = counts / sum_factors       
     else:
         raise RunTimeError("Error, incorrect normalization method\n")
     
