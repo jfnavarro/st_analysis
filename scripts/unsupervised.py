@@ -5,11 +5,9 @@ A script that does unsupervised
 classification on single cell data (Mainly used for Spatial Transcriptomics)
 It takes a list of data frames as input and outputs :
 
- - the filtered aggregated data frame
- - a scatter plot with the predicted classes for each spot 
- - a file with the predicted classes for each spot (tab delimited)
- - a scatter plot for each dataset of the spots and the predicted color 
-   (if images are given, the images are used as background)
+ - a scatter plot with the predicted classes (coulored) for each spot 
+ - the spots plotted onto the images (if given) with the predicted class/color
+ - a file containing two columns (CLASS and SPOT) for each dataset
 
 The input data frames must have the gene names as columns and
 the spots coordinates as rows (1x1).
@@ -114,15 +112,9 @@ def main(counts_table_files,
     # Remove noisy spots and genes (Spots are rows and genes are columns)
     counts = remove_noise(counts, num_exp_genes)
     
-    # Write un-normalized filtered counts to a file (for downstream analysis)
-    counts.to_csv(os.path.join(outdir, "aggregated_filtered_counts.tsv"), sep="\t")
-    
     # Normalize data
     print "Computing per spot normalization..." 
     norm_counts = normalize_data(counts, normalization)
-   
-    # Write normalized filtered counts to a file (for downstream analysis)
-    counts.to_csv(os.path.join(outdir, "aggregated_filtered_norm_counts.tsv"), sep="\t")
     
     # Keep top genes (variance or expressed)
     norm_counts = keep_top_genes(norm_counts, num_genes_keep, criteria=top_genes_criteria)
@@ -134,10 +126,6 @@ def main(counts_table_files,
     print "Performing dimensionality reduction..."   
            
     if "tSNE" in dimensionality_algorithm:
-        #decomp_model = TSNE(n_components=num_dimensions, random_state=None, perplexity=30,
-        #                    early_exaggeration=4.0, learning_rate=1000, n_iter=1000,
-        #                    n_iter_without_progress=30, metric="euclidean", init="pca",
-        #                    method="exact", angle=0.5, verbose=0)
         #NOTE the Scipy tsne seems buggy so we use the R one instead
         reduced_data = Rtsne(norm_counts, num_dimensions)
     elif "PCA" in dimensionality_algorithm:
@@ -176,6 +164,19 @@ def main(counts_table_files,
     # Check the number of predicted labels is correct
     assert(len(labels) == len(norm_counts.index))
     
+    # Write the spots and their classes to a file
+    file_writers = [open(os.path.join(outdir,"computed_classes_{}.txt".format(i)),"w") 
+                    for i in xrange(len(counts_table_files))]
+    # Write the coordinates and the label/class that they belong to
+    for i,bc in enumerate(norm_counts.index):
+        # bc is i_XxY
+        tokens = bc.split("x")
+        assert(len(tokens) == 2)
+        y = float(tokens[1])
+        x = float(tokens[0].split("_")[1])
+        index = int(tokens[0].split("_")[0])
+        file_writers[index].write("{0}\t{1}\n".format(labels[i], "{}x{}".format(x,y)))
+        
     # Compute a color_label based on the RGB representation of the 3D dimensionality reduced
     labels_colors = list()
     x_max = max(reduced_data[:,0])
@@ -219,63 +220,60 @@ def main(counts_table_files,
     # Plot the spots with colors corresponding to the predicted class
     # Use the HE image as background if the image is given
     tot_spots = norm_counts.index
-    with open(os.path.join(outdir,"computed_classes.txt"), "w") as filehandler:
-        for i in xrange(len(counts_table_files)):
-            # Get the list of spot coordinates and colors to plot for each dataset
-            x_points = list()
-            y_points = list()
-            colors_classes = list()
-            colors_dimensionality = list()
-            for j,spot in enumerate(tot_spots):
-                if spot.startswith("{}_".format(i)):
-                    # spot is i_XxY
-                    tokens = spot.split("x")
-                    assert(len(tokens) == 2)
-                    y = float(tokens[1])
-                    x = float(tokens[0].split("_")[1])
-                    x_points.append(x)
-                    y_points.append(y)
-                    colors_classes.append(labels[j])
-                    colors_dimensionality.append(labels_colors[j])
-                    # Write the predicted classes to a file (CLASS SPOT)
-                    filehandler.write("{0}\t{1}\n".format(labels[j], spot))
-                   
-            # Retrieve alignment matrix and image if any
-            image = image_files[i] if image_files is not None \
-            and len(image_files) >= i else None
-            alignment = alignment_files[i] if alignment_files is not None \
-            and len(alignment_files) >= i else None
-            
-            # alignment_matrix will be identity if alignment file is None
-            alignment_matrix = parseAlignmentMatrix(alignment)            
-            scatter_plot(x_points=x_points, 
-                         y_points=y_points,
-                         colors=colors_classes,
-                         output=os.path.join(outdir,"computed_classes_tissue_{}.png".format(i)), 
-                         alignment=alignment_matrix, 
-                         cmap=None, 
-                         title='Computed classes tissue', 
-                         xlabel='X', 
-                         ylabel='Y',
-                         image=image, 
-                         alpha=1.0, 
-                         size=spot_size)
-            scatter_plot(x_points=x_points, 
-                        y_points=y_points,
-                        colors=colors_dimensionality, 
-                        output=os.path.join(outdir,"dimensionality_color_tissue_{}.png".format(i)), 
-                        alignment=alignment_matrix, 
-                        cmap=plt.get_cmap("hsv"), 
-                        title='Dimensionality color tissue', 
-                        xlabel='X', 
-                        ylabel='Y',
-                        image=image, 
-                        alpha=1.0, 
-                        size=spot_size)           
+    for i in xrange(len(counts_table_files)):
+        # Get the list of spot coordinates and colors to plot for each dataset
+        x_points = list()
+        y_points = list()
+        colors_classes = list()
+        colors_dimensionality = list()
+        for j,spot in enumerate(tot_spots):
+            if spot.startswith("{}_".format(i)):
+                # spot is i_XxY
+                tokens = spot.split("x")
+                assert(len(tokens) == 2)
+                y = float(tokens[1])
+                x = float(tokens[0].split("_")[1])
+                x_points.append(x)
+                y_points.append(y)
+                colors_classes.append(labels[j])
+                colors_dimensionality.append(labels_colors[j])
+               
+        # Retrieve alignment matrix and image if any
+        image = image_files[i] if image_files is not None \
+        and len(image_files) >= i else None
+        alignment = alignment_files[i] if alignment_files is not None \
+        and len(alignment_files) >= i else None
+        
+        # alignment_matrix will be identity if alignment file is None
+        alignment_matrix = parseAlignmentMatrix(alignment)            
+        scatter_plot(x_points=x_points, 
+                     y_points=y_points,
+                     colors=colors_classes,
+                     output=os.path.join(outdir,"computed_classes_tissue_{}.png".format(i)), 
+                     alignment=alignment_matrix, 
+                     cmap=None, 
+                     title='Computed classes tissue', 
+                     xlabel='X', 
+                     ylabel='Y',
+                     image=image, 
+                     alpha=1.0, 
+                     size=spot_size)
+        scatter_plot(x_points=x_points, 
+                    y_points=y_points,
+                    colors=colors_dimensionality, 
+                    output=os.path.join(outdir,"dimensionality_color_tissue_{}.png".format(i)), 
+                    alignment=alignment_matrix, 
+                    cmap=plt.get_cmap("hsv"), 
+                    title='Dimensionality color tissue', 
+                    xlabel='X', 
+                    ylabel='Y',
+                    image=image, 
+                    alpha=1.0, 
+                    size=spot_size)           
                                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+                                     formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--counts-table-files", required=True, nargs='+', type=str,
                         help="One or more matrices with gene counts per feature/spot (genes as columns)")
     parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
@@ -319,7 +317,7 @@ if __name__ == '__main__':
                         "It can be one ore more, ideally one for each input dataset\n " \
                         "It is desirable that the image is cropped to the array " \
                         "corners otherwise an alignment file is needed")
-    parser.add_argument("--num-dimensions", default=3, metavar="[INT]", type=int, choices=[2,3],
+    parser.add_argument("--num-dimensions", default=2, metavar="[INT]", type=int, choices=[2,3],
                         help="The number of dimensions to use in the dimensionality reduction (2 or 3). (default: %(default)s)")
     parser.add_argument("--spot-size", default=100, metavar="[INT]", type=int, choices=range(10, 500),
                         help="The size of the spots when generating the plots. (default: %(default)s)")

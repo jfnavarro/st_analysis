@@ -1,17 +1,17 @@
 #! /usr/bin/env python
 """ 
 This script performs Differential
-Expression Analysis using DESeq2 
-on a table with gene counts in the following format:
+Expression Analysis using on a table with gene counts in the following format:
 
       GeneA   GeneB   GeneC
 1x1   
 1x2
 ...
 
+The script can take one or several datasets.
 The script also requires a file where spots are mapped
-to a class (output from unsupervised.py). This
-file is a tab delimited file like this:
+to a class for each dataset. 
+This file is a tab delimited file like this:
 
 CLASS SPOT 
 
@@ -21,6 +21,8 @@ analysis. For example 1-2 or 1-3, etc..
 
 The script will output the list of up-regulated and down-regulated
 for each DEA comparison as well as a set of plots.
+
+The script allows to normalize the datasets.
 
 @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
@@ -32,6 +34,7 @@ import pandas as pd
 from stanalysis.normalization import RimportLibrary
 from stanalysis.visualization import scatter_plot
 from stanalysis.normalization import *
+from stanalysis.preprocessing import *
 import rpy2.robjects.packages as rpackages
 import rpy2.robjects as robjects
 from rpy2.robjects import pandas2ri, r, globalenv
@@ -78,10 +81,20 @@ def dea(counts, conds, size_factors=None):
     pandas2ri.deactivate()
     return results
               
-def main(input_data, data_classes, conditions_tuples, outdir, fdr, normalization):
+def main(counts_table_files, data_classes, 
+         conditions_tuples, outdir, fdr, normalization):
 
-    if not os.path.isfile(input_data) or not os.path.isfile(data_classes) \
-    or len(conditions_tuples) < 1:
+    if len(counts_table_files) == 0 or \
+    any([not os.path.isfile(f) for f in counts_table_files]):
+        sys.stderr.write("Error, input file/s not present or invalid format\n")
+        sys.exit(1)
+        
+    if len(data_classes) == 0 or \
+    any([not os.path.isfile(f) for f in counts_table_files]):
+        sys.stderr.write("Error, input file/s not present or invalid format\n")
+        sys.exit(1)
+        
+    if len(data_classes) != len(counts_table_files):
         sys.stderr.write("Error, input file/s not present or invalid format\n")
         sys.exit(1)
      
@@ -90,34 +103,24 @@ def main(input_data, data_classes, conditions_tuples, outdir, fdr, normalization
         
     print "Output folder {}".format(outdir)
       
-    # Spots are rows and genes are columns
-    counts = pd.read_table(input_data, sep="\t", header=0, index_col=0)
+    # Merge input datasets (Spots are rows and genes are columns)
+    counts = aggregate_datatasets(counts_table_files)
     
     # loads all the classes for the spots
     spot_classes = dict()
-    with open(data_classes) as filehandler:
-        for line in filehandler.readlines():
-            tokens = line.split()
-            assert(len(tokens) == 2)
-            spot_classes[tokens[1]] = str(tokens[0])
-    assert(len(spot_classes) == len(counts.index))       
+    for i,class_file in enumerate(data_classes):
+        with open(class_file) as filehandler:
+            for line in filehandler.readlines():
+                tokens = line.split()
+                assert(len(tokens) == 2)
+                spot_classes["{}_{]".format(i,tokens[1])] = str(tokens[0])  
      
-    # Spots as columns and genes as rows
-    counts = counts.transpose()
-    # Per spot normalization
-    if normalization in "DESeq":
-        size_factors = None
-    elif normalization in "EdgeR":
-        size_factors = computeEdgeRNormalization(counts)
-    elif normalization in "TMM":
-        size_factors = computeTMMFactors(counts)
-    elif normalization in "DESeq+1":
-        size_factors = computeSizeFactors(counts + 1)
-    elif normalization in "Scran":
-        size_factors = computeSumFactors(counts)  
-    else:
-        raise RunTimeError("Error, incorrect normalization method\n")
-        
+    # Normalize data
+    counts = normalize_data(counts, normalization)
+    
+    # Genes as rows
+    counts = counts.transpose()    
+    
     # Iterate the conditions
     for cond in conditions_tuples:
         tokens = cond.split("-")
@@ -152,11 +155,11 @@ def main(input_data, data_classes, conditions_tuples, outdir, fdr, normalization
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--input-data",
-                        help="The matrix of counts (spots as row names and genes as column names)")
-    parser.add_argument("--data-classes", required=True,
-                        help="A tab delimited file with the classes mapping to the spots " \
+                                     formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument("--counts-table-files", required=True, nargs='+', type=str,
+                        help="One or more matrices with gene counts per feature/spot (genes as columns)")
+    parser.add_argument("--data-classes", required=True, nargs='+', type=str,
+                        help="One or more delimited file/s with the classes mapping to the spots " \
                         "(Class first column and spot second column)")
     parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
                         type=str, choices=["DESeq", "TMM", "DESeq+1", "Scran"],
@@ -174,5 +177,5 @@ if __name__ == '__main__':
                         help="The FDR minimum confidence threshold (default: %(default)s)")
     parser.add_argument("--outdir", help="Path to output dir")
     args = parser.parse_args()
-    main(args.input_data, args.data_classes, args.conditions_tuples, 
+    main(args.counts_table_files, args.data_classes, args.conditions_tuples, 
          args.outdir, args.fdr, args.normalization)

@@ -59,6 +59,7 @@ def main(train_data,
          classes_train, 
          classes_test,
          use_log_scale,
+         normalization,
          outdir,
          alignment, 
          image):
@@ -131,6 +132,8 @@ def main(train_data,
     # Scale spots (columns) against the mean and variance (TODO)
     
     # Get the counts
+    train_data_frame = normalize_data(train_data_frame, normalization)
+    test_data_frame = normalize_data(test_data_frame, normalization)
     test_counts = test_data_frame.values # Assume they are normalized
     train_counts = train_data_frame.values # Assume they are normalized
     
@@ -184,7 +187,7 @@ def main(train_data,
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+                                     formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--train-data", required=True, nargs='+', type=str,
                         help="One or more data frames with normalized counts")
     parser.add_argument("--test-data", required=True,
@@ -195,6 +198,19 @@ if __name__ == '__main__':
                         help="One file with the class of each spot in the train data")
     parser.add_argument("--use-log-scale", action="store_true", default=False,
                         help="Use log values for the counts.")
+    parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
+                        type=str, choices=["RAW", "DESeq", "DESeq2", "DESeq2Log", "EdgeR", "REL", "TMM", "DESeq+1", "Scran"],
+                        help="Normalize the counts using:\n" \
+                        "RAW = absolute counts\n" \
+                        "DESeq = DESeq::estimateSizeFactors()\n" \
+                        "DESeq+1 = DESeq::estimateSizeFactors() + 1\n" \
+                        "DESeq2 = DESeq2::estimateSizeFactors(linear=TRUE)\n" \
+                        "DESeq2Log = DESeq2::rlog()\n" \
+                        "EdgeR = EdgeR RLE\n" \
+                        "TMM = TMM with raw counts\n" \
+                        "Scran = Deconvolution Sum Factors\n" \
+                        "REL = Each gene count divided by the total count of its spot)\n" \
+                        "(default: %(default)s)")
     parser.add_argument("--alignment", default=None,
                         help="A file containing the alignment image " \
                         "(array coordinates to pixel coordinates) as a 3x3 matrix in tab delimited format\n" \
@@ -206,6 +222,6 @@ if __name__ == '__main__':
     parser.add_argument("--outdir", help="Path to output dir")
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
-         args.test_classes, args.use_log_scale, args.outdir, 
-         args.alignment, args.image)
+         args.test_classes, args.use_log_scale, args.normalization, 
+         args.outdir, args.alignment, args.image)
 
