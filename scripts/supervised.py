@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 """ 
-This script performs a supervised prediction
+This script performs a supervised prediction in ST single cell data
 using a training set and a test set. 
 
 The training set will be one or more matrices of
@@ -128,10 +128,10 @@ def main(train_data,
     print "Class labels"
     print class_labels
     
-    # Keep only 1000 highest scored genes (TODO)
-    # Scale spots (columns) against the mean and variance (TODO)
+    # TODO
+    # Remove noisy spots/genes 
     
-    # Get the counts
+    # Get the normalized counts
     train_data_frame = normalize_data(train_data_frame, normalization)
     test_data_frame = normalize_data(test_data_frame, normalization)
     test_counts = test_data_frame.values # Assume they are normalized

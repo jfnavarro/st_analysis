@@ -47,8 +47,8 @@ def computeSumFactors(counts):
 
 def computeSizeFactors(counts):
     """ Computes size factors using DESeq
-    for the counts matrix given as input (Genes as index
-    and spots as rows). Returns the computed size factors
+    for the counts matrix given as input (Genes as rows
+    and spots as columns). Returns the computed size factors
     as a Pandas object.
     """
     pandas2ri.activate()
@@ -61,8 +61,8 @@ def computeSizeFactors(counts):
 
 def computeSizeFactorsSizeAdjusted(counts):
     """ Computes size factors using DESeq
-    for the counts matrix given as input (Genes as index
-    and spots as rows) the counts are library size adjusted. 
+    for the counts matrix given as input (Genes as rows
+    and spots as columns) the counts are library size adjusted. 
     Returns the computed size factors as a Pandas object.
     """
     pandas2ri.activate()
@@ -76,9 +76,9 @@ def computeSizeFactorsSizeAdjusted(counts):
     return pandas_sf
 
 def computeSizeFactorsLinear(counts):
-    """ Computes size factors using DESeq2
-    for the counts matrix given as input (Genes as index
-    and spots as rows). Returns the computed size factors
+    """ Computes size factors using DESeq2 iterative size factors
+    for the counts matrix given as input (Genes as rows
+    and spots as columns). Returns the computed size factors
     as a Pandas object.
     """
     pandas2ri.activate()
@@ -96,8 +96,8 @@ def computeSizeFactorsLinear(counts):
 
 def computeDESeq2LogTransform(counts):
     """ Computes size factors using DESeq2 Log transform
-    for the counts matrix given as input (Genes as index
-    and spots as rows). Returns the normalized counts matrix
+    for the counts matrix given as input (Genes as rows
+    and spots as columns). Returns the normalized counts matrix
     as a Pandas data frame.
     """
     pandas2ri.activate()
@@ -117,8 +117,8 @@ def computeDESeq2LogTransform(counts):
             
 def computeEdgeRNormalization(counts):
     """ Computes size factors using EdgeR
-    for the counts matrix given as input (Genes as index
-    and spots as rows). Returns the computed size factors
+    for the counts matrix given as input (Genes as rows
+    and spots as columns). Returns the computed size factors
     as a Pandas object.
     """
     pandas2ri.activate()
