@@ -9,8 +9,8 @@ It allows to highlight spots with colors using a file with the following format 
 
 INTEGER XxY
 
-When highlighting spots the order of the spots in the highlight file
-must be the same as the order of spots in the input data.
+When highlighting spots a new file will be created with the highlighted
+spots.
 
 It allows to choose transparency for the data points
 
@@ -54,10 +54,10 @@ def main(input_data,
         outfile = "data_plot.png"
         
     # Extract data frame and normalize it if needed (genes as columns)
-    norm_counts_table = pd.read_table(input_data, sep="\t", header=0, index_col=0)
+    counts_table = pd.read_table(input_data, sep="\t", header=0, index_col=0)
 
     # Normalization
-    norm_counts_table = normalize_data(norm_counts_table, normalization)
+    norm_counts_table = normalize_data(counts_table, normalization)
                          
     # Extract the list of the genes that must be shown
     genes_to_keep = list()
@@ -74,49 +74,60 @@ def main(input_data,
     # as the sum of all spots that pass the thresholds (Gene and counts)
     x_points = list()
     y_points = list()
-    values = list()
+    colors = list()
     for spot in norm_counts_table.index:
         tokens = spot.split("x")
         assert(len(tokens) == 2)
         x_points.append(float(tokens[0]))
         y_points.append(float(tokens[1]))
-        values.append(sum(count for count in 
+        colors.append(sum(count for count in 
                           norm_counts_table.loc[spot,genes_to_keep] if count > cutoff))           
                      
-    # Parse the clusters colors if given for each spot
-    colors = list()
-    if highlight_barcodes: 
+    # If highlight barcodes is given then
+    # parse the spots and their color and plot
+    # them on top of the image if given
+    if highlight_barcodes:
+        colors_highlight = list()
+        x_points_highlight = list()
+        y_points_highlight = list()
         with open(highlight_barcodes, "r") as filehandler_read:
             for line in filehandler_read.readlines():
                 tokens = line.split()
-                assert(len(tokens) == 2 or len(tokens) ==3)
-                colors.append(int(tokens[0]))
-    
+                assert(len(tokens) == 2)
+                tokens2 = tokens[1].split("x")
+                assert(len(tokens2) == 2)
+                x_points_highlight.append(float(tokens2[0]))
+                y_points_highlight.append(float(tokens2[1]))
+                colors_highlight.append(int(tokens[0]))
+                scatter_plot(x_points=x_points_highlight,
+                             y_points=y_points_highlight,
+                             colors=colors_highlight,
+                             output="{}_{}".format("highlight",outfile),
+                             alignment=alignment,
+                             cmap=None,
+                             title='ST Data scatter highlight',
+                             xlabel='X',
+                             ylabel='Y',
+                             image=image,
+                             alpha=highlight_alpha,
+                             size=dot_size)
         if len(colors) != len(values):
             sys.stderr.write("Error, the list of spots to highlight does not match the input data\n")
             sys.exit(1)        
 
-    # Create a scatter plot, if highlight_barcodes is given
-    # then plot another scatter plot on the same canvas.
+    # Create a scatter plot for the gene data
     # If image is given plot it as a background
-    color = values
-    cmap = plt.get_cmap("YlOrBr")
-    alpha = data_alpha
-    if highlight_barcodes:
-        color = colors
-        cmap = None
-        alpha = highlight_alpha
     scatter_plot(x_points=x_points,
                  y_points=y_points,
-                 colors=color,
+                 colors=colors,
                  output=outfile,
                  alignment=alignment,
-                 cmap=cmap,
+                 cmap=plt.get_cmap("YlOrBr"),
                  title='ST Data scatter',
                  xlabel='X',
                  ylabel='Y',
                  image=image,
-                 alpha=alpha,
+                 alpha=data_alpha,
                  size=dot_size)
 
 if __name__ == '__main__':
@@ -143,19 +154,20 @@ if __name__ == '__main__':
                         help="The transparency level for the highlighted barcodes, 0 min and 1 max (default: %(default)s)")
     parser.add_argument("--dot-size", type=int, default=100, metavar="[INT]", choices=range(10, 500),
                         help="The size of the dots (default: %(default)s)")
-    parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
+    parser.add_argument("--normalization", default="DESeq2", metavar="[STR]", 
                         type=str, 
-                        choices=["RAW", "DESeq", "DESeq2", "DESeq2Log", "EdgeR", "REL", "TMM", "DESeq+1", "Scran"],
+                        choices=["RAW", "DESeq2", "DESeq2Linear", "DESeq2PseudoCount", 
+                                 "DESeq2SizeAdjusted", "REL", "TMM", "RLE", "Scran"],
                         help="Normalize the counts using:\n" \
                         "RAW = absolute counts\n" \
-                        "DESeq = DESeq::estimateSizeFactors()\n" \
-                        "DESeq+1 = DESeq::estimateSizeFactors() + 1\n" \
-                        "DESeq2 = DESeq2::estimateSizeFactors(linear=TRUE)\n" \
-                        "DESeq2Log = DESeq2::rlog()\n" \
-                        "EdgeR = EdgeR RLE\n" \
-                        "TMM = TMM with raw counts\n" \
+                        "DESeq2 = DESeq2::estimateSizeFactors(counts)\n" \
+                        "DESeq2PseudoCount = DESeq2::estimateSizeFactors(counts + 1)\n" \
+                        "DESeq2Linear = DESeq2::estimateSizeFactors(counts, linear=TRUE)\n" \
+                        "DESeq2SizeAdjusted = DESeq2::estimateSizeFactors(counts + lib_size_factors)\n" \
+                        "RLE = EdgeR RLE * lib_size\n" \
+                        "TMM = EdgeR TMM * lib_size\n" \
                         "Scran = Deconvolution Sum Factors\n" \
-                        "REL = Each gene count divided by the total count of its spot)\n" \
+                        "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
     parser.add_argument("--show-genes", help="Regular expression for gene symbols to be shown\n" \
                         "If given only the genes matching the reg-exp will be shown",

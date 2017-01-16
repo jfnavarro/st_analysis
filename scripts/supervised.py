@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 """ 
-This script performs a supervised prediction in ST single cell data
+This script performs a supervised prediction in ST RNA-Seq data
 using a training set and a test set. 
 
 The training set will be one or more matrices of
@@ -18,7 +18,8 @@ It will then try to predict the classes of the spots(rows) in the
 test set. If class labels for the test sets
 are given the script will compute accuracy of the prediction.
 
-The script assumes that the counts are already normalized.
+The script allows to normalize the train/test counts using different
+methods.
 
 The script will output the predicted classes and the spots
 plotted on top of an image if the image is given.
@@ -81,12 +82,24 @@ def main(train_data,
     train_genes = list(train_data_frame.columns.values)
     
     # loads all the classes for the training set
-    train_labels = list()
+    train_labels_dict = dict()
     for labels_file in classes_train:
         with open(labels_file) as filehandler:
             for line in filehandler.readlines():
-                train_labels.append(line.split()[0])
-    assert(len(train_labels) == len(train_data_frame))       
+                tokens = line.split()
+                train_labels_dict[tokens[1]] = tokens[0]
+    # make sure the spots in the training set data frame
+    # and the label training spots have the same order
+    # and are the same 
+    train_labels = list()
+    for spot in train_data_frame.index:
+        try:
+            train_labels.append(train_labels_dict[spot])
+        except KeyError:
+            train_data_frame.drop(spot, axis=0, inplace=True)
+    if len(train_labels) != len(train_data_frame.index):
+        sys.stderr.write("Error, none of the train labels were not found in the train data\n")
+        sys.exit(1)
          
     # loads the test set
     # spots are rows and genes are columns
@@ -94,7 +107,7 @@ def main(train_data,
     test_genes = list(test_data_frame.columns.values)
     
     # loads all the classes for the test set
-    # filter out labels whose barcode is not present and
+    # filter out labels whose spot is not present and
     # also make sure that the order of the labels is the same in the data frame
     test_labels = list()
     if classes_test is not None:
@@ -110,13 +123,18 @@ def main(train_data,
                 test_labels.append(spot_label[spot])
             except KeyError:
                 test_data_frame.drop(spot, axis=0, inplace=True)
-        assert(len(test_labels) == len(test_data_frame))  
-      
+        if len(test_labels) != len(test_data_frame.index):
+            sys.stderr.write("Error, none of the test labels were not found in the test data\n")
+            sys.exit(1)  
           
     # Keep only the record in the training set that intersects with the test set
     print "Training genes {}".format(len(train_genes))
     print "Test genes {}".format(len(test_genes))
     intersect_genes = np.intersect1d(train_genes, test_genes)
+    if len(intersect_genes) == 0:
+        sys.stderr.write("Error, there are no genes intersecting the train and test datasets\n")
+        sys.exit(1)  
+            
     print "Intersected genes {}".format(len(intersect_genes))
     train_data_frame = train_data_frame.ix[:,intersect_genes]
     test_data_frame = test_data_frame.ix[:,intersect_genes]
@@ -124,18 +142,13 @@ def main(train_data,
     # Classes in test and train must be the same
     print "Training elements {}".format(len(train_labels))
     print "Test elements {}".format(len(test_labels))
-    class_labels = sorted(set(train_labels))
-    print "Class labels"
-    print class_labels
-    
-    # TODO
-    # Remove noisy spots/genes 
+    print "Class labels {}".format(sorted(set(train_labels)))
     
     # Get the normalized counts
     train_data_frame = normalize_data(train_data_frame, normalization)
     test_data_frame = normalize_data(test_data_frame, normalization)
-    test_counts = test_data_frame.values # Assume they are normalized
-    train_counts = train_data_frame.values # Assume they are normalized
+    test_counts = test_data_frame.values 
+    train_counts = train_data_frame.values 
     
     # Log the counts
     if use_log_scale:
@@ -198,18 +211,20 @@ if __name__ == '__main__':
                         help="One file with the class of each spot in the train data")
     parser.add_argument("--use-log-scale", action="store_true", default=False,
                         help="Use log values for the counts.")
-    parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
-                        type=str, choices=["RAW", "DESeq", "DESeq2", "DESeq2Log", "EdgeR", "REL", "TMM", "DESeq+1", "Scran"],
+    parser.add_argument("--normalization", default="DESeq2", metavar="[STR]", 
+                        type=str, 
+                        choices=["RAW", "DESeq2", "DESeq2Linear", "DESeq2PseudoCount", 
+                                 "DESeq2SizeAdjusted", "REL", "TMM", "RLE", "Scran"],
                         help="Normalize the counts using:\n" \
                         "RAW = absolute counts\n" \
-                        "DESeq = DESeq::estimateSizeFactors()\n" \
-                        "DESeq+1 = DESeq::estimateSizeFactors() + 1\n" \
-                        "DESeq2 = DESeq2::estimateSizeFactors(linear=TRUE)\n" \
-                        "DESeq2Log = DESeq2::rlog()\n" \
-                        "EdgeR = EdgeR RLE\n" \
-                        "TMM = TMM with raw counts\n" \
+                        "DESeq2 = DESeq2::estimateSizeFactors(counts)\n" \
+                        "DESeq2PseudoCount = DESeq2::estimateSizeFactors(counts + 1)\n" \
+                        "DESeq2Linear = DESeq2::estimateSizeFactors(counts, linear=TRUE)\n" \
+                        "DESeq2SizeAdjusted = DESeq2::estimateSizeFactors(counts + lib_size_factors)\n" \
+                        "RLE = EdgeR RLE * lib_size\n" \
+                        "TMM = EdgeR TMM * lib_size\n" \
                         "Scran = Deconvolution Sum Factors\n" \
-                        "REL = Each gene count divided by the total count of its spot)\n" \
+                        "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
     parser.add_argument("--alignment", default=None,
                         help="A file containing the alignment image " \

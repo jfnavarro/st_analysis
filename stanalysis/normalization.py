@@ -18,15 +18,31 @@ def RimportLibrary(lib_name):
     return rpackages.importr(lib_name)
 
 def computeTMMFactors(counts):
-    """ Compute normalization factors
-    using the TMM method
-    described in Merioni et al.
-    Returns the computed size factors as a Pandas object."""
+    """ Compute normalization size factors
+    using the TMM method described in EdgeR and returns then as a vector.
+    :param counts: a matrix of counts (genes as rows)
+    :return returns the normalization factors a vector
+    """
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
-    scran = RimportLibrary("scran")
+    scran = RimportLibrary("edgeR")
     as_matrix = r["as.matrix"]
-    dds = scran.calcNormFactors(as_matrix(r_counts)) * r.colSums(counts)
+    dds = scran.calcNormFactors(as_matrix(r_counts), method="TMM") * r.colSums(counts)
+    pandas_sf = pandas2ri.ri2py(dds)
+    pandas2ri.deactivate()
+    return pandas_sf
+
+def computeRLEFactors(counts):
+    """ Compute normalization size factors
+    using the RLE method described in EdgeR and returns then as a vector.
+    :param counts: a matrix of counts (genes as rows)
+    :return returns the normalization factors a vector
+    """
+    pandas2ri.activate()
+    r_counts = pandas2ri.py2ri(counts)
+    scran = RimportLibrary("edgeR")
+    as_matrix = r["as.matrix"]
+    dds = scran.calcNormFactors(as_matrix(r_counts), method="RLE") * r.colSums(counts)
     pandas_sf = pandas2ri.ri2py(dds)
     pandas2ri.deactivate()
     return pandas_sf
@@ -35,12 +51,15 @@ def computeSumFactors(counts):
     """ Compute normalization factors
     using the deconvolution method
     described in Merioni et al.
-    Returns the computed size factors as a Pandas object."""
+    Returns the computed size factors as a vector.
+    :param counts: a matrix of counts (genes as rows)
+    :return returns the normalization factors a vector
+    """
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
     scran = RimportLibrary("scran")
     as_matrix = r["as.matrix"]
-    dds = scran.computeSumFactors(as_matrix(r_counts))
+    dds = scran.computeSumFactors(as_matrix(r_counts), sizes=r.c(10,20,30,40))
     pandas_sf = pandas2ri.ri2py(dds)
     pandas2ri.deactivate()
     return pandas_sf
@@ -48,8 +67,10 @@ def computeSumFactors(counts):
 def computeSizeFactors(counts):
     """ Computes size factors using DESeq
     for the counts matrix given as input (Genes as rows
-    and spots as columns). Returns the computed size factors
-    as a Pandas object.
+    and spots as columns).
+    Returns the computed size factors as a vector.
+    :param counts: a matrix of counts (genes as rows)
+    :return returns the normalization factors a vector
     """
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
@@ -63,23 +84,21 @@ def computeSizeFactorsSizeAdjusted(counts):
     """ Computes size factors using DESeq
     for the counts matrix given as input (Genes as rows
     and spots as columns) the counts are library size adjusted. 
-    Returns the computed size factors as a Pandas object.
+    Returns the computed size factors as a vector.
+    :param counts: a matrix of counts (genes as rows)
+    :return returns the normalization factors a vector
     """
-    pandas2ri.activate()
-    r_counts = pandas2ri.py2ri(counts)
-    deseq = RimportLibrary("DESeq")
-    lib_size = r.colSums(r_counts)
-    adjust_r_counts = r.t(r.t(r_counts) + lib_size / r.mean(lib_size))
-    dds = deseq.estimateSizeFactorsForMatrix(adjust_r_counts)
-    pandas_sf = pandas2ri.ri2py(dds)
-    pandas2ri.deactivate()
-    return pandas_sf
+    lib_size = counts.sum(axis=0)
+    counts = counts + (lib_size / np.mean(lib_size))
+    return computeSizeFactors(counts)
 
 def computeSizeFactorsLinear(counts):
     """ Computes size factors using DESeq2 iterative size factors
     for the counts matrix given as input (Genes as rows
-    and spots as columns). Returns the computed size factors
-    as a Pandas object.
+    and spots as columns). 
+    Returns the computed size factors as a vector.
+    :param counts: a matrix of counts (genes as rows)
+    :return returns the normalization factors a vector
     """
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
@@ -91,45 +110,5 @@ def computeSizeFactorsLinear(counts):
     dds = deseq2.DESeqDataSetFromMatrix(countData=r_counts, colData=cond, design=design)
     dds = bio_generics.estimateSizeFactors(dds, type="iterate")
     pandas_sf = pandas2ri.ri2py(bio_generics.sizeFactors(dds))
-    pandas2ri.deactivate()
-    return pandas_sf
-
-def computeDESeq2LogTransform(counts):
-    """ Computes size factors using DESeq2 Log transform
-    for the counts matrix given as input (Genes as rows
-    and spots as columns). Returns the normalized counts matrix
-    as a Pandas data frame.
-    """
-    pandas2ri.activate()
-    r_counts = pandas2ri.py2ri(counts)
-    deseq2 = RimportLibrary("DESeq2")
-    vec = rpackages.importr('S4Vectors')
-    gr = rpackages.importr('GenomicRanges')
-    cond = vec.DataFrame(condition=base.factor(base.c(base.colnames(r_counts))))
-    design = r('formula(~ condition)')
-    dds = deseq2.DESeqDataSetFromMatrix(countData=r_counts, colData=cond, design=design)
-    logs = deseq2.rlog(dds, blind=True, fitType="mean")
-    logs_count = gr.assay(logs)
-    pandas_count = pd.DataFrame(np.matrix(logs_count), 
-                                columns=logs_count.colnames, index=logs_count.rownames)
-    pandas2ri.deactivate()
-    return pandas_count
-            
-def computeEdgeRNormalization(counts):
-    """ Computes size factors using EdgeR
-    for the counts matrix given as input (Genes as rows
-    and spots as columns). Returns the computed size factors
-    as a Pandas object.
-    """
-    pandas2ri.activate()
-    r_counts = pandas2ri.py2ri(counts)
-    edger = RimportLibrary("edgeR")
-    factors = base.factor(base.c(base.colnames(r_counts)))
-    dge = edger.DGEList(counts=r_counts, group=factors)
-    y = edger.calcNormFactors(dge)
-    y = edger.estimateCommonDisp(y)
-    mult = r.get('*')
-    dds = mult(y[1][1], y[1][2])
-    pandas_sf = pandas2ri.ri2py(dds)
     pandas2ri.deactivate()
     return pandas_sf

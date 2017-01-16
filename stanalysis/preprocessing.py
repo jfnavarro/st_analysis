@@ -41,7 +41,7 @@ def aggregate_datatasets(counts_table_files, plot_hist=False):
     counts.fillna(0.0, inplace=True)
     return counts
   
-def remove_noise(counts, num_exp_genes):
+def remove_noise(counts, num_exp_genes, num_exp_spots=1, min_expression=1):
     """This functions remove noisy genes and spots 
     for a given data frame (Genes as columns and spots as rows).
     - The noisy spots are removed so to keep a percentage
@@ -52,9 +52,13 @@ def remove_noise(counts, num_exp_genes):
     :param counts: a Pandas data frame with the counts
     :param num_exp_genes: an integer from 1-100 representing the % of 
     the distribution of expressed genes a spot must have to be kept
+    :param num_exp_spots: a float from 0-100 representing the % of 
+    the total number of spots that a gene must have with a count bigger
+    than the parameter min_expression in order to be kept
+    :param min_expression: the minimum expression for a gene to be
+    considered expressed
     :return: a new Pandas data frame with noisy spots/genes removed
     """
-    MIN_EXPRESION = 2
     
     # How many spots do we keep based on the number of genes expressed?
     num_spots = len(counts.index)
@@ -69,9 +73,9 @@ def remove_noise(counts, num_exp_genes):
     counts = counts.transpose()
   
     # Remove noisy genes
-    min_features_gene = round(len(counts.columns) * 0.01) 
+    min_features_gene = round(len(counts.columns) * num_exp_spots) 
     print "Removing genes that are expressed in less than {} " \
-    "spots with a count of at least {}".format(min_features_gene, MIN_EXPRESION)
+    "spots with a count of at least {}".format(min_features_gene, min_expression)
     counts = counts[(counts >= MIN_EXPRESION).sum(axis=1) >= min_features_gene]
     print "Dropped {} genes".format(num_genes - len(counts.index))
     
@@ -113,41 +117,34 @@ def normalize_data(counts, normalization):
     different methods.
     :param counts: a Pandas data frame with the counts
     :param normalization: the normalization method to use 
-    (DESeq, DESeq2, DESeq2Log, EdgeR, REL, RAW, TMM, DESeq+1, Scran)
-    :return: a Pandas data frame with the normalized counts
+    (DESeq2, DESeq2Linear, DESeq2PseudoCount, DESeq2SizeAdjusted,RLE, REL, RAW, TMM, Scran)
+    :return: a Pandas data frame with the normalized counts (genes as columns)
     """
     # Spots as columns and genes as rows
     counts = counts.transpose()
     # Per spot normalization
-    if normalization in "DESeq":
+    if normalization in "DESeq2":
         size_factors = computeSizeFactors(counts)
-        norm_counts = counts / size_factors
-    elif normalization in "DESeq2":
+    elif normalization in "DESeq2Linear":
         size_factors = computeSizeFactorsLinear(counts)
-        norm_counts = counts / size_factors
-    elif normalization in "DESeq2Log":
-        norm_counts = computeDESeq2LogTransform(counts)
-    elif normalization in "EdgeR":
-        size_factors = computeEdgeRNormalization(counts)
-        # An alternative is to multiply by 10e6
-        norm_counts = (counts / size_factors) * np.mean(size_factors)
-    elif normalization in "REL":
-        spots_sum = counts.sum(axis=0)
-        norm_counts = counts / spots_sum
-    elif normalization in "RAW":
-        norm_counts = counts
-    elif normalization in "TMM":
-        tmm_factors = computeTMMFactors(counts)
-        norm_counts = counts / tmm_factors
-    elif normalization in "DESeq+1":
+    elif normalization in "DESeq2PseudoCount":
         size_factors = computeSizeFactors(counts + 1)
-        norm_counts = counts / size_factors   
+    elif normalization in "DESeq2SizeAdjusted":
+        size_factors = computeSizeFactorsSizeAdjusted(counts)
+    elif normalization in "TMM":
+        size_factors = computeTMMFactors(counts)
+    elif normalization in "RLE":
+        size_factors = computeRLEFactors(counts)
+    elif normalization in "REL":
+        size_factors = counts.sum(axis=0)
+    elif normalization in "RAW":
+        size_factors = 1
     elif normalization in "Scran":
-        sum_factors = computeSumFactors(counts)
-        norm_counts = counts / sum_factors       
+        size_factors = computeSumFactors(counts)         
     else:
         raise RunTimeError("Error, incorrect normalization method\n")
     
+    norm_counts = counts / size_factors   
     return counts.transpose()
     
 def normalize_samples(counts, number_datasets):

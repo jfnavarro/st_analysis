@@ -69,18 +69,19 @@ def Rtsne(counts, dimensions):
   
 def main(counts_table_files, 
          normalization, 
-         num_clusters, 
-         clustering_algorithm, 
-         dimensionality_algorithm,
-         use_log_scale,
-         num_exp_genes, 
+         num_clusters,
+         num_exp_genes,
+         num_exp_spots,
          num_genes_keep,
-         outdir,
+         clustering, 
+         dimensionality, 
+         use_log_scale, 
          alignment_files, 
-         image_files,
-         num_dimensions,
+         image_files, 
+         num_dimensions, 
          spot_size,
-         top_genes_criteria):
+         top_genes_criteria,
+         outdir):
 
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
@@ -105,12 +106,13 @@ def main(counts_table_files,
        
     num_exp_genes = num_exp_genes / 100.0
     num_genes_keep = num_genes_keep / 100.0
+    num_exp_spots = num_exp_spots / 100.0
     
     # Merge input datasets (Spots are rows and genes are columns)
     counts = aggregate_datatasets(counts_table_files)
 
     # Remove noisy spots and genes (Spots are rows and genes are columns)
-    counts = remove_noise(counts, num_exp_genes)
+    counts = remove_noise(counts, num_exp_genes, num_exp_spots)
     
     # Normalize data
     print "Computing per spot normalization..." 
@@ -276,27 +278,33 @@ if __name__ == '__main__':
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--counts-table-files", required=True, nargs='+', type=str,
                         help="One or more matrices with gene counts per feature/spot (genes as columns)")
-    parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
-                        type=str, choices=["RAW", "DESeq", "DESeq2", "DESeq2Log", "EdgeR", "REL", "TMM", "DESeq+1", "Scran"],
+    parser.add_argument("--normalization", default="DESeq2", metavar="[STR]", 
+                        type=str, 
+                        choices=["RAW", "DESeq2", "DESeq2Linear", "DESeq2PseudoCount", 
+                                 "DESeq2SizeAdjusted", "REL", "TMM", "RLE", "Scran"],
                         help="Normalize the counts using:\n" \
                         "RAW = absolute counts\n" \
-                        "DESeq = DESeq::estimateSizeFactors()\n" \
-                        "DESeq+1 = DESeq::estimateSizeFactors() + 1\n" \
-                        "DESeq2 = DESeq2::estimateSizeFactors(linear=TRUE)\n" \
-                        "DESeq2Log = DESeq2::rlog()\n" \
-                        "EdgeR = EdgeR RLE\n" \
-                        "TMM = TMM with raw counts\n" \
-                        "Scran = Deconvolution Sum Factors\n" \
-                        "REL = Each gene count divided by the total count of its spot)\n" \
+                        "DESeq2 = DESeq2::estimateSizeFactors(counts)\n" \
+                        "DESeq2PseudoCount = DESeq2::estimateSizeFactors(counts + 1)\n" \
+                        "DESeq2Linear = DESeq2::estimateSizeFactors(counts, linear=TRUE)\n" \
+                        "DESeq2SizeAdjusted = DESeq2::estimateSizeFactors(counts + lib_size_factors)\n" \
+                        "RLE = EdgeR RLE * lib_size\n" \
+                        "TMM = EdgeR TMM * lib_size\n" \
+                        "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
+                        "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
     parser.add_argument("--num-clusters", default=3, metavar="[INT]", type=int, choices=range(2, 10),
                         help="The number of clusters/regions expected to be found. (default: %(default)s)")
     parser.add_argument("--num-exp-genes", default=10, metavar="[INT]", type=int, choices=range(0, 100),
-                        help="The percentage of number of expressed genes ( != 0 ) a spot " \
+                        help="The percentage of number of expressed genes (!= 0) a spot\n" \
                         "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
+    parser.add_argument("--num-exp-spots", default=1, metavar="[INT]", type=int, choices=range(0, 100),
+                        help="The percentage of number of expressed spots (!= 0) a gene " \
+                        "must have to be kept from the total number of spots (default: %(default)s)")
     parser.add_argument("--num-genes-keep", default=20, metavar="[INT]", type=int, choices=range(0, 100),
-                        help="The percentage of top genes to discard from the distribution of all the genes " \
-                        "across all the spots (default: %(default)s)")
+                        help="The percentage of top genes to discard from the distribution of all the genes\n" \
+                        "across all the spots using the varience of the top expression " \
+                        "(see --top-genes-criteria) (default: %(default)s)")
     parser.add_argument("--clustering", default="KMeans", metavar="[STR]", 
                         type=str, choices=["Hierarchical", "KMeans"],
                         help="What clustering algorithm to use after the dimensionality reduction " \
@@ -306,19 +314,20 @@ if __name__ == '__main__':
                         help="What dimensionality reduction algorithm to use " \
                         "(tSNE - PCA - ICA - SPCA) (default: %(default)s)")
     parser.add_argument("--use-log-scale", action="store_true", default=False,
-                        help="Use log values in the dimensionality reduction step")
+                        help="Use log2(counts + 1) values in the dimensionality reduction step")
     parser.add_argument("--alignment-files", default=None, nargs='+', type=str,
-                        help="One or more tab delimited files containing and alignment matrix for the images " \
+                        help="One or more tab delimited files containing and alignment matrix for the images\n" \
                         "(array coordinates to pixel coordinates) as a 3x3 matrix in one row.\n" \
-                        "Only useful is the image has extra borders, for instance not cropped to the array corners" \
+                        "Only useful is the image has extra borders, for instance not cropped to the array corners\n" \
                         "or if you want the keep the original image size in the plots.")
     parser.add_argument("--image-files", default=None, nargs='+', type=str,
-                        help="When given the data will plotted on top of the image, " \
+                        help="When given the data will plotted on top of the image\n" \
                         "It can be one ore more, ideally one for each input dataset\n " \
-                        "It is desirable that the image is cropped to the array " \
+                        "It is desirable that the image is cropped to the array\n" \
                         "corners otherwise an alignment file is needed")
     parser.add_argument("--num-dimensions", default=2, metavar="[INT]", type=int, choices=[2,3],
-                        help="The number of dimensions to use in the dimensionality reduction (2 or 3). (default: %(default)s)")
+                        help="The number of dimensions to use in the dimensionality " \
+                        "reduction (2 or 3). (default: %(default)s)")
     parser.add_argument("--spot-size", default=100, metavar="[INT]", type=int, choices=range(10, 500),
                         help="The size of the spots when generating the plots. (default: %(default)s)")
     parser.add_argument("--top-genes-criteria", default="Variance", metavar="[STR]", 
@@ -327,9 +336,19 @@ if __name__ == '__main__':
                         "the dimensionality reduction (Variance or TopRanked) (default: %(default)s)")   
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     args = parser.parse_args()
-    main(args.counts_table_files, args.normalization, int(args.num_clusters), 
-         args.clustering, args.dimensionality, args.use_log_scale,
-         args.num_exp_genes, args.num_genes_keep, args.outdir, 
-         args.alignment_files, args.image_files, args.num_dimensions, args.spot_size,
-         args.top_genes_criteria)
+    main(args.counts_table_files, 
+         args.normalization, 
+         args.num_clusters,
+         args.num_exp_genes,
+         args.num_exp_spots,
+         args.num_genes_keep,
+         args.clustering, 
+         args.dimensionality, 
+         args.use_log_scale, 
+         args.alignment_files, 
+         args.image_files, 
+         args.num_dimensions, 
+         args.spot_size,
+         args.top_genes_criteria,
+         args.outdir)
 
