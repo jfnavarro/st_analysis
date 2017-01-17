@@ -76,7 +76,7 @@ def remove_noise(counts, num_exp_genes, num_exp_spots=1, min_expression=1):
     min_features_gene = round(len(counts.columns) * num_exp_spots) 
     print "Removing genes that are expressed in less than {} " \
     "spots with a count of at least {}".format(min_features_gene, min_expression)
-    counts = counts[(counts >= MIN_EXPRESION).sum(axis=1) >= min_features_gene]
+    counts = counts[(counts >= min_expression).sum(axis=1) >= min_features_gene]
     print "Dropped {} genes".format(num_genes - len(counts.index))
     
     return counts.transpose()
@@ -110,19 +110,10 @@ def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
     print "Dropped {} genes".format(num_genes - len(counts.index))    
     return counts.transpose()
 
-def normalize_data(counts, normalization):
-    """This functions takes a data frame as input
-    with ST data (genes as columns and spots as rows) and 
-    returns a data frame with the normalized counts using
-    different methods.
-    :param counts: a Pandas data frame with the counts
-    :param normalization: the normalization method to use 
-    (DESeq2, DESeq2Linear, DESeq2PseudoCount, DESeq2SizeAdjusted,RLE, REL, RAW, TMM, Scran)
-    :return: a Pandas data frame with the normalized counts (genes as columns)
-    """
-    # Spots as columns and genes as rows
+def compute_size_factors(counts, normalization):
+    """ Helper function to compute normalization
+    size factors"""
     counts = counts.transpose()
-    # Per spot normalization
     if normalization in "DESeq2":
         size_factors = computeSizeFactors(counts)
     elif normalization in "DESeq2Linear":
@@ -143,9 +134,33 @@ def normalize_data(counts, normalization):
         size_factors = computeSumFactors(counts)         
     else:
         raise RunTimeError("Error, incorrect normalization method\n")
-    
-    norm_counts = counts / size_factors   
-    return counts.transpose()
+    if np.isnan(size_factors).any(): size_factors = 1.0
+    return size_factors
+
+def normalize_data(counts, normalization, center=False, adjusted_log=False):
+    """This functions takes a data frame as input
+    with ST data (genes as columns and spots as rows) and 
+    returns a data frame with the normalized counts using
+    different methods.
+    :param counts: a Pandas data frame with the counts
+    :param normalization: the normalization method to use
+    :param center: if True the size factors will be centered by their mean
+    :param adjusted_log: return adjusted logged normalized counts if True
+    (DESeq2, DESeq2Linear, DESeq2PseudoCount, DESeq2SizeAdjusted,RLE, REL, RAW, TMM, Scran)
+    :return: a Pandas data frame with the normalized counts (genes as columns)
+    """
+    # Compute the size factors
+    size_factors = compute_size_factors(counts, normalization)
+    # Spots as columns and genes as rows
+    counts = counts.transpose()
+    # Center and/or adjust log the size_factors and counts
+    if center: size_factors = size_factors / np.mean(size_factors)
+    if adjusted_log:
+        norm_counts = logCountsWithFactors(counts, size_factors)
+    else:
+        norm_counts = counts / size_factors
+    # return normalize counts (genes as columns)
+    return norm_counts.transpose()
     
 def normalize_samples(counts, number_datasets):
     """ This function takes a data frame

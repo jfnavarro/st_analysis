@@ -69,7 +69,11 @@ def main(input_data,
                     break                         
     else: 
         genes_to_keep = norm_counts_table.columns
-        
+    
+    if len(genes_to_keep) == 0:
+        sys.stderr.write("Error, no genes found with the reg-exp given\n")
+        sys.exit(1)        
+     
     # Compute the expressions for each spot
     # as the sum of all spots that pass the thresholds (Gene and counts)
     x_points = list()
@@ -78,11 +82,12 @@ def main(input_data,
     for spot in norm_counts_table.index:
         tokens = spot.split("x")
         assert(len(tokens) == 2)
-        x_points.append(float(tokens[0]))
-        y_points.append(float(tokens[1]))
-        colors.append(sum(count for count in 
-                          norm_counts_table.loc[spot,genes_to_keep] if count > cutoff))           
-                     
+        exp = sum(count for count in norm_counts_table.loc[spot,genes_to_keep] if count > cutoff)
+        if exp > 0.0:
+            x_points.append(float(tokens[0]))
+            y_points.append(float(tokens[1]))
+            colors.append(exp)           
+               
     # If highlight barcodes is given then
     # parse the spots and their color and plot
     # them on top of the image if given
@@ -99,21 +104,18 @@ def main(input_data,
                 x_points_highlight.append(float(tokens2[0]))
                 y_points_highlight.append(float(tokens2[1]))
                 colors_highlight.append(int(tokens[0]))
-                scatter_plot(x_points=x_points_highlight,
-                             y_points=y_points_highlight,
-                             colors=colors_highlight,
-                             output="{}_{}".format("highlight",outfile),
-                             alignment=alignment,
-                             cmap=None,
-                             title='ST Data scatter highlight',
-                             xlabel='X',
-                             ylabel='Y',
-                             image=image,
-                             alpha=highlight_alpha,
-                             size=dot_size)
-        if len(colors) != len(values):
-            sys.stderr.write("Error, the list of spots to highlight does not match the input data\n")
-            sys.exit(1)        
+        scatter_plot(x_points=x_points_highlight,
+                     y_points=y_points_highlight,
+                     colors=colors_highlight,
+                     output="{}_{}".format("highlight",outfile),
+                     alignment=alignment,
+                     cmap=None,
+                     title='ST Data scatter highlight',
+                     xlabel='X',
+                     ylabel='Y',
+                     image=image,
+                     alpha=highlight_alpha,
+                     size=dot_size)     
 
     # Create a scatter plot for the gene data
     # If image is given plot it as a background

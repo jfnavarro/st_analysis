@@ -4,7 +4,9 @@ Normalization functions for the st analysis package
 import numpy as np
 import pandas as pd
 import rpy2.robjects.packages as rpackages
-from rpy2.robjects import pandas2ri, r, globalenv
+from rpy2.robjects import pandas2ri, r, numpy2ri
+import rpy2.robjects as ro
+ro.conversion.py2ri = numpy2ri
 base = rpackages.importr("base")
 
 def RimportLibrary(lib_name):
@@ -25,9 +27,9 @@ def computeTMMFactors(counts):
     """
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
-    scran = RimportLibrary("edgeR")
+    edger = RimportLibrary("edgeR")
     as_matrix = r["as.matrix"]
-    dds = scran.calcNormFactors(as_matrix(r_counts), method="TMM") * r.colSums(counts)
+    dds = edger.calcNormFactors(as_matrix(r_counts), method="TMM") * r.colSums(counts)
     pandas_sf = pandas2ri.ri2py(dds)
     pandas2ri.deactivate()
     return pandas_sf
@@ -40,9 +42,9 @@ def computeRLEFactors(counts):
     """
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
-    scran = RimportLibrary("edgeR")
+    edger = RimportLibrary("edgeR")
     as_matrix = r["as.matrix"]
-    dds = scran.calcNormFactors(as_matrix(r_counts), method="RLE") * r.colSums(counts)
+    dds = edger.calcNormFactors(as_matrix(r_counts), method="RLE") * r.colSums(counts)
     pandas_sf = pandas2ri.ri2py(dds)
     pandas2ri.deactivate()
     return pandas_sf
@@ -63,6 +65,31 @@ def computeSumFactors(counts):
     pandas_sf = pandas2ri.ri2py(dds)
     pandas2ri.deactivate()
     return pandas_sf
+
+def logCountsWithFactors(counts, size_factors):
+    """ Uses the R package scater to log a matrix of counts (genes as rows)
+    and a vector of size factor using the method normalize().
+    :param counts: a matrix of counts (genes as rows)
+    :param size_factors: a vector of size factors
+    :return the normalized log counts (genes as rows)
+    """
+    pandas2ri.activate()
+    r_counts = pandas2ri.py2ri(counts)
+    scater = RimportLibrary("scater")
+    r_call = """
+        function(counts, size_factors){
+          sce = newSCESet(countData=counts)
+          sce@phenoData$size_factor = size_factors
+          sce = normalize(sce, recompute_cpm=FALSE)
+          norm_counts = sce@assayData$norm_exprs
+          return(as.data.frame(norm_counts))
+        }
+    """
+    r_func = r(r_call)
+    r_norm_counts = r_func(r_counts, size_factors)
+    pandas_norm_counts = pandas2ri.ri2py(r_norm_counts)
+    pandas2ri.deactivate()
+    return pandas_norm_counts
 
 def computeSizeFactors(counts):
     """ Computes size factors using DESeq

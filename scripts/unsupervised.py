@@ -81,7 +81,8 @@ def main(counts_table_files,
          num_dimensions, 
          spot_size,
          top_genes_criteria,
-         outdir):
+         outdir,
+         use_adjusted_log):
 
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
@@ -99,7 +100,12 @@ def main(counts_table_files,
         sys.stderr.write("Error, the number of alignments given as " \
         "input is not the same as the number of images\n")
         sys.exit(1)   
-                 
+       
+    if use_adjusted_log and use_log_scale:
+        sys.stdout.write("Warning, both log and adjusted log are enabled " \
+                         "only adjusted log will be used\n")
+        use_log_scale = False
+                          
     if outdir is None or not os.path.isdir(outdir): 
         outdir = os.getcwd()
     outdir = os.path.abspath(outdir)
@@ -116,7 +122,9 @@ def main(counts_table_files,
     
     # Normalize data
     print "Computing per spot normalization..." 
-    norm_counts = normalize_data(counts, normalization)
+    center_size_factors = not use_adjusted_log
+    norm_counts = normalize_data(counts, normalization, 
+                                 center=center_size_factors, adjusted_log=use_adjusted_log)
     
     # Keep top genes (variance or expressed)
     norm_counts = keep_top_genes(norm_counts, num_genes_keep, criteria=top_genes_criteria)
@@ -127,42 +135,40 @@ def main(counts_table_files,
       
     print "Performing dimensionality reduction..."   
            
-    if "tSNE" in dimensionality_algorithm:
+    if "tSNE" in dimensionality:
         #NOTE the Scipy tsne seems buggy so we use the R one instead
         reduced_data = Rtsne(norm_counts, num_dimensions)
-    elif "PCA" in dimensionality_algorithm:
+    elif "PCA" in dimensionality:
         # n_components = None, number of mle to estimate optimal
         decomp_model = PCA(n_components=num_dimensions, whiten=True, copy=True)
-    elif "ICA" in dimensionality_algorithm:
+    elif "ICA" in dimensionality:
         decomp_model = FastICA(n_components=num_dimensions, 
                                algorithm='parallel', whiten=True,
                                fun='logcosh', w_init=None, random_state=None)
-    elif "SPCA" in dimensionality_algorithm:
+    elif "SPCA" in dimensionality:
         decomp_model = SparsePCA(n_components=num_dimensions, alpha=1)
     else:
         sys.stderr.write("Error, incorrect dimensionality reduction method\n")
         sys.exit(1)
      
-    if not "tSNE" in dimensionality_algorithm:
+    if not "tSNE" in dimensionality:
         # Perform dimensionality reduction, outputs a bunch of 2D/3D coordinates
         reduced_data = decomp_model.fit_transform(norm_counts)
     
     # Do clustering of the dimensionality reduced coordinates
-    if "KMeans" in clustering_algorithm:
-        clustering = KMeans(init='k-means++', n_clusters=num_clusters, n_init=10)    
-    elif "Hierarchical" in clustering_algorithm:
-        clustering = AgglomerativeClustering(n_clusters=num_clusters, 
-                                             affinity='euclidean',
-                                             n_components=None, linkage='ward') 
+    if "KMeans" in clustering:
+        clustering_object = KMeans(init='k-means++', n_clusters=num_clusters, n_init=10)    
+    elif "Hierarchical" in clustering:
+        clustering_object = AgglomerativeClustering(n_clusters=num_clusters, 
+                                                    affinity='euclidean',
+                                                    n_components=None, linkage='ward') 
     else:
         sys.stderr.write("Error, incorrect clustering method\n")
         sys.exit(1)
 
     print "Performing clustering..."  
     # Obtain predicted classes for each spot
-    labels = clustering.fit_predict(reduced_data)
-    if 0 in labels: labels = labels + 1
-    
+    labels = clustering_object.fit_predict(reduced_data)
     # Check the number of predicted labels is correct
     assert(len(labels) == len(norm_counts.index))
     
@@ -171,7 +177,6 @@ def main(counts_table_files,
                     for i in xrange(len(counts_table_files))]
     # Write the coordinates and the label/class that they belong to
     for i,bc in enumerate(norm_counts.index):
-        # bc is i_XxY
         tokens = bc.split("x")
         assert(len(tokens) == 2)
         y = float(tokens[1])
@@ -217,7 +222,7 @@ def main(counts_table_files,
                      output=os.path.join(outdir,"computed_classes.png"), 
                      title='Computed classes', 
                      alpha=1.0, 
-                     size=80)          
+                     size=100)          
     
     # Plot the spots with colors corresponding to the predicted class
     # Use the HE image as background if the image is given
@@ -261,17 +266,17 @@ def main(counts_table_files,
                      alpha=1.0, 
                      size=spot_size)
         scatter_plot(x_points=x_points, 
-                    y_points=y_points,
-                    colors=colors_dimensionality, 
-                    output=os.path.join(outdir,"dimensionality_color_tissue_{}.png".format(i)), 
-                    alignment=alignment_matrix, 
-                    cmap=plt.get_cmap("hsv"), 
-                    title='Dimensionality color tissue', 
-                    xlabel='X', 
-                    ylabel='Y',
-                    image=image, 
-                    alpha=1.0, 
-                    size=spot_size)           
+                     y_points=y_points,
+                     colors=colors_dimensionality, 
+                     output=os.path.join(outdir,"dimensionality_color_tissue_{}.png".format(i)), 
+                     alignment=alignment_matrix, 
+                     cmap=plt.get_cmap("hsv"), 
+                     title='Dimensionality color tissue', 
+                     xlabel='X', 
+                     ylabel='Y',
+                     image=image, 
+                     alpha=1.0, 
+                     size=spot_size)        
                                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
@@ -333,7 +338,9 @@ if __name__ == '__main__':
     parser.add_argument("--top-genes-criteria", default="Variance", metavar="[STR]", 
                         type=str, choices=["Variance", "TopRankded"],
                         help="What criteria to use to keep top genes before doing " \
-                        "the dimensionality reduction (Variance or TopRanked) (default: %(default)s)")   
+                        "the dimensionality reduction (Variance or TopRanked) (default: %(default)s)")
+    parser.add_argument("--use-adjusted-log", action="store_true", default=False,
+                        help="Use adjusted log normalized counts (R Scater::normalized()) in the dimensionality reduction step")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     args = parser.parse_args()
     main(args.counts_table_files, 
@@ -350,5 +357,6 @@ if __name__ == '__main__':
          args.num_dimensions, 
          args.spot_size,
          args.top_genes_criteria,
-         args.outdir)
+         args.outdir,
+         args.use_adjusted_log)
 

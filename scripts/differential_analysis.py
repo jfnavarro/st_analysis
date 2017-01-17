@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 """ 
-This script performs Differential
-Expression Analysis using on a table with gene counts in the following format:
+This script performs Differential Expression Analysis 
+using DESeq2 on a table with gene counts with the following format:
 
       GeneA   GeneB   GeneC
 1x1   
@@ -17,12 +17,13 @@ CLASS SPOT
 
 The script also requires a 
 list of classes/groups to perform differential expression
-analysis. For example 1-2 or 1-3, etc..
+analysis. For example 1-2 or 1-3, etc..Where 1,2,3 are classes
+defined in the tab delimited file.
 
 The script will output the list of up-regulated and down-regulated
 for each DEA comparison as well as a set of plots.
 
-The script allows to normalize the datasets.
+The script allows to normalize the data with different methods.
 
 @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
@@ -74,7 +75,7 @@ def dea(counts, conds, size_factors=None):
         dds = assign_sf(object=dds, value=robjects.FloatVector(size_factors))
         dds = r.estimateDispersions(dds)
         dds = r.nbinomWaldTest(dds)
-    results = r.results(dds, alpha=0.05)
+    results = r.results(dds, contrast=r.c("condition", "A", "B"))
     results = pandas2ri.ri2py_dataframe(r['as.data.frame'](results))
     results.index = counts.index
     # Return the DESeq2 DEA results object
@@ -115,33 +116,40 @@ def main(counts_table_files, data_classes,
                 assert(len(tokens) == 2)
                 spot_classes["{}_{]".format(i,tokens[1])] = str(tokens[0])  
      
-    # Normalize data
-    counts = normalize_data(counts, normalization)
+    # Compute size factors
+    size_factors = compute_size_factors(counts, normalization)
     
-    # Genes as rows
-    counts = counts.transpose()    
+    # Spots as columns
+    counts = counts.transpose()
     
     # Iterate the conditions
     for cond in conditions_tuples:
+        new_counts = counts.copy()
         tokens = cond.split("-")
         assert(len(tokens) == 2)
-        a = str(tokens[0])
-        b = str(tokens[1])
+        tokens_a = tokens[0].split(":")
+        assert(len(tokens_a) == 2)
+        tokens_b = tokens[1].split(":")
+        assert(len(tokens_b) == 2)
+        dataset_a = str(tokens_a[0])
+        dataset_b = str(tokens_b[0])
+        region_a = str(tokens_a[1])
+        region_b = str(tokens_b[1])
         conds = list()
-        for spot in counts.columns:
+        for spot in new_counts.columns:
             try:
                 spot_class = spot_classes[spot]
-                if spot_class in [a,b]:
-                    conds.append(spot_class)
-                elif b == "REST":
-                    conds.append(b)
+                if spot_class == a:
+                    conds.append("A")
+                elif spot_class == b:
+                    conds.append("B")
                 else:
-                    counts.drop(spot, axis=1, inplace=True)
+                    new_counts.drop(spot, axis=1, inplace=True)
             except KeyError:
-                counts.drop(spot, axis=1, inplace=True)
+                new_counts.drop(spot, axis=1, inplace=True)
         # Make the DEA call
         print "Doing DEA for the conditions {} ...".format(cond)
-        dea_results = dea(counts, conds, size_factors)
+        dea_results = dea(new_counts, conds, size_factors)
         dea_results.sort_values(by=["padj"], ascending=True, inplace=True, axis=0)
         print "Writing results to output..."
         dea_results.to_csv(os.path.join(outdir, "dea_results_{}.tsv".format(cond)), sep="\t")
@@ -161,18 +169,24 @@ if __name__ == '__main__':
     parser.add_argument("--data-classes", required=True, nargs='+', type=str,
                         help="One or more delimited file/s with the classes mapping to the spots " \
                         "(Class first column and spot second column)")
-    parser.add_argument("--normalization", default="DESeq", metavar="[STR]", 
-                        type=str, choices=["DESeq", "TMM", "DESeq+1", "Scran"],
+    parser.add_argument("--normalization", default="DESeq2", metavar="[STR]", 
+                        type=str, 
+                        choices=["RAW", "DESeq2", "DESeq2Linear", "DESeq2PseudoCount", 
+                                 "DESeq2SizeAdjusted", "REL", "TMM", "RLE", "Scran"],
                         help="Normalize the counts using:\n" \
-                        "DESeq = DESeq::estimateSizeFactors()\n" \
-                        "DESeq+1 = DESeq::estimateSizeFactors() + 1\n" \
-                        "EdgeR = EdgeR RLE\n" \
-                        "TMM = TMM with raw counts\n" \
-                        "Scran = Deconvolution Sum Factors\n" \
+                        "RAW = absolute counts\n" \
+                        "DESeq2 = DESeq2::estimateSizeFactors(counts)\n" \
+                        "DESeq2PseudoCount = DESeq2::estimateSizeFactors(counts + 1)\n" \
+                        "DESeq2Linear = DESeq2::estimateSizeFactors(counts, linear=TRUE)\n" \
+                        "DESeq2SizeAdjusted = DESeq2::estimateSizeFactors(counts + lib_size_factors)\n" \
+                        "RLE = EdgeR RLE * lib_size\n" \
+                        "TMM = EdgeR TMM * lib_size\n" \
+                        "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
+                        "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
     parser.add_argument("--conditions-tuples", required=True, nargs='+', type=str,
-                        help="One of more tuples that represent what classes will be compared for DEA, " \
-                        "for example 1-2 1-3 2-REST")
+                        help="One of more tuples that represent what classes and datasets will be compared for DEA, " \
+                        "for example 0:1-1:2 1:1-1:3 0:2-0:1")
     parser.add_argument("--fdr", type=float, default=0.05,
                         help="The FDR minimum confidence threshold (default: %(default)s)")
     parser.add_argument("--outdir", help="Path to output dir")
