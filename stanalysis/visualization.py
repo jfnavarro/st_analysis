@@ -159,5 +159,4 @@ def scatter_plot(x_points, y_points, output, colors=None,
                  ncol=1, scatterpoints=1, fontsize=10)
     a.set_title(title, size=20)
     fig.set_size_inches(16, 16)
-    fig.axes().set_aspect('equal', 'datalim')
     fig.savefig(output, dpi=300)
