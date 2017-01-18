@@ -156,11 +156,11 @@ def main(counts_table_files, data_classes,
         dea_results = dea(new_counts, conds, size_factors)
         dea_results.sort_values(by=["padj"], ascending=True, inplace=True, axis=0)
         print "Writing results to output..."
-        (dea_results["padj"] <= fdr).to_csv(os.path.join(outdir, "dea_results_{}.tsv".format(cond)), sep="\t")
+        dea_results.ix[dea_results["padj"] <= fdr].to_csv(os.path.join(outdir, "dea_results_{}.tsv".format(cond)), sep="\t")
         # Volcano plot
         print "Generating plots..."
         # Add colors according to differently expressed or not (needs a p-value parameter)
-        colors = ["blue" if p <= fdr else "red" for p in dea_results["padj"]]
+        colors = [0 if p <= fdr else 1 for p in dea_results["padj"]]
         scatter_plot(dea_results["log2FoldChange"], -np.log10(dea_results["pvalue"]),
                      xlabel="Log2FoldChange", ylabel="-log10(pvalue)", colors=colors,
                      title="Volcano plot", output=os.path.join(outdir, "volcano_{}.png".format(cond)))
