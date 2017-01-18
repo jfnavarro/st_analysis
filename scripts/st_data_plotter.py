@@ -154,7 +154,7 @@ if __name__ == '__main__':
                         help="The transparency level for the data points, 0 min and 1 max (default: %(default)s)")
     parser.add_argument("--highlight-alpha", type=float, default=1.0, metavar="[FLOAT]",
                         help="The transparency level for the highlighted barcodes, 0 min and 1 max (default: %(default)s)")
-    parser.add_argument("--dot-size", type=int, default=100, metavar="[INT]", choices=range(10, 500),
+    parser.add_argument("--dot-size", type=int, default=20, metavar="[INT]", choices=range(1, 100),
                         help="The size of the dots (default: %(default)s)")
     parser.add_argument("--normalization", default="DESeq2", metavar="[STR]", 
                         type=str, 

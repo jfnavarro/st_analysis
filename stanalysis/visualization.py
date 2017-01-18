@@ -50,7 +50,7 @@ def histogram(x_points, output, title="Histogram", xlabel="X",
     
 def scatter_plot3d(x_points, y_points, z_points, output,
                    colors=None, cmap=None, title='Scatter', xlabel='X', 
-                   ylabel='Y', zlabel="Z", alpha=1.0, size=50):
+                   ylabel='Y', zlabel="Z", alpha=1.0, size=10):
     """ 
     This function makes a scatter 3d plot of a set of points (x,y,z).
     The plot will always use a predefine set of colors unless specified otherwise.
@@ -71,7 +71,7 @@ def scatter_plot3d(x_points, y_points, z_points, output,
     :raises: RuntimeError
     """
     # Plot spots with the color class in the tissue image
-    fig = plt.figure(figsize=(16,16))
+    fig = plt.figure()
     a = fig.add_subplot(111, projection="3d")
     color_values = None
     if cmap is None and colors is not None:
@@ -94,14 +94,14 @@ def scatter_plot3d(x_points, y_points, z_points, output,
     if color_values is not None:
         a.legend([plt.Line2D((0,1),(0,0), color=x) for x in color_values], 
                  color_list, loc="upper right", markerscale=1.0, 
-                 ncol=1, scatterpoints=1, fontsize=10)
-    a.set_title(title, size=20)
-    fig.set_size_inches(16, 16)
+                 ncol=1, scatterpoints=1, fontsize=5)
+    a.set_title(title, size=10)
+    plt.axis('scaled')
     fig.savefig(output, dpi=300)
     
 def scatter_plot(x_points, y_points, output, colors=None,
                  alignment=None, cmap=None, title='Scatter', xlabel='X', 
-                 ylabel='Y', image=None, alpha=1.0, size=50):
+                 ylabel='Y', image=None, alpha=1.0, size=10):
     """ 
     This function makes a scatter plot of a set of points (x,y).
     The alignment matrix is optional to transform the coordinates
@@ -124,7 +124,7 @@ def scatter_plot(x_points, y_points, output, colors=None,
     :raises: RuntimeError
     """
     # Plot spots with the color class in the tissue image
-    fig = plt.figure(figsize=(16,16))
+    fig = plt.figure()
     a = fig.add_subplot(111, aspect='equal')
     base_trans = a.transData
     extent_size = (1,33,35,1)
@@ -156,7 +156,7 @@ def scatter_plot(x_points, y_points, output, colors=None,
     if color_values is not None:
         a.legend([plt.Line2D((0,1),(0,0), color=x) for x in color_values], 
                  color_list, loc="upper right", markerscale=1.0, 
-                 ncol=1, scatterpoints=1, fontsize=10)
-    a.set_title(title, size=20)
-    fig.set_size_inches(16, 16)
+                 ncol=1, scatterpoints=1, fontsize=5)
+    a.set_title(title, size=10)
+    plt.axis('scaled')
     fig.savefig(output, dpi=300)

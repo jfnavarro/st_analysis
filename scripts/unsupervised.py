@@ -231,7 +231,7 @@ def main(counts_table_files,
                        output=os.path.join(outdir,"computed_classes.png"), 
                        title='Computed classes', 
                        alpha=1.0, 
-                       size=100)
+                       size=20)
     else:
         scatter_plot(x_points=reduced_data[:,0], 
                      y_points=reduced_data[:,1],
@@ -239,7 +239,7 @@ def main(counts_table_files,
                      output=os.path.join(outdir,"computed_classes.png"), 
                      title='Computed classes', 
                      alpha=1.0, 
-                     size=100)          
+                     size=20)          
     
     # Plot the spots with colors corresponding to the predicted class
     # Use the HE image as background if the image is given
@@ -351,7 +351,7 @@ if __name__ == '__main__':
     parser.add_argument("--num-dimensions", default=2, metavar="[INT]", type=int, choices=[2,3],
                         help="The number of dimensions to use in the dimensionality " \
                         "reduction (2 or 3). (default: %(default)s)")
-    parser.add_argument("--spot-size", default=200, metavar="[INT]", type=int, choices=range(10, 500),
+    parser.add_argument("--spot-size", default=20, metavar="[INT]", type=int, choices=range(1, 100),
                         help="The size of the spots when generating the plots. (default: %(default)s)")
     parser.add_argument("--top-genes-criteria", default="Variance", metavar="[STR]", 
                         type=str, choices=["Variance", "TopRankded"],

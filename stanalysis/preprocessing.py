@@ -134,7 +134,9 @@ def compute_size_factors(counts, normalization):
         size_factors = computeSumFactors(counts)         
     else:
         raise RunTimeError("Error, incorrect normalization method\n")
-    if np.isnan(size_factors).any(): size_factors = 1
+    if np.isnan(size_factors).any() or np.isinf(size_factors).any():
+        print "Warning: Computed size factors contained NaN or Inf. The data will not be normalized!"
+        size_factors = 1
     return size_factors
 
 def normalize_data(counts, normalization, center=False, adjusted_log=False):
