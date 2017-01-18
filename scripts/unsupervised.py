@@ -66,6 +66,18 @@ def Rtsne(counts, dimensions):
     pandas_tsne_out = pandas2ri.ri2py(tsne_out.rx2('Y'))
     pandas2ri.deactivate()
     return pandas_tsne_out
+
+def computeNClusters(counts, min_size=20):
+    """Computes the number of clusters
+    from the data using Scran::quickCluster"""
+    pandas2ri.activate()
+    r_counts = pandas2ri.py2ri(counts.transpose())
+    scran = RimportLibrary("scran")    
+    as_matrix = r["as.matrix"]
+    clusters = scran.quickCluster(as_matrix(r_counts), min_size)
+    n_clust = len(set(clusters))
+    pandas2ri.deactivate()
+    return n_clust
   
 def main(counts_table_files, 
          normalization, 
@@ -120,15 +132,19 @@ def main(counts_table_files,
     # Remove noisy spots and genes (Spots are rows and genes are columns)
     counts = remove_noise(counts, num_exp_genes, num_exp_spots)
     
+    if num_clusters is None:
+        num_clusters = computeNClusters(counts)
+        print "Computation of number of clusters obtained {} clusters...".format(num_clusters)
+
     # Normalize data
     print "Computing per spot normalization..." 
     center_size_factors = not use_adjusted_log
     norm_counts = normalize_data(counts, normalization, 
                                  center=center_size_factors, adjusted_log=use_adjusted_log)
-    
+        
     # Keep top genes (variance or expressed)
     norm_counts = keep_top_genes(norm_counts, num_genes_keep, criteria=top_genes_criteria)
-         
+       
     if use_log_scale:
         print "Using pseudo-log counts log2(counts + 1)"
         norm_counts = np.log2(norm_counts + 1)  
@@ -169,6 +185,7 @@ def main(counts_table_files,
     print "Performing clustering..."  
     # Obtain predicted classes for each spot
     labels = clustering_object.fit_predict(reduced_data)
+    if 0 in labels: labels = labels + 1
     # Check the number of predicted labels is correct
     assert(len(labels) == len(norm_counts.index))
     
@@ -298,8 +315,9 @@ if __name__ == '__main__':
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
-    parser.add_argument("--num-clusters", default=3, metavar="[INT]", type=int, choices=range(2, 10),
-                        help="The number of clusters/regions expected to be found. (default: %(default)s)")
+    parser.add_argument("--num-clusters", default=None, metavar="[INT]", type=int, choices=range(2, 10),
+                        help="The number of clusters/regions expected to be found.\n" \
+                        "If not given the number of clusters will be computed.")
     parser.add_argument("--num-exp-genes", default=10, metavar="[INT]", type=int, choices=range(0, 100),
                         help="The percentage of number of expressed genes (!= 0) a spot\n" \
                         "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
@@ -333,7 +351,7 @@ if __name__ == '__main__':
     parser.add_argument("--num-dimensions", default=2, metavar="[INT]", type=int, choices=[2,3],
                         help="The number of dimensions to use in the dimensionality " \
                         "reduction (2 or 3). (default: %(default)s)")
-    parser.add_argument("--spot-size", default=100, metavar="[INT]", type=int, choices=range(10, 500),
+    parser.add_argument("--spot-size", default=200, metavar="[INT]", type=int, choices=range(10, 500),
                         help="The size of the spots when generating the plots. (default: %(default)s)")
     parser.add_argument("--top-genes-criteria", default="Variance", metavar="[STR]", 
                         type=str, choices=["Variance", "TopRankded"],

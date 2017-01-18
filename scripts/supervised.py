@@ -83,11 +83,11 @@ def main(train_data,
     
     # loads all the classes for the training set
     train_labels_dict = dict()
-    for labels_file in classes_train:
+    for i,labels_file in enumerate(classes_train):
         with open(labels_file) as filehandler:
             for line in filehandler.readlines():
                 tokens = line.split()
-                train_labels_dict[tokens[1]] = tokens[0]
+                train_labels_dict["{}_{}".format(i,tokens[1])] = tokens[0]
     # make sure the spots in the training set data frame
     # and the label training spots have the same order
     # and are the same 

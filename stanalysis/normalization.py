@@ -73,6 +73,8 @@ def logCountsWithFactors(counts, size_factors):
     :param size_factors: a vector of size factors
     :return the normalized log counts (genes as rows)
     """
+    columns = counts.columns
+    indexes = counts.index
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
     scater = RimportLibrary("scater")
@@ -88,6 +90,8 @@ def logCountsWithFactors(counts, size_factors):
     r_func = r(r_call)
     r_norm_counts = r_func(r_counts, size_factors)
     pandas_norm_counts = pandas2ri.ri2py(r_norm_counts)
+    pandas_norm_counts.index = indexes
+    pandas_norm_counts.columns = columns
     pandas2ri.deactivate()
     return pandas_norm_counts
 

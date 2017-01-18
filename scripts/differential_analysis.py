@@ -15,10 +15,11 @@ This file is a tab delimited file like this:
 
 CLASS SPOT 
 
-The script also requires a 
-list of classes/groups to perform differential expression
-analysis. For example 1-2 or 1-3, etc..Where 1,2,3 are classes
-defined in the tab delimited file.
+The script also requires a  list of dataset:region-dataset:region 
+tuples to perform differential expression analysis. 
+For example 0:1-1:2 or 0:1-0:3.
+Where 0:1 represents dataset number 0 (inputted)
+and region 1 (from the classess tab delimited file)
 
 The script will output the list of up-regulated and down-regulated
 for each DEA comparison as well as a set of plots.
@@ -75,7 +76,7 @@ def dea(counts, conds, size_factors=None):
         dds = assign_sf(object=dds, value=robjects.FloatVector(size_factors))
         dds = r.estimateDispersions(dds)
         dds = r.nbinomWaldTest(dds)
-    results = r.results(dds, contrast=r.c("condition", "A", "B"))
+    results = r.results(dds, contrast=r.c("conditions", "A", "B"))
     results = pandas2ri.ri2py_dataframe(r['as.data.frame'](results))
     results.index = counts.index
     # Return the DESeq2 DEA results object
@@ -114,15 +115,14 @@ def main(counts_table_files, data_classes,
             for line in filehandler.readlines():
                 tokens = line.split()
                 assert(len(tokens) == 2)
-                spot_classes["{}_{]".format(i,tokens[1])] = str(tokens[0])  
-     
-    # Compute size factors
-    size_factors = compute_size_factors(counts, normalization)
+                spot_classes["{}_{}".format(i,tokens[1])] = str(tokens[0])  
     
     # Spots as columns
     counts = counts.transpose()
     
-    # Iterate the conditions
+    # Iterate the conditions and create a new data frame
+    # with the datasets/regions specified in each condition
+    # NOTE this could be done more elegantly using slicing
     for cond in conditions_tuples:
         new_counts = counts.copy()
         tokens = cond.split("-")
@@ -139,9 +139,10 @@ def main(counts_table_files, data_classes,
         for spot in new_counts.columns:
             try:
                 spot_class = spot_classes[spot]
-                if spot_class == a:
+                spot_dataset = spot.split("_")[0]
+                if spot_dataset == dataset_a and spot_class == region_a:
                     conds.append("A")
-                elif spot_class == b:
+                elif spot_dataset == dataset_b and spot_class == region_b:
                     conds.append("B")
                 else:
                     new_counts.drop(spot, axis=1, inplace=True)
@@ -149,10 +150,13 @@ def main(counts_table_files, data_classes,
                 new_counts.drop(spot, axis=1, inplace=True)
         # Make the DEA call
         print "Doing DEA for the conditions {} ...".format(cond)
+        # Compute size factors
+        size_factors = compute_size_factors(new_counts.transpose(), normalization)
+        # DEA call
         dea_results = dea(new_counts, conds, size_factors)
         dea_results.sort_values(by=["padj"], ascending=True, inplace=True, axis=0)
         print "Writing results to output..."
-        dea_results.to_csv(os.path.join(outdir, "dea_results_{}.tsv".format(cond)), sep="\t")
+        (dea_results["padj"] <= fdr).to_csv(os.path.join(outdir, "dea_results_{}.tsv".format(cond)), sep="\t")
         # Volcano plot
         print "Generating plots..."
         # Add colors according to differently expressed or not (needs a p-value parameter)
@@ -185,8 +189,9 @@ if __name__ == '__main__':
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
     parser.add_argument("--conditions-tuples", required=True, nargs='+', type=str,
-                        help="One of more tuples that represent what classes and datasets will be compared for DEA, " \
-                        "for example 0:1-1:2 1:1-1:3 0:2-0:1")
+                        help="One of more tuples that represent what classes and datasets will be compared for DEA.\n" \
+                        "The notation is simple, DATASET_NUMBER1:REGION_NUMBER1-DATASET_NUMBER2:REGION_NUMBER2.\n" \
+                        "For example 0:1-1:2 1:1-1:3 0:2-0:1. Note that dataset number starts by 0.")
     parser.add_argument("--fdr", type=float, default=0.05,
                         help="The FDR minimum confidence threshold (default: %(default)s)")
     parser.add_argument("--outdir", help="Path to output dir")

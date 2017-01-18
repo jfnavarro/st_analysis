@@ -5,7 +5,18 @@ Version 0.2.5
 * Bug fixes
 * Added more normalization methods
 
-Version 0.2.6
+Version 0.3.0
 * Bug fixes
 * Optimized the normalization
-* Improvements in supervised and st_data_plotter
+* Unsupervised allows to center size factors by mean
+* Unsupervised allows to computed adjuted log normalized counts
+* Unsupervised allows to compute the number of clusters automatically
+* Supervised allows to normalize the data
+* Supervised allows to input train/classes with different spots
+  than in the train/test data and in different order
+* st_data_plotter allows to highlith selected spots
+* st_data_plotter only plots the spots where the gene is present
+  when a gene reg-exp is given
+* st_data_plotter allows to normalize the data
+* differential_analysis allows to normalize the data
+* differential_analysis allows to input more than one dataset
