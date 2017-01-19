@@ -61,7 +61,9 @@ def computeSumFactors(counts):
     r_counts = pandas2ri.py2ri(counts)
     scran = RimportLibrary("scran")
     as_matrix = r["as.matrix"]
-    dds = scran.computeSumFactors(as_matrix(r_counts), sizes=r.c(10,20,30,40))
+    r_clusters = scran.quickCluster(as_matrix(r_counts), 20)
+    dds = scran.computeSumFactors(as_matrix(r_counts), clusters=r_clusters,
+                                  sizes=r.c(10,20,30,40), positive=True)
     pandas_sf = pandas2ri.ri2py(dds)
     pandas2ri.deactivate()
     return pandas_sf
