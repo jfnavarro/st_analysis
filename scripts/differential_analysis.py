@@ -163,7 +163,8 @@ def main(counts_table_files, data_classes,
         colors = [0 if p <= fdr else 1 for p in dea_results["padj"]]
         scatter_plot(dea_results["log2FoldChange"], -np.log10(dea_results["pvalue"]),
                      xlabel="Log2FoldChange", ylabel="-log10(pvalue)", colors=colors,
-                     title="Volcano plot", output=os.path.join(outdir, "volcano_{}.png".format(cond)))
+                     title="Volcano plot", 
+                     output=os.path.join(outdir, "volcano_{}.png".format(cond)), scale_axis=False)
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,

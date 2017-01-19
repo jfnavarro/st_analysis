@@ -13,7 +13,6 @@ color_map = ["red", "green", "blue", "orange", "cyan", "yellow", "orchid",
              "saddlebrown", "darkcyan", "gray", "darkred", "darkgreen", "darkblue", 
              "antiquewhite", "bisque", "black"]
 
-
 def histogram(x_points, output, title="Histogram", xlabel="X",
               nbins=50, normed=1, color="blue", alpha=1.0):
     """ This function generates a simple density histogram
@@ -50,7 +49,7 @@ def histogram(x_points, output, title="Histogram", xlabel="X",
     
 def scatter_plot3d(x_points, y_points, z_points, output,
                    colors=None, cmap=None, title='Scatter', xlabel='X', 
-                   ylabel='Y', zlabel="Z", alpha=1.0, size=10):
+                   ylabel='Y', zlabel="Z", alpha=1.0, size=10, scale_axis=True):
     """ 
     This function makes a scatter 3d plot of a set of points (x,y,z).
     The plot will always use a predefine set of colors unless specified otherwise.
@@ -68,6 +67,7 @@ def scatter_plot3d(x_points, y_points, z_points, output,
     :param image: the path to the image file
     :param alpha: the alpha transparency level for the dots
     :param size: the size of the dots
+    :param scale_axis: scale the x,y axis when True
     :raises: RuntimeError
     """
     # Plot spots with the color class in the tissue image
@@ -96,12 +96,18 @@ def scatter_plot3d(x_points, y_points, z_points, output,
                  color_list, loc="upper right", markerscale=1.0, 
                  ncol=1, scatterpoints=1, fontsize=5)
     a.set_title(title, size=10)
-    plt.axis('scaled')
+    if scale_axis:
+        plt.axis('scaled')
+    else:
+        plt.xlim(min(x_points), max(x_points))
+        plt.ylim(min(y_points), max(y_points))
+        plt.zlim(min(z_points), max(z_points))
+        plt.gca().set_aspect('equal', adjustable='box')
     fig.savefig(output, dpi=300)
     
 def scatter_plot(x_points, y_points, output, colors=None,
                  alignment=None, cmap=None, title='Scatter', xlabel='X', 
-                 ylabel='Y', image=None, alpha=1.0, size=10):
+                 ylabel='Y', image=None, alpha=1.0, size=10, scale_axis=True):
     """ 
     This function makes a scatter plot of a set of points (x,y).
     The alignment matrix is optional to transform the coordinates
@@ -121,6 +127,7 @@ def scatter_plot(x_points, y_points, output, colors=None,
     :param image: the path to the image file
     :param alpha: the alpha transparency level for the dots
     :param size: the size of the dots
+    :param scale_axis: scale the x,y axis when True
     :raises: RuntimeError
     """
     # Plot spots with the color class in the tissue image
@@ -158,5 +165,10 @@ def scatter_plot(x_points, y_points, output, colors=None,
                  color_list, loc="upper right", markerscale=1.0, 
                  ncol=1, scatterpoints=1, fontsize=5)
     a.set_title(title, size=10)
-    plt.axis('scaled')
+    if scale_axis:
+        plt.axis('scaled')
+    else:
+        plt.xlim(min(x_points), max(x_points))
+        plt.ylim(min(y_points), max(y_points))
+        plt.gca().set_aspect('equal', adjustable='box')
     fig.savefig(output, dpi=300)
