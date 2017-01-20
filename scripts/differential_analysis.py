@@ -151,20 +151,34 @@ def main(counts_table_files, data_classes,
         # Make the DEA call
         print "Doing DEA for the conditions {} ...".format(cond)
         # Compute size factors
-        size_factors = compute_size_factors(new_counts.transpose(), normalization)
+        size_factors = compute_size_factors(new_counts, normalization)
         # DEA call
         dea_results = dea(new_counts, conds, size_factors)
         dea_results.sort_values(by=["padj"], ascending=True, inplace=True, axis=0)
         print "Writing results to output..."
-        dea_results.ix[dea_results["padj"] <= fdr].to_csv(os.path.join(outdir, "dea_results_{}.tsv".format(cond)), sep="\t")
+        dea_results.ix[dea_results["padj"] <= fdr].to_csv(os.path.join(outdir, 
+                                                                       "dea_results_{}.tsv".format(cond)), sep="\t")
         # Volcano plot
         print "Generating plots..."
         # Add colors according to differently expressed or not (needs a p-value parameter)
-        colors = [0 if p <= fdr else 1 for p in dea_results["padj"]]
-        scatter_plot(dea_results["log2FoldChange"], -np.log10(dea_results["pvalue"]),
-                     xlabel="Log2FoldChange", ylabel="-log10(pvalue)", colors=colors,
-                     title="Volcano plot", 
-                     output=os.path.join(outdir, "volcano_{}.png".format(cond)), scale_axis=False)
+        colors = ["red" if p <= fdr else "blue" for p in dea_results["padj"]]
+        fig, a = plt.subplots(figsize=(30, 30))
+        x_points = dea_results["log2FoldChange"]
+        y_points = -np.log10(dea_results["pvalue"])
+        x_points_conf = dea_results.ix[dea_results["padj"] <= fdr]["log2FoldChange"]
+        y_points_conf = -np.log10(dea_results.ix[dea_results["padj"] <= fdr]["pvalue"])
+        names_conf = dea_results.ix[dea_results["padj"] <= fdr].index
+        # Scale axes
+        OFFSET = 0.1
+        a.set_xlim([min(x_points) - OFFSET, max(x_points) + OFFSET])
+        a.set_ylim([min(y_points) - OFFSET, max(y_points) + OFFSET])
+        a.set_xlabel("Log2FoldChange")
+        a.set_ylabel("-log10(pvalue)")
+        a.set_title("Volcano plot", size=10)
+        a.scatter(x_points, y_points, c=colors, edgecolor="none")  
+        for x,y,text in izip(x_points_conf,y_points_conf,names_conf):
+            a.text(x,y,text,size="x-small")
+        fig.savefig(output=os.path.join(outdir, "volcano_{}.png".format(cond)), dpi=300)
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
@@ -193,7 +207,7 @@ if __name__ == '__main__':
                         help="One of more tuples that represent what classes and datasets will be compared for DEA.\n" \
                         "The notation is simple, DATASET_NUMBER1:REGION_NUMBER1-DATASET_NUMBER2:REGION_NUMBER2.\n" \
                         "For example 0:1-1:2 1:1-1:3 0:2-0:1. Note that dataset number starts by 0.")
-    parser.add_argument("--fdr", type=float, default=0.05,
+    parser.add_argument("--fdr", type=float, default=0.01,
                         help="The FDR minimum confidence threshold (default: %(default)s)")
     parser.add_argument("--outdir", help="Path to output dir")
     args = parser.parse_args()

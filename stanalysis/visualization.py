@@ -47,9 +47,9 @@ def histogram(x_points, output, title="Histogram", xlabel="X",
     fig.set_size_inches(16, 16)
     fig.savefig(output, dpi=300)
     
-def scatter_plot3d(x_points, y_points, z_points, output,
+def scatter_plot3d(x_points, y_points, z_points, output=None,
                    colors=None, cmap=None, title='Scatter', xlabel='X', 
-                   ylabel='Y', zlabel="Z", alpha=1.0, size=10, scale_axis=True):
+                   ylabel='Y', zlabel="Z", alpha=1.0, size=10):
     """ 
     This function makes a scatter 3d plot of a set of points (x,y,z).
     The plot will always use a predefine set of colors unless specified otherwise.
@@ -59,20 +59,17 @@ def scatter_plot3d(x_points, y_points, z_points, output,
     :param z_points: a list of z coordinates (optional)
     :param output: the name/path of the output file
     :param colors: a color label for each point (can be None)
-    :param alignment: an alignment 3x3 matrix (pass identity to not align)
     :param cmap: Matplotlib color mapping object (optional)
     :param title: the title for the plot
     :param xlabel: the name of the X label
     :param ylabel: the name of the Y label
-    :param image: the path to the image file
     :param alpha: the alpha transparency level for the dots
     :param size: the size of the dots
-    :param scale_axis: scale the x,y axis when True
     :raises: RuntimeError
     """
     # Plot spots with the color class in the tissue image
     fig = plt.figure()
-    a = fig.add_subplot(111, projection="3d")
+    a = plt.subplot(projection="3d")
     color_values = None
     if cmap is None and colors is not None:
         color_list = set(colors)
@@ -96,18 +93,15 @@ def scatter_plot3d(x_points, y_points, z_points, output,
                  color_list, loc="upper right", markerscale=1.0, 
                  ncol=1, scatterpoints=1, fontsize=5)
     a.set_title(title, size=10)
-    if scale_axis:
-        plt.axis('scaled')
+    # Save or show the plot
+    if output is not None:
+        fig.savefig(output, dpi=300)
     else:
-        plt.xlim(min(x_points), max(x_points))
-        plt.ylim(min(y_points), max(y_points))
-        plt.zlim(min(z_points), max(z_points))
-        plt.gca().set_aspect('equal', adjustable='box')
-    fig.savefig(output, dpi=300)
+        fig.show()
     
-def scatter_plot(x_points, y_points, output, colors=None,
+def scatter_plot(x_points, y_points, output=None, colors=None,
                  alignment=None, cmap=None, title='Scatter', xlabel='X', 
-                 ylabel='Y', image=None, alpha=1.0, size=10, scale_axis=True):
+                 ylabel='Y', image=None, alpha=1.0, size=10):
     """ 
     This function makes a scatter plot of a set of points (x,y).
     The alignment matrix is optional to transform the coordinates
@@ -118,7 +112,7 @@ def scatter_plot(x_points, y_points, output, colors=None,
     :param x_points: a list of x coordinates
     :param y_points: a list of y coordinates
     :param output: the name/path of the output file
-    :param colors: a color label for each point (can be None)
+    :param colors: a color int value label for each point (can be None)
     :param alignment: an alignment 3x3 matrix (pass identity to not align)
     :param cmap: Matplotlib color mapping object (optional)
     :param title: the title for the plot
@@ -127,18 +121,18 @@ def scatter_plot(x_points, y_points, output, colors=None,
     :param image: the path to the image file
     :param alpha: the alpha transparency level for the dots
     :param size: the size of the dots
-    :param scale_axis: scale the x,y axis when True
     :raises: RuntimeError
     """
     # Plot spots with the color class in the tissue image
-    fig = plt.figure()
-    a = fig.add_subplot(111, aspect='equal')
+    fig, a = plt.subplots()
     base_trans = a.transData
-    extent_size = (1,33,35,1)
+    extent_size = (1,33,1,35)
     # If alignment is None we re-size the image to chip size (1,1,33,35)
+    # Otherwise we keep the image intact and apply the 3x3 transformation
     if alignment is not None:
         base_trans = transforms.Affine2D(matrix = alignment) + base_trans
         extent_size = None
+    # We convert the list of color int values to color labels
     color_values = None
     if cmap is None and colors is not None:
         color_list = set(colors)
@@ -146,29 +140,24 @@ def scatter_plot(x_points, y_points, output, colors=None,
         cmap = ListedColormap(color_values)
     elif colors is None:
         colors = "blue"
-    a.scatter(x_points, 
-              y_points,  
-              c=colors, 
-              cmap=cmap, 
-              edgecolor="none", 
-              s=size, 
-              transform=base_trans,
-              alpha=alpha)
+    # Create the scatter plot      
+    a.scatter(x_points, y_points, c=colors, edgecolor="none", 
+              cmap=cmap, s=size, transform=base_trans,  alpha=alpha)
+    # Plot the image
     if image is not None and os.path.isfile(image):
         img = plt.imread(image)
-        # TODO imgshow() will not work if I pass extent_size as variable
-        a.imshow(img, extent=(1,33,35,1))
+        a.imshow(img, origin="image", aspect="equal", extent=extent_size)
+    # Add labels and title
     a.set_xlabel(xlabel)
     a.set_ylabel(ylabel)
+    a.set_title(title, size=10)
+    # Add legend
     if color_values is not None:
         a.legend([plt.Line2D((0,1),(0,0), color=x) for x in color_values], 
                  color_list, loc="upper right", markerscale=1.0, 
                  ncol=1, scatterpoints=1, fontsize=5)
-    a.set_title(title, size=10)
-    if scale_axis:
-        plt.axis('scaled')
+    # Save or show the plot
+    if output is not None:
+        fig.savefig(output, dpi=300)
     else:
-        plt.xlim(min(x_points), max(x_points))
-        plt.ylim(min(y_points), max(y_points))
-        plt.gca().set_aspect('equal', adjustable='box')
-    fig.savefig(output, dpi=300)
+        fig.show()

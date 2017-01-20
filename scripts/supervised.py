@@ -159,8 +159,9 @@ def main(train_data,
     # TODO optimize parameters of the classifier
     classifier = OneVsRestClassifier(LinearSVC(random_state=0), n_jobs=4)
     # NOTE one could also get the predict prob of each class for each spot predict_proba() 
-    predicted = classifier.fit(train_counts, train_labels).predict(test_counts) 
-    
+    #predicted = classifier.fit(train_counts, train_labels).predict(test_counts) 
+    predicted = classifier.fit(train_counts, train_labels).predict_proba(test_counts)
+     
     # Compute accuracy
     if classes_test is not None:
         print("Classification report for classifier {0}:\n{1}\n".
