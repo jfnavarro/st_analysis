@@ -32,14 +32,12 @@ import argparse
 import sys
 import os
 import numpy as np
-import pandas as pd
+from itertools import izip
 from stanalysis.normalization import RimportLibrary
-from stanalysis.visualization import scatter_plot
-from stanalysis.normalization import *
-from stanalysis.preprocessing import *
-import rpy2.robjects.packages as rpackages
+from stanalysis.preprocessing import compute_size_factors, aggregate_datatasets, remove_noise
 import rpy2.robjects as robjects
-from rpy2.robjects import pandas2ri, r, globalenv
+from rpy2.robjects import pandas2ri, r
+import matplotlib.pyplot as plt
 
 def get_classes_coordinate(class_file):
     """ Helper function
@@ -107,6 +105,7 @@ def main(counts_table_files, data_classes,
       
     # Merge input datasets (Spots are rows and genes are columns)
     counts = aggregate_datatasets(counts_table_files)
+    counts.to_csv("test.csv", sep="\t")
     
     # loads all the classes for the spots
     spot_classes = dict()
@@ -117,14 +116,17 @@ def main(counts_table_files, data_classes,
                 assert(len(tokens) == 2)
                 spot_classes["{}_{}".format(i,tokens[1])] = str(tokens[0])  
     
+    # Remove noise
+    counts = remove_noise(counts, 0.01, 0.01, 1)
     # Spots as columns
     counts = counts.transpose()
-    
+    # Compute size factors
+    size_factors = compute_size_factors(counts, normalization)
+            
     # Iterate the conditions and create a new data frame
     # with the datasets/regions specified in each condition
     # NOTE this could be done more elegantly using slicing
     for cond in conditions_tuples:
-        new_counts = counts.copy()
         tokens = cond.split("-")
         assert(len(tokens) == 2)
         tokens_a = tokens[0].split(":")
@@ -136,7 +138,7 @@ def main(counts_table_files, data_classes,
         region_a = str(tokens_a[1])
         region_b = str(tokens_b[1])
         conds = list()
-        for spot in new_counts.columns:
+        for spot in counts.columns:
             try:
                 spot_class = spot_classes[spot]
                 spot_dataset = spot.split("_")[0]
@@ -145,15 +147,13 @@ def main(counts_table_files, data_classes,
                 elif spot_dataset == dataset_b and spot_class == region_b:
                     conds.append("B")
                 else:
-                    new_counts.drop(spot, axis=1, inplace=True)
+                    conds.append("REST")
             except KeyError:
-                new_counts.drop(spot, axis=1, inplace=True)
+                conds.append("REST")
         # Make the DEA call
         print "Doing DEA for the conditions {} ...".format(cond)
-        # Compute size factors
-        size_factors = compute_size_factors(new_counts, normalization)
         # DEA call
-        dea_results = dea(new_counts, conds, size_factors)
+        dea_results = dea(counts, conds, size_factors)
         dea_results.sort_values(by=["padj"], ascending=True, inplace=True, axis=0)
         print "Writing results to output..."
         dea_results.ix[dea_results["padj"] <= fdr].to_csv(os.path.join(outdir, 

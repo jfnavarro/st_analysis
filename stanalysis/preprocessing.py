@@ -41,7 +41,7 @@ def aggregate_datatasets(counts_table_files, plot_hist=False):
     counts.fillna(0.0, inplace=True)
     return counts
   
-def remove_noise(counts, num_exp_genes, num_exp_spots=1, min_expression=1):
+def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=1):
     """This functions remove noisy genes and spots 
     for a given data frame (Genes as columns and spots as rows).
     - The noisy spots are removed so to keep a percentage
@@ -50,9 +50,9 @@ def remove_noise(counts, num_exp_genes, num_exp_spots=1, min_expression=1):
     - The noisy genes are removed so every gene that is expressed
     in less than 1% of the total spots. Expressed with a count >= 2. 
     :param counts: a Pandas data frame with the counts
-    :param num_exp_genes: an integer from 1-100 representing the % of 
+    :param num_exp_genes: a float from 0-1 representing the % of 
     the distribution of expressed genes a spot must have to be kept
-    :param num_exp_spots: a float from 0-100 representing the % of 
+    :param num_exp_spots: a float from 0-1 representing the % of 
     the total number of spots that a gene must have with a count bigger
     than the parameter min_expression in order to be kept
     :param min_expression: the minimum expression for a gene to be
