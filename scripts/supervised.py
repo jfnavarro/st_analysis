@@ -33,28 +33,14 @@ import numpy as np
 import pandas as pd
 #from sklearn.feature_selection import VarianceThreshold
 from stanalysis.preprocessing import *
-from sklearn.svm import LinearSVC
+from sklearn.svm import LinearSVC, SVC
 from sklearn import metrics
 from sklearn.multiclass import OneVsRestClassifier
-from stanalysis.visualization import scatter_plot
+from stanalysis.visualization import scatter_plot, color_map
 from stanalysis.alignment import parseAlignmentMatrix
 from cProfile import label
-
-def get_classes_coordinate(class_file):
-    """ Helper function
-    to get a dictionary of spot -> class 
-    from a tab delimited file
-    """
-    barcodes_classes = dict()
-    with open(class_file, "r") as filehandler:
-        for line in filehandler.readlines():
-            tokens = line.split()
-            assert(len(tokens) == 2)
-            spot = tokens[1]
-            class_label = tokens[0]
-            barcodes_classes[spot] = class_label
-    return barcodes_classes
-               
+from matplotlib.colors import LinearSegmentedColormap
+      
 def main(train_data, 
          test_data, 
          classes_train, 
@@ -87,7 +73,7 @@ def main(train_data,
         with open(labels_file) as filehandler:
             for line in filehandler.readlines():
                 tokens = line.split()
-                train_labels_dict["{}_{}".format(i,tokens[1])] = tokens[0]
+                train_labels_dict["{}_{}".format(i,tokens[1])] = int(tokens[0])
     # make sure the spots in the training set data frame
     # and the label training spots have the same order
     # and are the same 
@@ -115,9 +101,8 @@ def main(train_data,
         with open(classes_test) as filehandler:
             for line in filehandler.readlines():
                 tokens = line.split()
-                spot = tokens[1]
-                label = tokens[0]
-                spot_label[spot] = label      
+                assert(len(tokens) == 2)
+                spot_label[tokens[1]] = int(tokens[0])      
         for spot in test_data_frame.index:
             try:
                 test_labels.append(spot_label[spot])
@@ -156,39 +141,62 @@ def main(train_data,
         test_counts = np.log2(test_counts + 1)
         
     # Train the classifier and predict
-    # TODO optimize parameters of the classifier
-    classifier = OneVsRestClassifier(LinearSVC(random_state=0), n_jobs=4)
-    # NOTE one could also get the predict prob of each class for each spot predict_proba() 
-    #predicted = classifier.fit(train_counts, train_labels).predict(test_counts) 
-    predicted = classifier.fit(train_counts, train_labels).predict(test_counts)
+    # TODO optimize parameters of the classifier (kernel="rbf" or "sigmoid")
+    classifier = OneVsRestClassifier(SVC(probability=True, random_state=0, 
+                                         decision_function_shape="ovr", kernel="linear"), n_jobs=4)
+    classifier = classifier.fit(train_counts, train_labels)
+    predicted_class = classifier.predict(test_counts) 
+    predicted_prob = classifier.predict_proba(test_counts)
      
     # Compute accuracy
     if classes_test is not None:
         print("Classification report for classifier {0}:\n{1}\n".
-              format(classifier, metrics.classification_report(test_labels, predicted)))
-        print("Confusion matrix:\n{}".format(metrics.confusion_matrix(test_labels, predicted)))
+              format(classifier, metrics.classification_report(test_labels, predicted_class)))
+        print("Confusion matrix:\n{}".format(metrics.confusion_matrix(test_labels, predicted_class)))
     
-    # Write the spots and their predicted classes to a file
+    # Write the spots and their predicted classes/probs to a file
     x_points = list()
     y_points = list()
     with open(os.path.join(outdir, "predicted_classes.txt"), "w") as filehandler:
         labels = list(test_data_frame.index)
-        for i,label in enumerate(predicted):
+        for i,label in enumerate(predicted_class):
+            probs = predicted_prob[i].tolist()
             tokens = labels[i].split("x")
             assert(len(tokens) == 2)
             y = float(tokens[1])
             x = float(tokens[0])
             x_points.append(x)
             y_points.append(y)
-            filehandler.write("{0}\t{1}\t{2}\n".format(label, x, y))
+            filehandler.write("{0}\t{1}\t{2}\n".format(labels[i], label,
+                                                       "\t".join(['{:.6f}'.format(x) for x in probs])))
             
     # Plot the spots with the predicted color on top of the tissue image
-    colors = [int(x) for x in predicted]
+    # The plotted color will be taken from a linear space from 
+    # all the unique colors from the classes so it shows
+    # how strong the prediction is for a specific spot
     # alignment_matrix will be identity if alignment file is None
     alignment_matrix = parseAlignmentMatrix(alignment)
+    colors = [color_map[i] for i in set(train_labels)]
+    color_values = [1-p[0] for p in predicted_prob]
+    cm = LinearSegmentedColormap.from_list("LinearColors", colors, N=100)
     scatter_plot(x_points=x_points, 
                  y_points=y_points, 
-                 colors=colors, 
+                 colors=color_values, 
+                 output=os.path.join(outdir,"predicted_classes_tissue_probability.png"), 
+                 alignment=alignment_matrix, 
+                 cmap=cm, 
+                 title='Computed classes tissue (probability)', 
+                 xlabel='X', 
+                 ylabel='Y',
+                 image=image, 
+                 alpha=1.0, 
+                 size=20,
+                 show_legend=True,
+                 show_color_bar=True)
+    # Plot also the predicted color for each spot (highest probablity)
+    scatter_plot(x_points=x_points, 
+                 y_points=y_points, 
+                 colors=[int(c) for c in predicted_class], 
                  output=os.path.join(outdir,"predicted_classes_tissue.png"), 
                  alignment=alignment_matrix, 
                  cmap=None, 
@@ -197,8 +205,10 @@ def main(train_data,
                  ylabel='Y',
                  image=image, 
                  alpha=1.0, 
-                 size=20)
-                
+                 size=20,
+                 show_legend=True,
+                 show_color_bar=False)
+       
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
@@ -211,7 +221,7 @@ if __name__ == '__main__':
     parser.add_argument("--test-classes", default=None,
                         help="One file with the class of each spot in the train data")
     parser.add_argument("--use-log-scale", action="store_true", default=False,
-                        help="Use log values for the counts.")
+                        help="Use log2 + 1 for the training and test set instead of raw/normalized counts.")
     parser.add_argument("--normalization", default="DESeq2", metavar="[STR]", 
                         type=str, 
                         choices=["RAW", "DESeq2", "DESeq2Linear", "DESeq2PseudoCount", 

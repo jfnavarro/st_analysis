@@ -36,7 +36,8 @@ from itertools import izip
 from stanalysis.normalization import RimportLibrary
 from stanalysis.preprocessing import compute_size_factors, aggregate_datatasets, remove_noise
 import rpy2.robjects as robjects
-from rpy2.robjects import pandas2ri, r
+from rpy2.robjects import pandas2ri, r, numpy2ri
+robjects.conversion.py2ri = numpy2ri
 import matplotlib.pyplot as plt
 
 def get_classes_coordinate(class_file):
@@ -105,7 +106,6 @@ def main(counts_table_files, data_classes,
       
     # Merge input datasets (Spots are rows and genes are columns)
     counts = aggregate_datatasets(counts_table_files)
-    counts.to_csv("test.csv", sep="\t")
     
     # loads all the classes for the spots
     spot_classes = dict()
@@ -122,7 +122,8 @@ def main(counts_table_files, data_classes,
     counts = counts.transpose()
     # Compute size factors
     size_factors = compute_size_factors(counts, normalization)
-            
+    if all(size_factors) == 1: size_factors = None
+        
     # Iterate the conditions and create a new data frame
     # with the datasets/regions specified in each condition
     # NOTE this could be done more elegantly using slicing

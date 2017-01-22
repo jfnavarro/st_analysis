@@ -101,7 +101,8 @@ def scatter_plot3d(x_points, y_points, z_points, output=None,
     
 def scatter_plot(x_points, y_points, output=None, colors=None,
                  alignment=None, cmap=None, title='Scatter', xlabel='X', 
-                 ylabel='Y', image=None, alpha=1.0, size=10):
+                 ylabel='Y', image=None, alpha=1.0, size=10, 
+                 show_legend=True, show_color_bar=False):
     """ 
     This function makes a scatter plot of a set of points (x,y).
     The alignment matrix is optional to transform the coordinates
@@ -121,6 +122,8 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
     :param image: the path to the image file
     :param alpha: the alpha transparency level for the dots
     :param size: the size of the dots
+    :param show_legend: True draws a legend with the unique colors
+    :param show_color_bar: True draws the color bar distribution
     :raises: RuntimeError
     """
     # Plot spots with the color class in the tissue image
@@ -141,21 +144,24 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
     elif colors is None:
         colors = "blue"
     # Create the scatter plot      
-    a.scatter(x_points, y_points, c=colors, edgecolor="none", 
-              cmap=cmap, s=size, transform=base_trans,  alpha=alpha)
+    sc = a.scatter(x_points, y_points, c=colors, edgecolor="none", 
+                   cmap=cmap, s=size, transform=base_trans, alpha=alpha)
     # Plot the image
     if image is not None and os.path.isfile(image):
         img = plt.imread(image)
-        a.imshow(img, origin="image", aspect="equal", extent=extent_size)
+        a.imshow(img, origin="image", aspect="equal", extent=(1,33,1,35))
     # Add labels and title
     a.set_xlabel(xlabel)
     a.set_ylabel(ylabel)
     a.set_title(title, size=10)
     # Add legend
-    if color_values is not None:
+    if color_values is not None and show_legend:
         a.legend([plt.Line2D((0,1),(0,0), color=x) for x in color_values], 
                  color_list, loc="upper right", markerscale=1.0, 
                  ncol=1, scatterpoints=1, fontsize=5)
+    # Add color bar
+    if colors is not None and show_color_bar:
+        plt.colorbar(sc)
     # Save or show the plot
     if output is not None:
         fig.savefig(output, dpi=300)
