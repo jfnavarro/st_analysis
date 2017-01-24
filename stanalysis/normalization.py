@@ -57,13 +57,14 @@ def computeSumFactors(counts):
     :param counts: a matrix of counts (genes as rows)
     :return returns the normalization factors a vector
     """
+    n_cells = len(counts.columns)
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
     scran = RimportLibrary("scran")
     as_matrix = r["as.matrix"]
-    r_clusters = scran.quickCluster(as_matrix(r_counts), 20)
+    r_clusters = scran.quickCluster(as_matrix(r_counts), max(n_cells/10, 10))
     dds = scran.computeSumFactors(as_matrix(r_counts), clusters=r_clusters,
-                                  sizes=r.c(10,20,30,40), positive=True)
+                                  sizes=r.c(5,10,15,20), positive=True)
     pandas_sf = pandas2ri.ri2py(dds)
     pandas2ri.deactivate()
     return pandas_sf

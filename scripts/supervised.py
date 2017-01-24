@@ -40,7 +40,34 @@ from stanalysis.visualization import scatter_plot, color_map
 from stanalysis.alignment import parseAlignmentMatrix
 from cProfile import label
 from matplotlib.colors import LinearSegmentedColormap
-      
+from matplotlib import colors as mpcolors
+
+def linear_conv(old, min, max, new_min, new_max):
+    return ((old - min) / (max - min)) * ((new_max - new_min) + new_min)
+
+def weighted_color(colors, probs, n_bins=100):
+    """Compute a weighted 0-1 value given
+    a list of colours, probabalities and number of bins"""
+    n_classes = float(len(colors)-1)
+    l = 1.0 / n_bins
+    h = 1-l
+    p = 0.0
+    for i,prob in enumerate(probs):
+        wi = linear_conv(float(i),0.0,n_classes,h,l)
+        p += abs(prob * wi)
+    return p
+   
+def composite_colors(colors, probs):
+    """Merge the set of colors
+    given using a set of probabilities"""
+    merged_color = [0.0,0.0,0.0,1.0]
+    for prob,color in zip(probs,colors):
+        new_color = mpcolors.colorConverter.to_rgba(color)
+        merged_color[0] = (new_color[0] - merged_color[0]) * prob + merged_color[0]
+        merged_color[1] = (new_color[1] - merged_color[1]) * prob + merged_color[1]
+        merged_color[2] = (new_color[2] - merged_color[2]) * prob + merged_color[2]
+    return merged_color
+
 def main(train_data, 
          test_data, 
          classes_train, 
@@ -157,10 +184,13 @@ def main(train_data,
     # Write the spots and their predicted classes/probs to a file
     x_points = list()
     y_points = list()
+    merged_prob_colors = list()
+    unique_colors = [color_map[i] for i in set(sorted(predicted_class))]
     with open(os.path.join(outdir, "predicted_classes.txt"), "w") as filehandler:
         labels = list(test_data_frame.index)
         for i,label in enumerate(predicted_class):
             probs = predicted_prob[i].tolist()
+            merged_prob_colors.append(composite_colors(unique_colors, probs))
             tokens = labels[i].split("x")
             assert(len(tokens) == 2)
             y = float(tokens[1])
@@ -176,12 +206,10 @@ def main(train_data,
     # how strong the prediction is for a specific spot
     # alignment_matrix will be identity if alignment file is None
     alignment_matrix = parseAlignmentMatrix(alignment)
-    colors = [color_map[i] for i in set(train_labels)]
-    color_values = [1-p[0] for p in predicted_prob]
-    cm = LinearSegmentedColormap.from_list("LinearColors", colors, N=100)
+    cm = LinearSegmentedColormap.from_list("CustomMap", unique_colors, N=100)
     scatter_plot(x_points=x_points, 
                  y_points=y_points, 
-                 colors=color_values, 
+                 colors=merged_prob_colors, 
                  output=os.path.join(outdir,"predicted_classes_tissue_probability.png"), 
                  alignment=alignment_matrix, 
                  cmap=cm, 
@@ -191,8 +219,8 @@ def main(train_data,
                  image=image, 
                  alpha=1.0, 
                  size=20,
-                 show_legend=True,
-                 show_color_bar=True)
+                 show_legend=False,
+                 show_color_bar=False)
     # Plot also the predicted color for each spot (highest probablity)
     scatter_plot(x_points=x_points, 
                  y_points=y_points, 

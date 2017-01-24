@@ -119,15 +119,12 @@ def main(counts_table_files, data_classes,
     # Remove noise
     counts = remove_noise(counts, 0.01, 0.01, 1)
     # Spots as columns
-    counts = counts.transpose()
-    # Compute size factors
-    size_factors = compute_size_factors(counts, normalization)
-    if all(size_factors) == 1: size_factors = None
-        
+    counts = counts.transpose()  
     # Iterate the conditions and create a new data frame
     # with the datasets/regions specified in each condition
     # NOTE this could be done more elegantly using slicing
     for cond in conditions_tuples:
+        new_counts = counts.copy()
         tokens = cond.split("-")
         assert(len(tokens) == 2)
         tokens_a = tokens[0].split(":")
@@ -139,7 +136,7 @@ def main(counts_table_files, data_classes,
         region_a = str(tokens_a[1])
         region_b = str(tokens_b[1])
         conds = list()
-        for spot in counts.columns:
+        for spot in new_counts.columns:
             try:
                 spot_class = spot_classes[spot]
                 spot_dataset = spot.split("_")[0]
@@ -148,13 +145,18 @@ def main(counts_table_files, data_classes,
                 elif spot_dataset == dataset_b and spot_class == region_b:
                     conds.append("B")
                 else:
-                    conds.append("REST")
+                    new_counts.drop(spot, axis=1, inplace=True)
             except KeyError:
-                conds.append("REST")
+                new_counts.drop(spot, axis=1, inplace=True)
         # Make the DEA call
-        print "Doing DEA for the conditions {} ...".format(cond)
+        print "Doing DEA for the conditions {} with {} spots and {} genes".format(cond,
+                                                                                  len(new_counts.columns), 
+                                                                                  len(new_counts.index))
+        # Compute size factors
+        size_factors = compute_size_factors(new_counts.transpose(), normalization)
+        if all(size_factors) == 1: size_factors = None
         # DEA call
-        dea_results = dea(counts, conds, size_factors)
+        dea_results = dea(new_counts, conds, size_factors)
         dea_results.sort_values(by=["padj"], ascending=True, inplace=True, axis=0)
         print "Writing results to output..."
         dea_results.ix[dea_results["padj"] <= fdr].to_csv(os.path.join(outdir, 
@@ -179,7 +181,7 @@ def main(counts_table_files, data_classes,
         a.scatter(x_points, y_points, c=colors, edgecolor="none")  
         for x,y,text in izip(x_points_conf,y_points_conf,names_conf):
             a.text(x,y,text,size="x-small")
-        fig.savefig(output=os.path.join(outdir, "volcano_{}.png".format(cond)), dpi=300)
+        fig.savefig(os.path.join(outdir, "volcano_{}.png".format(cond)), dpi=300)
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
