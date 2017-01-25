@@ -3,6 +3,7 @@ Normalization functions for the st analysis package
 """
 import numpy as np
 import pandas as pd
+from collections import Counter
 import rpy2.robjects.packages as rpackages
 from rpy2.robjects import pandas2ri, r, numpy2ri
 import rpy2.robjects as ro
@@ -63,8 +64,9 @@ def computeSumFactors(counts):
     scran = RimportLibrary("scran")
     as_matrix = r["as.matrix"]
     r_clusters = scran.quickCluster(as_matrix(r_counts), max(n_cells/10, 10))
-    dds = scran.computeSumFactors(as_matrix(r_counts), clusters=r_clusters,
-                                  sizes=r.c(5,10,15,20), positive=True)
+    min_cluster_size = min(Counter(r_clusters).values())
+    sizes = set([round((min_cluster_size/2)/i) for i in [5,4,3,2,1]])
+    dds = scran.computeSumFactors(as_matrix(r_counts), clusters=r_clusters, sizes=sizes, positive=True)
     pandas_sf = pandas2ri.ri2py(dds)
     pandas2ri.deactivate()
     return pandas_sf
