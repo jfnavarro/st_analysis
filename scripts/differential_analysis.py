@@ -160,7 +160,8 @@ def main(counts_table_files, data_classes,
         dea_results.sort_values(by=["padj"], ascending=True, inplace=True, axis=0)
         print "Writing results to output..."
         dea_results.ix[dea_results["padj"] <= fdr].to_csv(os.path.join(outdir, 
-                                                                       "dea_results_{}.tsv".format(cond)), sep="\t")
+                                                                       "dea_results_dataset{}_region{}_vs_dataset{}_region{}.tsv"
+                                                                       .format(dataset_a, region_a, dataset_b, region_b)), sep="\t")
         # Volcano plot
         print "Generating plots..."
         # Add colors according to differently expressed or not (needs a p-value parameter)
@@ -181,7 +182,8 @@ def main(counts_table_files, data_classes,
         a.scatter(x_points, y_points, c=colors, edgecolor="none")  
         for x,y,text in izip(x_points_conf,y_points_conf,names_conf):
             a.text(x,y,text,size="x-small")
-        fig.savefig(os.path.join(outdir, "volcano_{}.png".format(cond)), dpi=300)
+        fig.savefig(os.path.join(outdir, "volcano_dataset{}_region{}_vs_dataset{}_region{}.png"
+                                 .format(dataset_a, region_a, dataset_b, region_b)), dpi=300)
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
