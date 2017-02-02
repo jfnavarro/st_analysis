@@ -76,7 +76,8 @@ def main(train_data,
          normalization,
          outdir,
          alignment, 
-         image):
+         image,
+         spot_size):
 
     if len(train_data) == 0 or any([not os.path.isfile(f) for f in train_data]) \
     or len(train_data) != len(classes_train) \
@@ -218,7 +219,7 @@ def main(train_data,
                  ylabel='Y',
                  image=image, 
                  alpha=1.0, 
-                 size=20,
+                 size=spot_size,
                  show_legend=False,
                  show_color_bar=False)
     # Plot also the predicted color for each spot (highest probablity)
@@ -233,7 +234,7 @@ def main(train_data,
                  ylabel='Y',
                  image=image, 
                  alpha=1.0, 
-                 size=20,
+                 size=spot_size,
                  show_legend=True,
                  show_color_bar=False)
        
@@ -274,8 +275,10 @@ if __name__ == '__main__':
                         help="When given the data will plotted on top of the image, \
                         if the alignment matrix is given the data points will be transformed to pixel coordinates")
     parser.add_argument("--outdir", help="Path to output dir")
+    parser.add_argument("--spot-size", default=20, metavar="[INT]", type=int, choices=range(1, 100),
+                        help="The size of the spots when generating the plots. (default: %(default)s)")
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
          args.test_classes, args.use_log_scale, args.normalization, 
-         args.outdir, args.alignment, args.image)
+         args.outdir, args.alignment, args.image, args.spot_size)
 
