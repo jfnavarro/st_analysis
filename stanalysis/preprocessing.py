@@ -41,7 +41,7 @@ def aggregate_datatasets(counts_table_files, plot_hist=False):
     counts.fillna(0.0, inplace=True)
     return counts
   
-def remove_noise(counts, num_exp_genes):
+def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=1):
     """This functions remove noisy genes and spots 
     for a given data frame (Genes as columns and spots as rows).
     - The noisy spots are removed so to keep a percentage
@@ -50,18 +50,22 @@ def remove_noise(counts, num_exp_genes):
     - The noisy genes are removed so every gene that is expressed
     in less than 1% of the total spots. Expressed with a count >= 2. 
     :param counts: a Pandas data frame with the counts
-    :param num_exp_genes: an integer from 1-100 representing the % of 
+    :param num_exp_genes: a float from 0-1 representing the % of 
     the distribution of expressed genes a spot must have to be kept
+    :param num_exp_spots: a float from 0-1 representing the % of 
+    the total number of spots that a gene must have with a count bigger
+    than the parameter min_expression in order to be kept
+    :param min_expression: the minimum expression for a gene to be
+    considered expressed
     :return: a new Pandas data frame with noisy spots/genes removed
     """
-    MIN_EXPRESION = 2
     
     # How many spots do we keep based on the number of genes expressed?
     num_spots = len(counts.index)
     num_genes = len(counts.columns)
     min_genes_spot_exp = round((counts != 0).sum(axis=1).quantile(num_exp_genes))
     print "Number of expressed genes a spot must have to be kept " \
-    "(1% of total expressed genes) {}".format(min_genes_spot_exp)
+    "({}% of total expressed genes) {}".format(num_exp_genes,min_genes_spot_exp)
     counts = counts[(counts != 0).sum(axis=1) >= min_genes_spot_exp]
     print "Dropped {} spots".format(num_spots - len(counts.index))
           
@@ -69,10 +73,10 @@ def remove_noise(counts, num_exp_genes):
     counts = counts.transpose()
   
     # Remove noisy genes
-    min_features_gene = round(len(counts.columns) * 0.01) 
+    min_features_gene = round(len(counts.columns) * num_exp_spots) 
     print "Removing genes that are expressed in less than {} " \
-    "spots with a count of at least {}".format(min_features_gene, MIN_EXPRESION)
-    counts = counts[(counts >= MIN_EXPRESION).sum(axis=1) >= min_features_gene]
+    "spots with a count of at least {}".format(min_features_gene, min_expression)
+    counts = counts[(counts >= min_expression).sum(axis=1) >= min_features_gene]
     print "Dropped {} genes".format(num_genes - len(counts.index))
     
     return counts.transpose()
@@ -106,40 +110,59 @@ def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
     print "Dropped {} genes".format(num_genes - len(counts.index))    
     return counts.transpose()
 
-def normalize_data(counts, normalization):
+def compute_size_factors(counts, normalization):
+    """ Helper function to compute normalization
+    size factors"""
+    counts = counts.transpose()
+    if normalization in "DESeq2":
+        size_factors = computeSizeFactors(counts)
+    elif normalization in "DESeq2Linear":
+        size_factors = computeSizeFactorsLinear(counts)
+    elif normalization in "DESeq2PseudoCount":
+        size_factors = computeSizeFactors(counts + 1)
+    elif normalization in "DESeq2SizeAdjusted":
+        size_factors = computeSizeFactorsSizeAdjusted(counts)
+    elif normalization in "TMM":
+        size_factors = computeTMMFactors(counts)
+    elif normalization in "RLE":
+        size_factors = computeRLEFactors(counts)
+    elif normalization in "REL":
+        size_factors = counts.sum(axis=0)
+    elif normalization in "RAW":
+        size_factors = 1
+    elif normalization in "Scran":
+        size_factors = computeSumFactors(counts)         
+    else:
+        raise RunTimeError("Error, incorrect normalization method\n")
+    if np.isnan(size_factors).any() or np.isinf(size_factors).any():
+        print "Warning: Computed size factors contained NaN or Inf. The data will not be normalized!"
+        size_factors = np.ones(len(size_factors))
+    return size_factors
+
+def normalize_data(counts, normalization, center=False, adjusted_log=False):
     """This functions takes a data frame as input
     with ST data (genes as columns and spots as rows) and 
     returns a data frame with the normalized counts using
     different methods.
     :param counts: a Pandas data frame with the counts
-    :param normalization: the normalization method to use 
-    (DESeq, DESeq2, DESeq2Log, EdgeR, REL, RAW)
-    :return: a Pandas data frame with the normalized counts
+    :param normalization: the normalization method to use
+    :param center: if True the size factors will be centered by their mean
+    :param adjusted_log: return adjusted logged normalized counts if True
+    (DESeq2, DESeq2Linear, DESeq2PseudoCount, DESeq2SizeAdjusted,RLE, REL, RAW, TMM, Scran)
+    :return: a Pandas data frame with the normalized counts (genes as columns)
     """
+    # Compute the size factors
+    size_factors = compute_size_factors(counts, normalization)
     # Spots as columns and genes as rows
     counts = counts.transpose()
-    # Per spot normalization
-    if normalization in "DESeq":
-        size_factors = computeSizeFactors(counts)
-        norm_counts = counts / size_factors
-    elif normalization in "DESeq2":
-        size_factors = computeSizeFactorsLinear(counts)
-        norm_counts = counts / size_factors
-    elif normalization in "DESeq2Log":
-        norm_counts = computeDESeq2LogTransform(counts)
-    elif normalization in "EdgeR":
-        size_factors = computeEdgeRNormalization(counts)
-        # An alternative is to multiply by 10e6
-        norm_counts = (counts / size_factors) * np.mean(size_factors)
-    elif normalization in "REL":
-        spots_sum = counts.sum(axis=0)
-        norm_counts = counts / spots_sum
-    elif normalization in "RAW":
-        norm_counts = counts
+    # Center and/or adjust log the size_factors and counts
+    if center: size_factors = size_factors / np.mean(size_factors)
+    if adjusted_log:
+        norm_counts = logCountsWithFactors(counts, size_factors)
     else:
-        raise RunTimeError("Error, incorrect normalization method\n")
-    
-    return counts.transpose()
+        norm_counts = counts / size_factors
+    # return normalize counts (genes as columns)
+    return norm_counts.transpose()
     
 def normalize_samples(counts, number_datasets):
     """ This function takes a data frame
