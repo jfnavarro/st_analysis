@@ -129,7 +129,10 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
     # Plot spots with the color class in the tissue image
     fig, a = plt.subplots()
     base_trans = a.transData
-    extent_size = (1,33,1,35)
+    # Extend (left, right, bottom, top)
+    # The location, in data-coordinates, of the lower-left and upper-right corners. 
+    # If None, the image is positioned such that the pixel centers fall on zero-based (row, column) indices.
+    extent_size = [1,33,35,1]
     # If alignment is None we re-size the image to chip size (1,1,33,35)
     # Otherwise we keep the image intact and apply the 3x3 transformation
     if alignment is not None:
@@ -149,7 +152,7 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
     # Plot the image
     if image is not None and os.path.isfile(image):
         img = plt.imread(image)
-        a.imshow(img, origin="image", aspect="equal", extent=(1,33,1,35))
+        a.imshow(img, extent=extent_size)
     # Add labels and title
     a.set_xlabel(xlabel)
     a.set_ylabel(ylabel)

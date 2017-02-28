@@ -16,7 +16,7 @@ with io.open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
   name = 'stanalysis',
-  version = "0.3.0",
+  version = "0.3.1",
   description = __doc__.split("\n", 1)[0],
   long_description = long_description,
   keywords = 'rna-seq analysis machine_learning spatial transcriptomics toolkit',

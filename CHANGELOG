@@ -20,3 +20,6 @@ Version 0.3.0
 * st_data_plotter allows to normalize the data
 * differential_analysis allows to normalize the data
 * differential_analysis allows to input more than one dataset
+
+Version 0.3.1
+* The orientation of the cell tissue image is correct now
