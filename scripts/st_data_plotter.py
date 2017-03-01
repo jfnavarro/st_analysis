@@ -31,6 +31,7 @@ from matplotlib import pyplot as plt
 from stanalysis.visualization import scatter_plot
 from stanalysis.preprocessing import *
 import pandas as pd
+import numpy as np
 import os
 import sys
 
@@ -44,7 +45,8 @@ def main(input_data,
          dot_size,
          normalization,
          filter_genes,
-         outfile):
+         outfile,
+         use_log_scale):
 
     if not os.path.isfile(input_data):
         sys.stderr.write("Error, input file/s not present or invalid format\n")
@@ -86,6 +88,7 @@ def main(input_data,
         if exp > 0.0:
             x_points.append(float(tokens[0]))
             y_points.append(float(tokens[1]))
+            if use_log_scale: exp = np.log2(exp)
             colors.append(exp)           
                
     # If highlight barcodes is given then
@@ -115,7 +118,9 @@ def main(input_data,
                      ylabel='Y',
                      image=image,
                      alpha=highlight_alpha,
-                     size=dot_size)     
+                     size=dot_size,
+                     show_legend=True,
+                     show_color_bar=False)     
 
     # Create a scatter plot for the gene data
     # If image is given plot it as a background
@@ -130,7 +135,9 @@ def main(input_data,
                  ylabel='Y',
                  image=image,
                  alpha=data_alpha,
-                 size=dot_size)
+                 size=dot_size,
+                 show_legend=False,
+                 show_color_bar=True)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
@@ -177,6 +184,7 @@ if __name__ == '__main__':
                         type=str,
                         action='append')
     parser.add_argument("--outfile", type=str, help="Name of the output file")
+    parser.add_argument("--use-log-scale", action="store_true", default=False, help="Use log2(counts + 1) values")
     args = parser.parse_args()
 
     main(args.input_data,
@@ -189,4 +197,5 @@ if __name__ == '__main__':
          args.dot_size,
          args.normalization,
          args.show_genes,
-         args.outfile)
+         args.outfile,
+         args.use_log_scale)

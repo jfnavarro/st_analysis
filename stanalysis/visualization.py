@@ -13,24 +13,20 @@ color_map = ["red", "green", "blue", "orange", "cyan", "yellow", "orchid",
              "saddlebrown", "darkcyan", "gray", "darkred", "darkgreen", "darkblue", 
              "antiquewhite", "bisque", "black"]
 
-def histogram(x_points, output, title="Histogram", xlabel="X",
-              nbins=50, normed=1, color="blue", alpha=1.0):
+def histogram(x_points, output, title="Histogram", xlabel="X", color="blue"):
     """ This function generates a simple density histogram
     with the points given as input.
     :param x_points: a list of x coordinates
     :param title: the title for the plot
     :param xlabel: the name of the X label
     :param output: the name/path of the output file
-    :param alpha: the alpha transparency level for the histogram
-    :param nbins: the number of bings for the histogram
-    :param normed: the normalization factor
     :param color: the color for the histogram
     """
     fig = plt.figure()
 
     # the histogram of the data
-    n, bins, patches = plt.hist(x_points, bins=nbins, 
-                                normed=normed, facecolor=color, alpha=alpha)
+    n, bins, patches = plt.hist(x_points, bins="auto", 
+                                normed=False, facecolor=color, alpha=1.0)
     
     mean = np.mean(x_points)
     std_dev = np.std(x_points)
@@ -39,7 +35,7 @@ def histogram(x_points, output, title="Histogram", xlabel="X",
     plt.plot(bins, y, 'r--', linewidth=1)
     # generate plot
     plt.xlabel(xlabel)
-    plt.ylabel("Probability")
+    plt.ylabel("Occurrences")
     plt.title(title)
 
     # Tweak spacing to prevent clipping of ylabel
