@@ -16,16 +16,7 @@ def parseAlignmentMatrix(alignment_file):
     :param alignment_file: a file containing the 9 elements of a 3x3 matrix
     :return: a 3x3 matrix (default identify if error happens)
     """
-    alignment_matrix = np.zeros((3,3), dtype=np.float)
-    alignment_matrix[0,0] = 1
-    alignment_matrix[0,1] = 0
-    alignment_matrix[0,2] = 0
-    alignment_matrix[1,0] = 0
-    alignment_matrix[1,1] = 1
-    alignment_matrix[1,2] = 0
-    alignment_matrix[2,0] = 0
-    alignment_matrix[2,1] = 0
-    alignment_matrix[2,2] = 1
+    alignment_matrix = np.identity(3)
     if alignment_file is None or not os.path.isfile(alignment_file):
         return alignment_matrix
     with open(alignment_file, "r") as filehandler:

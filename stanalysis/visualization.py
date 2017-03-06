@@ -131,7 +131,7 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
     extent_size = [1,33,35,1]
     # If alignment is None we re-size the image to chip size (1,1,33,35)
     # Otherwise we keep the image intact and apply the 3x3 transformation
-    if alignment is not None:
+    if alignment is not None and not np.array_equal(alignment, np.identity(3)):
         base_trans = transforms.Affine2D(matrix = alignment) + base_trans
         extent_size = None
     # We convert the list of color int values to color labels
