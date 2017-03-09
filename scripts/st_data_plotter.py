@@ -46,14 +46,15 @@ def main(input_data,
          normalization,
          filter_genes,
          outfile,
-         use_log_scale):
+         use_log_scale,
+         title):
 
     if not os.path.isfile(input_data):
         sys.stderr.write("Error, input file/s not present or invalid format\n")
         sys.exit(1)
     
     if not outfile:
-        outfile = "data_plot.png"
+        outfile = "data_plot.pdf"
         
     # Extract data frame and normalize it if needed (genes as columns)
     counts_table = pd.read_table(input_data, sep="\t", header=0, index_col=0)
@@ -113,7 +114,7 @@ def main(input_data,
                      output="{}_{}".format("highlight",outfile),
                      alignment=alignment,
                      cmap=None,
-                     title='ST Data scatter highlight',
+                     title=title,
                      xlabel='X',
                      ylabel='Y',
                      image=image,
@@ -130,7 +131,7 @@ def main(input_data,
                  output=outfile,
                  alignment=alignment,
                  cmap=plt.get_cmap("YlOrBr"),
-                 title='ST Data scatter',
+                 title=title,
                  xlabel='X',
                  ylabel='Y',
                  image=image,
@@ -179,10 +180,12 @@ if __name__ == '__main__':
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
     parser.add_argument("--show-genes", help="Regular expression for gene symbols to be shown\n" \
-                        "If given only the genes matching the reg-exp will be shown",
+                        "If given only the genes matching the reg-exp will be shown.\n" \
+                        "Can be given several times.",
                         default=None,
                         type=str,
                         action='append')
+    parser.add_argument("--title", help="The title to show in the plot.", default="ST Data scatter", type=str)
     parser.add_argument("--outfile", type=str, help="Name of the output file")
     parser.add_argument("--use-log-scale", action="store_true", default=False, help="Use log2(counts + 1) values")
     args = parser.parse_args()
@@ -198,4 +201,5 @@ if __name__ == '__main__':
          args.normalization,
          args.show_genes,
          args.outfile,
-         args.use_log_scale)
+         args.use_log_scale,
+         args.title)
