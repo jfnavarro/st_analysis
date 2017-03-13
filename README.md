@@ -1,6 +1,22 @@
 # Spatial Transcriptomics Analysis 
 
-Different tools for visualization, conversion and analysis of Spatial Transcriptomics data
+Different tools for visualization, data processing, conversion and analysis (supervised and un-supervised learning, differential expression analysis, etc..) of Spatial Transcriptomics data (can also be used for single cell data).
+
+The package is compatible with the output format of the data generated with the ST Pipeline (https://github.com/SpatialTranscriptomicsResearch/st_pipeline) and give full support to plot the data onto the tissue images but it is compatible with any single cell datasets where the data is stored as a matrix of counts (genes as columns and spot/cells as rows). 
+
+This package makes use of the following tools:
+
+t-SNE
+https://github.com/lvdmaaten/bhtsne
+
+Scran
+https://github.com/MarioniLab/Deconvolution2016
+
+DESeq2
+http://bioconductor.org/packages/devel/bioc/html/DESeq2.html
+
+EdgeR
+https://bioconductor.org/packages/release/bioc/html/edgeR.html
 
 ### License
 MIT License, see LICENSE file.

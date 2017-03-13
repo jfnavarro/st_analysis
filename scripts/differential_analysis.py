@@ -182,7 +182,7 @@ def main(counts_table_files, data_classes,
         a.scatter(x_points, y_points, c=colors, edgecolor="none")  
         for x,y,text in izip(x_points_conf,y_points_conf,names_conf):
             a.text(x,y,text,size="x-small")
-        fig.savefig(os.path.join(outdir, "volcano_dataset{}_region{}_vs_dataset{}_region{}.png"
+        fig.savefig(os.path.join(outdir, "volcano_dataset{}_region{}_vs_dataset{}_region{}.pdf"
                                  .format(dataset_a, region_a, dataset_b, region_b)), dpi=300)
                 
 if __name__ == '__main__':

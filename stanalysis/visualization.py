@@ -40,8 +40,7 @@ def histogram(x_points, output, title="Histogram", xlabel="X", color="blue"):
 
     # Tweak spacing to prevent clipping of ylabel
     plt.subplots_adjust(left=0.15)
-    fig.set_size_inches(16, 16)
-    fig.savefig(output, dpi=300)
+    fig.savefig(os.path.splitext(os.path.basename(output))[0], format='pdf', dpi=300)
     
 def scatter_plot3d(x_points, y_points, z_points, output=None,
                    colors=None, cmap=None, title='Scatter', xlabel='X', 
@@ -91,7 +90,7 @@ def scatter_plot3d(x_points, y_points, z_points, output=None,
     a.set_title(title, size=10)
     # Save or show the plot
     if output is not None:
-        fig.savefig(output, dpi=300)
+        fig.savefig(os.path.splitext(os.path.basename(output))[0], format='pdf', dpi=300)
     else:
         fig.show()
     
@@ -131,7 +130,7 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
     extent_size = [1,33,35,1]
     # If alignment is None we re-size the image to chip size (1,1,33,35)
     # Otherwise we keep the image intact and apply the 3x3 transformation
-    if alignment is not None:
+    if alignment is not None and not np.array_equal(alignment, np.identity(3)):
         base_trans = transforms.Affine2D(matrix = alignment) + base_trans
         extent_size = None
     # We convert the list of color int values to color labels
@@ -163,6 +162,6 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
         plt.colorbar(sc)
     # Save or show the plot
     if output is not None:
-        fig.savefig(output, dpi=300)
+        fig.savefig(os.path.splitext(os.path.basename(output))[0], format='pdf', dpi=300)
     else:
         fig.show()
