@@ -40,7 +40,8 @@ def histogram(x_points, output, title="Histogram", xlabel="X", color="blue"):
 
     # Tweak spacing to prevent clipping of ylabel
     plt.subplots_adjust(left=0.15)
-    fig.savefig(os.path.splitext(os.path.basename(output))[0], format='pdf', dpi=300)
+    fig.savefig("{}.pdf".format(os.path.splitext(os.path.basename(output))[0]), 
+                format='pdf', dpi=300)
     
 def scatter_plot3d(x_points, y_points, z_points, output=None,
                    colors=None, cmap=None, title='Scatter', xlabel='X', 
@@ -90,7 +91,8 @@ def scatter_plot3d(x_points, y_points, z_points, output=None,
     a.set_title(title, size=10)
     # Save or show the plot
     if output is not None:
-        fig.savefig(os.path.splitext(os.path.basename(output))[0], format='pdf', dpi=300)
+        fig.savefig("{}.pdf".format(os.path.splitext(os.path.basename(output))[0]), 
+                    format='pdf', dpi=300)
     else:
         fig.show()
     
@@ -162,6 +164,7 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
         plt.colorbar(sc)
     # Save or show the plot
     if output is not None:
-        fig.savefig(os.path.splitext(os.path.basename(output))[0], format='pdf', dpi=300)
+        fig.savefig("{}.pdf".format(os.path.splitext(os.path.basename(output))[0]), 
+                    format='pdf', dpi=300)
     else:
         fig.show()
