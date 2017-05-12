@@ -68,6 +68,7 @@ def main(input_data,
         for gene in norm_counts_table.columns:
             for regex in filter_genes:
                 if re.match(regex, gene):
+                    print gene
                     genes_to_keep.append(gene)
                     break                         
     else: 
@@ -76,7 +77,7 @@ def main(input_data,
     if len(genes_to_keep) == 0:
         sys.stderr.write("Error, no genes found with the reg-exp given\n")
         sys.exit(1)        
-     
+    
     # Compute the expressions for each spot
     # as the sum of all spots that pass the thresholds (Gene and counts)
     x_points = list()
@@ -91,7 +92,11 @@ def main(input_data,
             y_points.append(float(tokens[1]))
             if use_log_scale: exp = np.log2(exp)
             colors.append(exp)           
-               
+       
+    if len(colors) == 0:
+        sys.stderr.write("Error, the gene/s given are not expressed in this dataset\n")
+        sys.exit(1)   
+                
     # If highlight barcodes is given then
     # parse the spots and their color and plot
     # them on top of the image if given
@@ -164,7 +169,7 @@ if __name__ == '__main__':
                         help="The transparency level for the highlighted barcodes, 0 min and 1 max (default: %(default)s)")
     parser.add_argument("--dot-size", type=int, default=20, metavar="[INT]", choices=range(1, 100),
                         help="The size of the dots (default: %(default)s)")
-    parser.add_argument("--normalization", default="DESeq2", metavar="[STR]", 
+    parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, 
                         choices=["RAW", "DESeq2", "DESeq2Linear", "DESeq2PseudoCount", 
                                  "DESeq2SizeAdjusted", "REL", "TMM", "RLE", "Scran"],

@@ -59,19 +59,6 @@ about how the script works.
 
     json_to_matrix.py --json-file file.json --output file_table.tsv
 
-### To adjust the BED output of the ST Pipeline (older versions) to newer versions (X and Y coordinates intead of BARCODE tags)
-
-    adjust_bed_file.py --bed-file stdata.bed --barcodes-ids ids.txt
-    
-  Where ids.txt is the file containin the barcodes and coordinates (BARCODE X Y).
-  
-### To adjust the counts of a selection made in the ST Viewer (Old version, tab delimited file)
-Lets say that you made a selection in the ST Viewer and exported it. Imagine
-that you have different versions of that dataset (newer pipeline, etc..). You
-can readjust the gene counts by running this :
-
-    convert_selection_counts.py --bed-file stdata.bed --viewer-selection selection.txt --outfile new_selection.txt
-  
 ### To convert the ST data in matrix format to JSON format (Compatible with older versions of the ST Viewer)
 If you have ST data in matrix (data frame) format and you want to convert it to JSON (compatibility
 with older versions of the ST Viewer for example). Then you can use the following script 
@@ -83,28 +70,12 @@ For instance to adjust for printing errors or to convert to pixel coordinates
 (spots not found in the coordinates files will be discarded). You can use the following script:
 
     adjust_bed_coordinates.py --coordinates-file coordinates.txt --outfile new_stdata.bed stdata.bed
-    
-### To adjust the spot coordinates to new coordinates in a ST Data in matrix format.
-For instance to adjust for printing errors or to convert to pixel coordinates
-(spots not found in the coordinates files will be discarded). You can use the following script:
-
-    adjust_matrix_coordinates.py --coordinates-file coordinates.txt --outfile new_stdata.tsv --counts-matrix stdata.tsv
 
 ### To adjust the spot coordinates to new coordinates in a ST JSON file.
 For instance to adjust for printing errors or to convert to pixel coordinates
 (spots not found in the coordinates files will be discarded). You can use the following script:
 
     adjust_json_coordinates.py --json-file stdata.json --coordinates-file new_coordinates.txt --outfile new_stdata.json
-    
-### To convert selections extracted from the ST Viewer to matrix format (ST data format)
-Older versions of the ST Viewer export the selections in a tab delimited format. 
-To convert this file to a matrix (data frame) you can use the following :
-
-    tab_to_matrix.py --tab-file selection.txt --outfile selection.tsv
-    
-### To remove genes(columns) in a the ST Data file in matrix format using reg-expressions
-
-    remove_genes_matrix.py --counts-matrix stadata.tsv --ref-exp Malat* --outfile stdata2.tsv
 
 ## Analysis tools
 
