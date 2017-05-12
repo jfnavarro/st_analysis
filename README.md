@@ -31,8 +31,8 @@ For bugs, feedback or help you can contact Jose Fernandez Navarro <jose.fernande
 The referred matrix format is the ST data format, a matrix of counts where spot coordinates are row names
 and the genes are column names.
 
-The scripts that allow you to pass the tissue images can optionally take a 3x3 alignment file.
-If the images are cropped to exact the array boundaries the alignment file is not needed
+The scripts that allow you to pass the tissue HE image can optionally take a 3x3 alignment file.
+If the images are cropped to the exact array boundaries the alignment file is not needed
 unless you want to plot the image in the original image size. If the image is un-cropped
 then you need the alignment file to convert from spot coordinates to pixel coordinates.
 
@@ -58,14 +58,14 @@ about how the script works.
 ### To convert JSON output from the ST Pipeline (older versions) to a matrix format (ST Data format)
 
     json_to_matrix.py --json-file file.json --output file_table.tsv
-  
+
 ### To convert the ST data in matrix format to JSON format (Compatible with older versions of the ST Viewer)
 If you have ST data in matrix (data frame) format and you want to convert it to JSON (compatibility
 with older versions of the ST Viewer for example). Then you can use the following script 
 
     matrix_to_json.py --data-file stdata.tsv --outfile stdata.json
     
-###To adjust the spot coordinates to new coordinates in a ST BED file.
+### To adjust the spot coordinates to new coordinates in a ST BED file.
 For instance to adjust for printing errors or to convert to pixel coordinates
 (spots not found in the coordinates files will be discarded). You can use the following script:
 
