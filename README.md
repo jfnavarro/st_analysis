@@ -53,30 +53,6 @@ A bunch of scripts will then be available in your system.
 Note that you can always type script_name.py --help to get more information
 about how the script works.
 
-## Conversion tools
-
-### To convert JSON output from the ST Pipeline (older versions) to a matrix format (ST Data format)
-
-    json_to_matrix.py --json-file file.json --output file_table.tsv
-
-### To convert the ST data in matrix format to JSON format (Compatible with older versions of the ST Viewer)
-If you have ST data in matrix (data frame) format and you want to convert it to JSON (compatibility
-with older versions of the ST Viewer for example). Then you can use the following script 
-
-    matrix_to_json.py --data-file stdata.tsv --outfile stdata.json
-    
-### To adjust the spot coordinates to new coordinates in a ST BED file.
-For instance to adjust for printing errors or to convert to pixel coordinates
-(spots not found in the coordinates files will be discarded). You can use the following script:
-
-    adjust_bed_coordinates.py --coordinates-file coordinates.txt --outfile new_stdata.bed stdata.bed
-
-### To adjust the spot coordinates to new coordinates in a ST JSON file.
-For instance to adjust for printing errors or to convert to pixel coordinates
-(spots not found in the coordinates files will be discarded). You can use the following script:
-
-    adjust_json_coordinates.py --json-file stdata.json --coordinates-file new_coordinates.txt --outfile new_stdata.json
-
 ## Analysis tools
 
 ### To do un-supervised learning
