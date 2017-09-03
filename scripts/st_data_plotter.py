@@ -7,7 +7,9 @@ The output will be a .png file with the same name as the input file if no name i
 
 It allows to highlight spots with colors using a file with the following format : 
 
-INTEGER XxY
+XxY INT
+
+Where INT represents a colour.
 
 When highlighting spots a new file will be created with the highlighted
 spots.
@@ -17,7 +19,7 @@ It allows to choose transparency for the data points
 It allows to pass an image so the spots are plotted on top of it (an alignment file
 can be passed along to convert spot coordinates to pixel coordinates)
 
-It allows to normalize the counts usins different algorithms
+It allows to normalize the counts using different algorithms
 
 It allows to filter out by gene counts or gene names (following a reg-exp pattern) 
 what spots to plot
@@ -108,11 +110,11 @@ def main(input_data,
             for line in filehandler_read.readlines():
                 tokens = line.split()
                 assert(len(tokens) == 2)
-                tokens2 = tokens[1].split("x")
+                tokens2 = tokens[0].split("x")
                 assert(len(tokens2) == 2)
                 x_points_highlight.append(float(tokens2[0]))
                 y_points_highlight.append(float(tokens2[1]))
-                colors_highlight.append(int(tokens[0]))
+                colors_highlight.append(int(tokens[1]))
         scatter_plot(x_points=x_points_highlight,
                      y_points=y_points_highlight,
                      colors=colors_highlight,
@@ -158,7 +160,7 @@ if __name__ == '__main__':
                         help="Do not include genes that falls below this reads cut off per spot (default: %(default)s)",
                         type=float, default=0.0, metavar="[FLOAT]", choices=range(0, 100))
     parser.add_argument("--highlight-spots", default=None,
-                        help="A file containing spots (XxY) and the class/label they belong to\n INT XxY")
+                        help="A file containing spots (XxY) and the class/label they belong to\n XxY INT")
     parser.add_argument("--alignment", default=None,
                         help="A file containing the alignment image (array coordinates to pixel coordinates)\n" \
                         "as a 3x3 matrix in a tab delimited format. Only useful if the image given is not cropped\n" \
