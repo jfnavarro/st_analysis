@@ -95,7 +95,10 @@ def scatter_plot3d(x_points, y_points, z_points, output=None,
                     format='pdf', dpi=300)
     else:
         fig.show()
-    
+   
+def grid_plot(x_points, y_points, colors, output=None, alignment=None):
+     return
+ 
 def scatter_plot(x_points, y_points, output=None, colors=None,
                  alignment=None, cmap=None, title='Scatter', xlabel='X', 
                  ylabel='Y', image=None, alpha=1.0, size=10, 

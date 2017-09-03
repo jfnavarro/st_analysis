@@ -7,7 +7,7 @@ It takes a list of data frames as input and outputs :
 
  - a scatter plot with the predicted classes (coulored) for each spot 
  - the spots plotted onto the images (if given) with the predicted class/color
- - a file containing two columns (CLASS and SPOT) for each dataset
+ - a file containing two columns (SPOT and CLASS) for each dataset
 
 The input data frames must have the gene names as columns and
 the spots coordinates as rows (1x1).
@@ -121,10 +121,6 @@ def main(counts_table_files,
     if outdir is None or not os.path.isdir(outdir): 
         outdir = os.getcwd()
     outdir = os.path.abspath(outdir)
-       
-    num_exp_genes = num_exp_genes / 100.0
-    num_genes_keep = num_genes_keep / 100.0
-    num_exp_spots = num_exp_spots / 100.0
     
     # Merge input datasets (Spots are rows and genes are columns)
     counts = aggregate_datatasets(counts_table_files)
@@ -143,6 +139,7 @@ def main(counts_table_files,
                                  center=center_size_factors, adjusted_log=use_adjusted_log)
         
     # Keep top genes (variance or expressed)
+    num_genes_keep = num_genes_keep / 100.0
     norm_counts = keep_top_genes(norm_counts, num_genes_keep, criteria=top_genes_criteria)
        
     if use_log_scale:
@@ -199,7 +196,7 @@ def main(counts_table_files,
         y = float(tokens[1])
         x = float(tokens[0].split("_")[1])
         index = int(tokens[0].split("_")[0])
-        file_writers[index].write("{0}\t{1}\n".format(labels[i], "{}x{}".format(x,y)))
+        file_writers[index].write("{0}\t{1}\n".format("{}x{}".format(x,y)), labels[i])
         
     # Compute a color_label based on the RGB representation of the 3D dimensionality reduced
     labels_colors = list()
@@ -318,16 +315,16 @@ if __name__ == '__main__':
     parser.add_argument("--num-clusters", default=None, metavar="[INT]", type=int, choices=range(2, 10),
                         help="The number of clusters/regions expected to be found.\n" \
                         "If not given the number of clusters will be computed.")
-    parser.add_argument("--num-exp-genes", default=10, metavar="[INT]", type=int, choices=range(0, 100),
-                        help="The percentage of number of expressed genes (!= 0) a spot\n" \
-                        "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
-    parser.add_argument("--num-exp-spots", default=1, metavar="[INT]", type=int, choices=range(0, 100),
-                        help="The percentage of number of expressed spots (!= 0) a gene " \
-                        "must have to be kept from the total number of spots (default: %(default)s)")
+    parser.add_argument("--num-exp-genes", default=5, metavar="[INT]", type=int, choices=range(1, 100),
+                        help="The number of expressed genes (!= 0) a spot\n" \
+                        "must have to be kept (default: %(default)s)")
+    parser.add_argument("--num-exp-spots", default=5, metavar="[INT]", type=int, choices=range(1, 100),
+                        help="The number of expressed spots (!= 0) a gene " \
+                        "must have to be kept (default: %(default)s)")
     parser.add_argument("--num-genes-keep", default=20, metavar="[INT]", type=int, choices=range(0, 100),
-                        help="The percentage of top genes to discard from the distribution of all the genes\n" \
-                        "across all the spots using the varience of the top expression " \
-                        "(see --top-genes-criteria) (default: %(default)s)")
+                        help="The percentage of genes to discard from the distribution of all the genes\n" \
+                        "across all the spots using the variance or the top expression " \
+                        "(see --top-genes-criteria)\nLow variance or low expressed will be discarded (default: %(default)s)")
     parser.add_argument("--clustering", default="KMeans", metavar="[STR]", 
                         type=str, choices=["Hierarchical", "KMeans"],
                         help="What clustering algorithm to use after the dimensionality reduction " \
@@ -358,7 +355,8 @@ if __name__ == '__main__':
                         help="What criteria to use to keep top genes before doing " \
                         "the dimensionality reduction (Variance or TopRanked) (default: %(default)s)")
     parser.add_argument("--use-adjusted-log", action="store_true", default=False,
-                        help="Use adjusted log normalized counts (R Scater::normalized()) in the dimensionality reduction step")
+                        help="Use adjusted log normalized counts (R Scater::normalized()) "
+                        "in the dimensionality reduction step")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     args = parser.parse_args()
     main(args.counts_table_files, 

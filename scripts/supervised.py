@@ -12,7 +12,7 @@ so the classifier knows what class each spot(row) in
 the training set belongs to, the file should
 be tab delimited :
 
-CLASS_NUMBER SPOT_NAME(as it in the matrix)
+SPOT_NAME(as it in the matrix) CLASS_NUMBER
 
 It will then try to predict the classes of the spots(rows) in the 
 test set. If class labels for the test sets
@@ -101,7 +101,7 @@ def main(train_data,
         with open(labels_file) as filehandler:
             for line in filehandler.readlines():
                 tokens = line.split()
-                train_labels_dict["{}_{}".format(i,tokens[1])] = int(tokens[0])
+                train_labels_dict["{}_{}".format(i,tokens[0])] = int(tokens[1])
     # make sure the spots in the training set data frame
     # and the label training spots have the same order
     # and are the same 
@@ -130,7 +130,7 @@ def main(train_data,
             for line in filehandler.readlines():
                 tokens = line.split()
                 assert(len(tokens) == 2)
-                spot_label[tokens[1]] = int(tokens[0])      
+                spot_label[tokens[0]] = int(tokens[1])      
         for spot in test_data_frame.index:
             try:
                 test_labels.append(spot_label[spot])
@@ -246,9 +246,9 @@ if __name__ == '__main__':
     parser.add_argument("--test-data", required=True,
                         help="One data frame with normalized counts")
     parser.add_argument("--train-classes", required=True, nargs='+', type=str,
-                        help="One of more files with the class of each spot in the train data")
+                        help="One of more files with the class of each spot in the train data as: XxY INT")
     parser.add_argument("--test-classes", default=None,
-                        help="One file with the class of each spot in the train data")
+                        help="One file with the class of each spot in the test data as: XxY INT")
     parser.add_argument("--use-log-scale", action="store_true", default=False,
                         help="Use log2 + 1 for the training and test set instead of raw/normalized counts.")
     parser.add_argument("--normalization", default="DESeq2", metavar="[STR]", 
