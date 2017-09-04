@@ -143,9 +143,10 @@ def compute_size_factors(counts, normalization):
     else:
         raise RunTimeError("Error, incorrect normalization method\n")
     if np.isnan(size_factors).any() or np.isinf(size_factors).any():
-        print "Warning: Computed size factors contained NaN or Inf. The data will not be normalized!"
-        size_factors = np.ones(len(size_factors))
-    elif (size_factors <= 0.0).any():
+        print "Warning: Computed size factors contained NaN or Inf.\nThey will be replaced by epsilon!"
+        size_factors[np.isnan(size_factors)] = np.finfo(np.float32).eps
+        size_factors[np.isinf(size_factors)] = np.finfo(np.float32).eps  
+    if (size_factors <= 0.0).any():
         print "Warning: Computed size factors contained zeroes or negative values.\nThey will be replaced by epsilon!"
         size_factors[size_factors <= 0.0] = np.finfo(np.float32).eps      
     return size_factors

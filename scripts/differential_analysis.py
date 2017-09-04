@@ -45,26 +45,29 @@ def dea(counts, conds, size_factors=None):
     perform D.E.A. in the given
     counts matrix with the given conditions
     """
-    pandas2ri.activate()
-    deseq2 = RimportLibrary("DESeq2")
-    r("suppressMessages(library(DESeq2))")
-    # Create the R conditions and counts data
-    r_counts = pandas2ri.py2ri(counts)
-    cond = robjects.DataFrame({"conditions": robjects.StrVector(conds)})
-    design = r('formula(~ conditions)')
-    dds = r.DESeqDataSetFromMatrix(countData=r_counts, colData=cond, design=design)
-    if size_factors is None:
-        dds = r.DESeq(dds)
-    else:
-        assign_sf = r["sizeFactors<-"]
-        dds = assign_sf(object=dds, value=robjects.FloatVector(size_factors))
-        dds = r.estimateDispersions(dds)
-        dds = r.nbinomWaldTest(dds)
-    results = r.results(dds, contrast=r.c("conditions", "A", "B"))
-    results = pandas2ri.ri2py_dataframe(r['as.data.frame'](results))
-    results.index = counts.index
-    # Return the DESeq2 DEA results object
-    pandas2ri.deactivate()
+    try:
+        pandas2ri.activate()
+        deseq2 = RimportLibrary("DESeq2")
+        r("suppressMessages(library(DESeq2))")
+        # Create the R conditions and counts data
+        r_counts = pandas2ri.py2ri(counts)
+        cond = robjects.DataFrame({"conditions": robjects.StrVector(conds)})
+        design = r('formula(~ conditions)')
+        dds = r.DESeqDataSetFromMatrix(countData=r_counts, colData=cond, design=design)
+        if size_factors is None:
+            dds = r.DESeq(dds)
+        else:
+            assign_sf = r["sizeFactors<-"]
+            dds = assign_sf(object=dds, value=robjects.FloatVector(size_factors))
+            dds = r.estimateDispersions(dds)
+            dds = r.nbinomWaldTest(dds)
+        results = r.results(dds, contrast=r.c("conditions", "A", "B"))
+        results = pandas2ri.ri2py_dataframe(r['as.data.frame'](results))
+        results.index = counts.index
+        # Return the DESeq2 DEA results object
+        pandas2ri.deactivate()
+    except Exception as e:
+        raise e
     return results
               
 def main(counts_table_files, data_classes, 
@@ -139,9 +142,14 @@ def main(counts_table_files, data_classes,
                                                                                   len(new_counts.index))
         # Compute size factors
         size_factors = compute_size_factors(new_counts.transpose(), normalization)
-        if all(size_factors) == 1: size_factors = None
+        if all(size_factors) == 1.0 or all(size_factors) == 0.0: size_factors = None
+        
         # DEA call
-        dea_results = dea(new_counts, conds, size_factors)
+        try:
+            dea_results = dea(new_counts, conds, size_factors)
+        except Exception as e:
+            print "Error while performing DEA " + str(e)
+            continue
         dea_results.sort_values(by=["padj"], ascending=True, inplace=True, axis=0)
         print "Writing results to output..."
         dea_results.ix[dea_results["padj"] <= fdr].to_csv(os.path.join(outdir, 
