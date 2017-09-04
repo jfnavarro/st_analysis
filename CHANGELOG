@@ -30,3 +30,6 @@ Version 0.3.3
 Version 0.4.0
 * Removed deprecated scripts
 * Adjusted some formats and parameters
+
+Version 0.4.1
+* Fixed a bug in the noise filtering function

@@ -5,6 +5,7 @@ functions (noisy spots and noisy genes)
 """
 import numpy as np
 import pandas as pd
+import math
 import os
 from stanalysis.normalization import *
 
@@ -41,18 +42,18 @@ def aggregate_datatasets(counts_table_files, plot_hist=False):
     counts.fillna(0.0, inplace=True)
     return counts
   
-def remove_noise(counts, num_exp_genes=5, num_exp_spots=5, min_expression=1):
+def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=1):
     """This functions remove noisy genes and spots 
     for a given data frame (Genes as columns and spots as rows).
-    - The noisy spots are removed by counting how many expressed genes > 0
-    a spot has. 
-    - The noisy genes are removed by counting how many expressed spots >= min_expression
-    a gene has. 
-    :param counts: a Pandas data frame with the counts (genes as columns)
-    :param num_exp_genes: an integer representing
-    the total number of genes that a spot must have with a count bigger
-    than 0 in order to be kept
-    :param num_exp_spots: an integer representing
+    - The noisy spots are removed so to keep a percentage
+    of the total distribution of spots whose gene counts are not 0
+    The percentage is given as a parameter.
+    - The noisy genes are removed so every gene that is expressed
+    in less than 1% of the total spots. Expressed with a count >= 2. 
+    :param counts: a Pandas data frame with the counts
+    :param num_exp_genes: a float from 0-1 representing the % of 
+    the distribution of expressed genes a spot must have to be kept
+    :param num_exp_spots: a float from 0-1 representing the % of 
     the total number of spots that a gene must have with a count bigger
     than the parameter min_expression in order to be kept
     :param min_expression: the minimum expression for a gene to be
@@ -62,20 +63,23 @@ def remove_noise(counts, num_exp_genes=5, num_exp_spots=5, min_expression=1):
     
     # How many spots do we keep based on the number of genes expressed?
     num_spots = len(counts.index)
-    print "Removing spots that are expressed in less than {} genes".format(nnum_exp_genes)
-    counts = counts[(counts != 0).sum(axis=1) >= num_exp_genes]
+    num_genes = len(counts.columns)
+    min_genes_spot_exp = round((counts != 0).sum(axis=1).quantile(num_exp_genes))
+    print "Number of expressed genes a spot must have to be kept " \
+    "({}% of total expressed genes) {}".format(num_exp_genes,min_genes_spot_exp)
+    counts = counts[(counts != 0).sum(axis=1) >= min_genes_spot_exp]
     print "Dropped {} spots".format(num_spots - len(counts.index))
           
     # Spots are columns and genes are rows
     counts = counts.transpose()
   
     # Remove noisy genes
-    num_genes = len(counts.columns)
-    print "Removing genes that are expressed in less than {} spots".format(num_exp_spots)
-    counts = counts[(counts >= min_expression).sum(axis=1) >= num_exp_spots]
+    min_features_gene = round(len(counts.columns) * num_exp_spots) 
+    print "Removing genes that are expressed in less than {} " \
+    "spots with a count of at least {}".format(min_features_gene, min_expression)
+    counts = counts[(counts >= min_expression).sum(axis=1) >= min_features_gene]
     print "Dropped {} genes".format(num_genes - len(counts.index))
     
-    # return the filtered matrix
     return counts.transpose()
     
 def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
@@ -86,22 +90,29 @@ def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
     :param counts: a Pandas data frame with the counts
     :param num_genes_keep: the % (1-100) of genes to keep
     :param criteria: the criteria used to select ("Variance or "TopRanked")
-    :return: a new Pandas data frame with only the top raned genes. 
+    :return: a new Pandas data frame with only the top ranked genes. 
     """
     # Spots as columns and genes as rows
     counts = counts.transpose()
     # Keep only the genes with higher over-all variance
     num_genes = len(counts.index)
+    print "Removing {}% of genes based on the {}".format(num_genes_keep * 100, criteria)
     if criteria == "Variance":
         min_genes_spot_var = counts.var(axis=1).quantile(num_genes_keep)
-        print "Min normalized variance a gene must have over all spots " \
-        "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_var)
-        counts = counts[counts.var(axis=1) >= min_genes_spot_var]
+        if math.isnan(min_genes_spot_var):
+            print "Computed variance is NaN! Check your normalization factors.."
+        else:
+            print "Min normalized variance a gene must have over all spots " \
+            "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_var)
+            counts = counts[counts.var(axis=1) >= min_genes_spot_var]
     elif criteria == "TopRankded":
         min_genes_spot_sum = counts.sum(axis=1).quantile(num_genes_keep)
-        print "Min normalized total count a gene must have over all spots " \
-        "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_sum)
-        counts = counts[counts.sum(axis=1) >= min_genes_spot_var]
+        if math.isnan(min_genes_spot_var):
+            print "Computed sum is NaN! Check your normalization factors.."
+        else:
+            print "Min normalized total count a gene must have over all spots " \
+            "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_sum)
+            counts = counts[counts.sum(axis=1) >= min_genes_spot_var]
     else:
         raise RunTimeError("Error, incorrect criteria method\n")  
     print "Dropped {} genes".format(num_genes - len(counts.index))    
@@ -134,6 +145,9 @@ def compute_size_factors(counts, normalization):
     if np.isnan(size_factors).any() or np.isinf(size_factors).any():
         print "Warning: Computed size factors contained NaN or Inf. The data will not be normalized!"
         size_factors = np.ones(len(size_factors))
+    elif (size_factors <= 0.0).any():
+        print "Warning: Computed size factors contained zeroes or negative values.\nThey will be replaced by epsilon!"
+        size_factors[size_factors <= 0.0] = np.finfo(np.float32).eps      
     return size_factors
 
 def normalize_data(counts, normalization, center=False, adjusted_log=False):
@@ -150,6 +164,8 @@ def normalize_data(counts, normalization, center=False, adjusted_log=False):
     """
     # Compute the size factors
     size_factors = compute_size_factors(counts, normalization)
+    if np.all(size_factors == 1.0):
+        return counts
     # Spots as columns and genes as rows
     counts = counts.transpose()
     # Center and/or adjust log the size_factors and counts

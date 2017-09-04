@@ -39,21 +39,6 @@ import rpy2.robjects as robjects
 from rpy2.robjects import pandas2ri, r, numpy2ri
 robjects.conversion.py2ri = numpy2ri
 import matplotlib.pyplot as plt
-
-def get_classes_coordinate(class_file):
-    """ Helper function
-    to get a dictionary of spot -> class 
-    from a tab delimited file
-    """
-    barcodes_classes = dict()
-    with open(class_file, "r") as filehandler:
-        for line in filehandler.readlines():
-            tokens = line.split()
-            assert(len(tokens) == 2)
-            spot = tokens[1]
-            class_label = tokens[0]
-            barcodes_classes[spot] = class_label
-    return barcodes_classes
    
 def dea(counts, conds, size_factors=None):
     """Makes a call to DESeq2 to
@@ -114,7 +99,7 @@ def main(counts_table_files, data_classes,
             for line in filehandler.readlines():
                 tokens = line.split()
                 assert(len(tokens) == 2)
-                spot_classes["{}_{}".format(i,tokens[1])] = str(tokens[0])  
+                spot_classes["{}_{}".format(i,tokens[0])] = str(tokens[1])  
     
     # Remove noise
     counts = remove_noise(counts, 0.01, 0.01, 1)

@@ -126,7 +126,7 @@ def main(counts_table_files,
     counts = aggregate_datatasets(counts_table_files)
 
     # Remove noisy spots and genes (Spots are rows and genes are columns)
-    counts = remove_noise(counts, num_exp_genes, num_exp_spots)
+    counts = remove_noise(counts, num_exp_genes / 100.0, num_exp_spots / 100.0)
     
     if num_clusters is None:
         num_clusters = computeNClusters(counts)
@@ -137,10 +137,9 @@ def main(counts_table_files,
     center_size_factors = not use_adjusted_log
     norm_counts = normalize_data(counts, normalization, 
                                  center=center_size_factors, adjusted_log=use_adjusted_log)
-        
+
     # Keep top genes (variance or expressed)
-    num_genes_keep = num_genes_keep / 100.0
-    norm_counts = keep_top_genes(norm_counts, num_genes_keep, criteria=top_genes_criteria)
+    norm_counts = keep_top_genes(norm_counts, num_genes_keep / 100.0, criteria=top_genes_criteria)
        
     if use_log_scale:
         print "Using pseudo-log counts log2(counts + 1)"
@@ -196,7 +195,7 @@ def main(counts_table_files,
         y = float(tokens[1])
         x = float(tokens[0].split("_")[1])
         index = int(tokens[0].split("_")[0])
-        file_writers[index].write("{0}\t{1}\n".format("{}x{}".format(x,y)), labels[i])
+        file_writers[index].write("{0}\t{1}\n".format("{}x{}".format(x,y), labels[i]))
         
     # Compute a color_label based on the RGB representation of the 3D dimensionality reduced
     labels_colors = list()
@@ -315,12 +314,12 @@ if __name__ == '__main__':
     parser.add_argument("--num-clusters", default=None, metavar="[INT]", type=int, choices=range(2, 10),
                         help="The number of clusters/regions expected to be found.\n" \
                         "If not given the number of clusters will be computed.")
-    parser.add_argument("--num-exp-genes", default=5, metavar="[INT]", type=int, choices=range(1, 100),
-                        help="The number of expressed genes (!= 0) a spot\n" \
-                        "must have to be kept (default: %(default)s)")
-    parser.add_argument("--num-exp-spots", default=5, metavar="[INT]", type=int, choices=range(1, 100),
-                        help="The number of expressed spots (!= 0) a gene " \
-                        "must have to be kept (default: %(default)s)")
+    parser.add_argument("--num-exp-genes", default=10, metavar="[INT]", type=int, choices=range(0, 100),
+                        help="The percentage of number of expressed genes (!= 0) a spot\n" \
+                        "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
+    parser.add_argument("--num-exp-spots", default=1, metavar="[INT]", type=int, choices=range(0, 100),
+                        help="The percentage of number of expressed spots (!= 0) a gene " \
+                        "must have to be kept from the total number of spots (default: %(default)s)")
     parser.add_argument("--num-genes-keep", default=20, metavar="[INT]", type=int, choices=range(0, 100),
                         help="The percentage of genes to discard from the distribution of all the genes\n" \
                         "across all the spots using the variance or the top expression " \
@@ -356,7 +355,7 @@ if __name__ == '__main__':
                         "the dimensionality reduction (Variance or TopRanked) (default: %(default)s)")
     parser.add_argument("--use-adjusted-log", action="store_true", default=False,
                         help="Use adjusted log normalized counts (R Scater::normalized()) "
-                        "in the dimensionality reduction step")
+                        "in the dimensionality reduction step (recommended with SCRAN normalization)")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     args = parser.parse_args()
     main(args.counts_table_files, 
