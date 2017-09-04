@@ -30,10 +30,11 @@ def computeTMMFactors(counts):
     r_counts = pandas2ri.py2ri(counts)
     edger = RimportLibrary("edgeR")
     as_matrix = r["as.matrix"]
-    dds = edger.calcNormFactors(as_matrix(r_counts), method="TMM") * r.colSums(counts)
+    dds = edger.calcNormFactors(as_matrix(r_counts), method="TMM")
     pandas_sf = pandas2ri.ri2py(dds)
+    pandas_cm = pandas2ri.ri2py(r.colSums(counts))
     pandas2ri.deactivate()
-    return pandas_sf
+    return pandas_sf * pandas_cm
 
 def computeRLEFactors(counts):
     """ Compute normalization size factors
@@ -45,10 +46,11 @@ def computeRLEFactors(counts):
     r_counts = pandas2ri.py2ri(counts)
     edger = RimportLibrary("edgeR")
     as_matrix = r["as.matrix"]
-    dds = edger.calcNormFactors(as_matrix(r_counts), method="RLE") * r.colSums(counts)
+    dds = edger.calcNormFactors(as_matrix(r_counts), method="RLE")
     pandas_sf = pandas2ri.ri2py(dds)
+    pandas_cm = pandas2ri.ri2py(r.colSums(counts))
     pandas2ri.deactivate()
-    return pandas_sf
+    return pandas_sf * pandas_cm
 
 def computeSumFactors(counts):
     """ Compute normalization factors
