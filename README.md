@@ -1,6 +1,6 @@
 # Spatial Transcriptomics Analysis 
 
-Different tools for visualization, data processing, conversion and analysis (supervised and un-supervised learning, differential expression analysis, etc..) of Spatial Transcriptomics data (can also be used for single cell data).
+Different tools for visualization, data processing and analysis (supervised and un-supervised learning, differential expression analysis, etc..) of Spatial Transcriptomics data (can also be used for single cell data).
 
 The package is compatible with the output format of the data generated with the ST Pipeline (https://github.com/SpatialTranscriptomicsResearch/st_pipeline) and give full support to plot the data onto the tissue images but it is compatible with any single cell datasets where the data is stored as a matrix of counts (genes as columns and spot/cells as rows). 
 
@@ -52,30 +52,6 @@ To install the ST Analsysis packate just clone or download the repository, cd in
 A bunch of scripts will then be available in your system.
 Note that you can always type script_name.py --help to get more information
 about how the script works.
-
-## Conversion tools
-
-### To convert JSON output from the ST Pipeline (older versions) to a matrix format (ST Data format)
-
-    json_to_matrix.py --json-file file.json --output file_table.tsv
-
-### To convert the ST data in matrix format to JSON format (Compatible with older versions of the ST Viewer)
-If you have ST data in matrix (data frame) format and you want to convert it to JSON (compatibility
-with older versions of the ST Viewer for example). Then you can use the following script 
-
-    matrix_to_json.py --data-file stdata.tsv --outfile stdata.json
-    
-### To adjust the spot coordinates to new coordinates in a ST BED file.
-For instance to adjust for printing errors or to convert to pixel coordinates
-(spots not found in the coordinates files will be discarded). You can use the following script:
-
-    adjust_bed_coordinates.py --coordinates-file coordinates.txt --outfile new_stdata.bed stdata.bed
-
-### To adjust the spot coordinates to new coordinates in a ST JSON file.
-For instance to adjust for printing errors or to convert to pixel coordinates
-(spots not found in the coordinates files will be discarded). You can use the following script:
-
-    adjust_json_coordinates.py --json-file stdata.json --coordinates-file new_coordinates.txt --outfile new_stdata.json
 
 ## Analysis tools
 
