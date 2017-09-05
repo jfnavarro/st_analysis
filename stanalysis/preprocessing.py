@@ -146,7 +146,7 @@ def compute_size_factors(counts, normalization):
         print "Warning: Computed size factors contained NaN or Inf.\nThey will be replaced by epsilon!"
         size_factors[np.isnan(size_factors)] = np.finfo(np.float32).eps
         size_factors[np.isinf(size_factors)] = np.finfo(np.float32).eps  
-    if (size_factors <= 0.0).any():
+    if np.any(size_factors <= 0.0):
         print "Warning: Computed size factors contained zeroes or negative values.\nThey will be replaced by epsilon!"
         size_factors[size_factors <= 0.0] = np.finfo(np.float32).eps      
     return size_factors
