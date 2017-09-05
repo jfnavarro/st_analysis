@@ -52,7 +52,7 @@ def computeRLEFactors(counts):
     pandas2ri.deactivate()
     return pandas_sf * pandas_cm
 
-def computeSumFactors(counts):
+def computeSumFactors(counts, scran_clusters=True):
     """ Compute normalization factors
     using the deconvolution method
     described in Merioni et al.
@@ -65,11 +65,15 @@ def computeSumFactors(counts):
     r_counts = pandas2ri.py2ri(counts)
     scran = RimportLibrary("scran")
     as_matrix = r["as.matrix"]
-    r_clusters = scran.quickCluster(as_matrix(r_counts), max(n_cells/10, 10))
-    min_cluster_size = min(Counter(r_clusters).values())
-    sizes = list(set([round((min_cluster_size/2)/i) for i in [5,4,3,2,1]]))
-    dds = scran.computeSumFactors(as_matrix(r_counts), 
-                                  clusters=r_clusters, sizes=sizes, positive=True)
+    if scran_clusters:
+        r_clusters = scran.quickCluster(as_matrix(r_counts), max(n_cells/10, 10))
+        min_cluster_size = min(Counter(r_clusters).values())
+        sizes = list(set([round((min_cluster_size/2) / i) for i in [5,4,3,2,1]]))
+        dds = scran.computeSumFactors(as_matrix(r_counts), 
+                                      clusters=r_clusters, sizes=sizes, positive=True)
+    else:
+        sizes = list(set([round((n_cells/2) * i) for i in [0.1,0.2,0.3,0.4,0.5]]))
+        dds = scran.computeSumFactors(as_matrix(r_counts), sizes=sizes, positive=True)        
     pandas_sf = pandas2ri.ri2py(dds)
     pandas2ri.deactivate()
     return pandas_sf

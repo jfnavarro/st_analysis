@@ -118,7 +118,7 @@ def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
     print "Dropped {} genes".format(num_genes - len(counts.index))    
     return counts.transpose()
 
-def compute_size_factors(counts, normalization):
+def compute_size_factors(counts, normalization, scran_clusters=True):
     """ Helper function to compute normalization
     size factors"""
     counts = counts.transpose()
@@ -139,7 +139,7 @@ def compute_size_factors(counts, normalization):
     elif normalization in "RAW":
         size_factors = 1
     elif normalization in "Scran":
-        size_factors = computeSumFactors(counts)         
+        size_factors = computeSumFactors(counts, scran_clusters)         
     else:
         raise RunTimeError("Error, incorrect normalization method\n")
     if np.isnan(size_factors).any() or np.isinf(size_factors).any():

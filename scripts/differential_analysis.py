@@ -158,7 +158,7 @@ def main(counts_table_files, data_classes,
         print "Dropped {} genes (less than 5 spots detected)".format(num_genes - len(new_counts.index))
         
         # Compute size factors
-        size_factors = compute_size_factors(new_counts.transpose(), normalization)
+        size_factors = compute_size_factors(new_counts.transpose(), normalization, scran_clusters=False)
         if all(size_factors) == 0.0 or np.isnan(size_factors).any() \
         or np.isinf(size_factors).any(): 
             size_factors = None
