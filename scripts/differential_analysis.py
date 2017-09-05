@@ -34,7 +34,7 @@ import os
 import numpy as np
 from itertools import izip
 from stanalysis.normalization import RimportLibrary
-from stanalysis.preprocessing import compute_size_factors, aggregate_datatasets, remove_noise
+from stanalysis.preprocessing import compute_size_factors, aggregate_datatasets
 import rpy2.robjects as robjects
 from rpy2.robjects import pandas2ri, r, numpy2ri
 robjects.conversion.py2ri = numpy2ri
@@ -104,8 +104,6 @@ def main(counts_table_files, data_classes,
                 assert(len(tokens) == 2)
                 spot_classes["{}_{}".format(i,tokens[0])] = str(tokens[1])  
     
-    # Remove noise
-    counts = remove_noise(counts, 0.01, 0.01, 1)
     # Spots as columns
     counts = counts.transpose()  
     # Iterate the conditions and create a new data frame
@@ -140,16 +138,38 @@ def main(counts_table_files, data_classes,
         print "Doing DEA for the conditions {} with {} spots and {} genes".format(cond,
                                                                                   len(new_counts.columns), 
                                                                                   len(new_counts.index))
+        
+        # Spots as rows
+        new_counts = new_counts.transpose()
+        
+        # Remove noise (spots)
+        num_spots = len(new_counts.index)
+        remove_indexes = (new_counts != 0).sum(axis=1) >= 5
+        new_counts = new_counts[remove_indexes]
+        conds = np.asarray(conds)[np.where(remove_indexes)].tolist()
+        print "Dropped {} spots (less than 5 genes detected)".format(num_spots - len(new_counts.index))
+    
+        # Remove noise (genes)
+        # Spots as columns 
+        new_counts = new_counts.transpose()
+        num_genes = len(new_counts.index)
+        remove_indexes = (new_counts >= 1).sum(axis=1) >= 5
+        new_counts = new_counts[remove_indexes]
+        print "Dropped {} genes (less than 5 spots detected)".format(num_genes - len(new_counts.index))
+        
         # Compute size factors
         size_factors = compute_size_factors(new_counts.transpose(), normalization)
-        if all(size_factors) == 1.0 or all(size_factors) == 0.0: size_factors = None
-        
+        if all(size_factors) == 0.0 or np.isnan(size_factors).any() \
+        or np.isinf(size_factors).any(): 
+            size_factors = None
+
         # DEA call
         try:
             dea_results = dea(new_counts, conds, size_factors)
         except Exception as e:
             print "Error while performing DEA " + str(e)
             continue
+        
         dea_results.sort_values(by=["padj"], ascending=True, inplace=True, axis=0)
         print "Writing results to output..."
         dea_results.ix[dea_results["padj"] <= fdr].to_csv(os.path.join(outdir, 
