@@ -65,20 +65,20 @@ def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=
     num_spots = len(counts.index)
     num_genes = len(counts.columns)
     min_genes_spot_exp = round((counts != 0).sum(axis=1).quantile(num_exp_genes))
-    print "Number of expressed genes a spot must have to be kept " \
-    "({}% of total expressed genes) {}".format(num_exp_genes,min_genes_spot_exp)
+    print("Number of expressed genes a spot must have to be kept " \
+    "({}% of total expressed genes) {}".format(num_exp_genes,min_genes_spot_exp))
     counts = counts[(counts != 0).sum(axis=1) >= min_genes_spot_exp]
-    print "Dropped {} spots".format(num_spots - len(counts.index))
+    print("Dropped {} spots".format(num_spots - len(counts.index)))
           
     # Spots are columns and genes are rows
     counts = counts.transpose()
   
     # Remove noisy genes
     min_features_gene = round(len(counts.columns) * num_exp_spots) 
-    print "Removing genes that are expressed in less than {} " \
-    "spots with a count of at least {}".format(min_features_gene, min_expression)
+    print("Removing genes that are expressed in less than {} " \
+    "spots with a count of at least {}".format(min_features_gene, min_expression))
     counts = counts[(counts >= min_expression).sum(axis=1) >= min_features_gene]
-    print "Dropped {} genes".format(num_genes - len(counts.index))
+    print("Dropped {} genes".format(num_genes - len(counts.index)))
     
     return counts.transpose()
     
@@ -96,29 +96,29 @@ def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
     counts = counts.transpose()
     # Keep only the genes with higher over-all variance
     num_genes = len(counts.index)
-    print "Removing {}% of genes based on the {}".format(num_genes_keep * 100, criteria)
+    print("Removing {}% of genes based on the {}".format(num_genes_keep * 100, criteria))
     if criteria == "Variance":
         min_genes_spot_var = counts.var(axis=1).quantile(num_genes_keep)
         if math.isnan(min_genes_spot_var):
-            print "Computed variance is NaN! Check your normalization factors.."
+            print("Computed variance is NaN! Check your normalization factors..")
         else:
-            print "Min normalized variance a gene must have over all spots " \
-            "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_var)
+            print("Min normalized variance a gene must have over all spots " \
+            "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_var))
             counts = counts[counts.var(axis=1) >= min_genes_spot_var]
     elif criteria == "TopRankded":
         min_genes_spot_sum = counts.sum(axis=1).quantile(num_genes_keep)
         if math.isnan(min_genes_spot_var):
-            print "Computed sum is NaN! Check your normalization factors.."
+            print("Computed sum is NaN! Check your normalization factors..")
         else:
-            print "Min normalized total count a gene must have over all spots " \
-            "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_sum)
+            print("Min normalized total count a gene must have over all spots " \
+            "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_sum))
             counts = counts[counts.sum(axis=1) >= min_genes_spot_var]
     else:
         raise RunTimeError("Error, incorrect criteria method\n")  
-    print "Dropped {} genes".format(num_genes - len(counts.index))    
+    print("Dropped {} genes".format(num_genes - len(counts.index)))
     return counts.transpose()
 
-def compute_size_factors(counts, normalization):
+def compute_size_factors(counts, normalization, scran_clusters=True):
     """ Helper function to compute normalization
     size factors"""
     counts = counts.transpose()
@@ -139,15 +139,17 @@ def compute_size_factors(counts, normalization):
     elif normalization in "RAW":
         size_factors = 1
     elif normalization in "Scran":
-        size_factors = computeSumFactors(counts)         
+        size_factors = computeSumFactors(counts, scran_clusters)         
     else:
         raise RunTimeError("Error, incorrect normalization method\n")
     if np.isnan(size_factors).any() or np.isinf(size_factors).any():
-        print "Warning: Computed size factors contained NaN or Inf.\nThey will be replaced by epsilon!"
+        print("Warning: Computed size factors contained NaN or Inf."
+              "\nThey will be replaced by epsilon!")
         size_factors[np.isnan(size_factors)] = np.finfo(np.float32).eps
         size_factors[np.isinf(size_factors)] = np.finfo(np.float32).eps  
-    if (size_factors <= 0.0).any():
-        print "Warning: Computed size factors contained zeroes or negative values.\nThey will be replaced by epsilon!"
+    if np.any(size_factors <= 0.0):
+        print("Warning: Computed size factors contained zeroes or negative values."
+              "\nThey will be replaced by epsilon!")
         size_factors[size_factors <= 0.0] = np.finfo(np.float32).eps      
     return size_factors
 

@@ -33,3 +33,6 @@ Version 0.4.0
 
 Version 0.4.1
 * Fixed a bug in the noise filtering function
+
+Version 0.4.2
+* Added compatibility with Python 3

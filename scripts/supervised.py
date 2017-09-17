@@ -89,7 +89,7 @@ def main(train_data,
     if not outdir or not os.path.isdir(outdir):
         outdir = os.getcwd()
         
-    print "Output folder {}".format(outdir)
+    print("Output folder {}".format(outdir))
   
     # Merge input train datasets (Spots are rows and genes are columns)
     train_data_frame = aggregate_datatasets(train_data)
@@ -141,21 +141,21 @@ def main(train_data,
             sys.exit(1)  
           
     # Keep only the record in the training set that intersects with the test set
-    print "Training genes {}".format(len(train_genes))
-    print "Test genes {}".format(len(test_genes))
+    print("Training genes {}".format(len(train_genes)))
+    print("Test genes {}".format(len(test_genes)))
     intersect_genes = np.intersect1d(train_genes, test_genes)
     if len(intersect_genes) == 0:
         sys.stderr.write("Error, there are no genes intersecting the train and test datasets\n")
         sys.exit(1)  
             
-    print "Intersected genes {}".format(len(intersect_genes))
+    print("Intersected genes {}".format(len(intersect_genes)))
     train_data_frame = train_data_frame.ix[:,intersect_genes]
     test_data_frame = test_data_frame.ix[:,intersect_genes]
     
     # Classes in test and train must be the same
-    print "Training elements {}".format(len(train_labels))
-    print "Test elements {}".format(len(test_labels))
-    print "Class labels {}".format(sorted(set(train_labels)))
+    print("Training elements {}".format(len(train_labels)))
+    print("Test elements {}".format(len(test_labels)))
+    print("Class labels {}".format(sorted(set(train_labels))))
     
     # Get the normalized counts
     train_data_frame = normalize_data(train_data_frame, normalization)

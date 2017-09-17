@@ -130,10 +130,10 @@ def main(counts_table_files,
     
     if num_clusters is None:
         num_clusters = computeNClusters(counts)
-        print "Computation of number of clusters obtained {} clusters...".format(num_clusters)
+        print("Computation of number of clusters obtained {} clusters...".format(num_clusters))
 
     # Normalize data
-    print "Computing per spot normalization..." 
+    print("Computing per spot normalization...")
     center_size_factors = not use_adjusted_log
     norm_counts = normalize_data(counts, normalization, 
                                  center=center_size_factors, adjusted_log=use_adjusted_log)
@@ -142,10 +142,10 @@ def main(counts_table_files,
     norm_counts = keep_top_genes(norm_counts, num_genes_keep / 100.0, criteria=top_genes_criteria)
        
     if use_log_scale:
-        print "Using pseudo-log counts log2(counts + 1)"
+        print("Using pseudo-log counts log2(counts + 1)")
         norm_counts = np.log2(norm_counts + 1)  
       
-    print "Performing dimensionality reduction..."   
+    print("Performing dimensionality reduction...") 
            
     if "tSNE" in dimensionality:
         #NOTE the Scipy tsne seems buggy so we use the R one instead
@@ -178,7 +178,7 @@ def main(counts_table_files,
         sys.stderr.write("Error, incorrect clustering method\n")
         sys.exit(1)
 
-    print "Performing clustering..."  
+    print("Performing clustering...")
     # Obtain predicted classes for each spot
     labels = clustering_object.fit_predict(reduced_data)
     if 0 in labels: labels = labels + 1
@@ -216,7 +216,7 @@ def main(counts_table_files,
         b = linear_conv(z, z_min, z_max, 0.0, 1.0) if num_dimensions == 3 else 1.0
         labels_colors.append((r,g,b))
 
-    print "Generating plots..." 
+    print("Generating plots...")
      
     # Plot the clustered spots with the class color
     if num_dimensions == 3:
