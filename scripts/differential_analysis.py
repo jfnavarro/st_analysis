@@ -32,7 +32,7 @@ import argparse
 import sys
 import os
 import numpy as np
-from itertools import izip
+import pandas as pd
 from stanalysis.normalization import RimportLibrary
 from stanalysis.preprocessing import compute_size_factors, aggregate_datatasets
 import rpy2.robjects as robjects
@@ -71,7 +71,8 @@ def dea(counts, conds, size_factors=None):
     return results
               
 def main(counts_table_files, data_classes, 
-         conditions_tuples, outdir, fdr, normalization):
+         conditions_tuples, outdir, fdr, normalization, num_exp_spots,
+         num_exp_genes):
 
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
@@ -90,7 +91,7 @@ def main(counts_table_files, data_classes,
     if not outdir or not os.path.isdir(outdir):
         outdir = os.getcwd()
         
-    print "Output folder {}".format(outdir)
+    print("Output folder {}".format(outdir))
       
     # Merge input datasets (Spots are rows and genes are columns)
     counts = aggregate_datatasets(counts_table_files)
@@ -135,27 +136,29 @@ def main(counts_table_files, data_classes,
             except KeyError:
                 new_counts.drop(spot, axis=1, inplace=True)
         # Make the DEA call
-        print "Doing DEA for the conditions {} with {} spots and {} genes".format(cond,
+        print("Doing DEA for the conditions {} with {} spots and {} genes".format(cond,
                                                                                   len(new_counts.columns), 
-                                                                                  len(new_counts.index))
+                                                                                  len(new_counts.index)))
         
         # Spots as rows
         new_counts = new_counts.transpose()
         
         # Remove noise (spots)
         num_spots = len(new_counts.index)
-        remove_indexes = (new_counts != 0).sum(axis=1) >= 5
-        new_counts = new_counts[remove_indexes]
-        conds = np.asarray(conds)[np.where(remove_indexes)].tolist()
-        print "Dropped {} spots (less than 5 genes detected)".format(num_spots - len(new_counts.index))
+        keep_indexes = (new_counts != 0).sum(axis=1) >= num_exp_genes
+        new_counts = new_counts[keep_indexes]
+        conds = np.asarray(conds)[np.where(keep_indexes)].tolist()
+        print("Dropped {} spots (less than {} genes detected)".
+              format(num_spots - len(new_counts.index), num_exp_genes))
     
         # Remove noise (genes)
         # Spots as columns 
         new_counts = new_counts.transpose()
         num_genes = len(new_counts.index)
-        remove_indexes = (new_counts >= 1).sum(axis=1) >= 5
-        new_counts = new_counts[remove_indexes]
-        print "Dropped {} genes (less than 5 spots detected)".format(num_genes - len(new_counts.index))
+        keep_indexes = (new_counts >= 1).sum(axis=1) >= num_exp_spots
+        new_counts = new_counts[keep_indexes]
+        print("Dropped {} genes (less than {} spots detected)".
+              format(num_genes - len(new_counts.index), num_exp_spots))
         
         # Compute size factors
         size_factors = compute_size_factors(new_counts.transpose(), normalization, scran_clusters=False)
@@ -167,16 +170,16 @@ def main(counts_table_files, data_classes,
         try:
             dea_results = dea(new_counts, conds, size_factors)
         except Exception as e:
-            print "Error while performing DEA " + str(e)
+            print("Error while performing DEA " + str(e))
             continue
-        
+        dea_results = dea_results[pd.notnull(dea_results)]
         dea_results.sort_values(by=["padj"], ascending=True, inplace=True, axis=0)
-        print "Writing results to output..."
+        print("Writing results to output...")
         dea_results.ix[dea_results["padj"] <= fdr].to_csv(os.path.join(outdir, 
                                                                        "dea_results_dataset{}_region{}_vs_dataset{}_region{}.tsv"
                                                                        .format(dataset_a, region_a, dataset_b, region_b)), sep="\t")
         # Volcano plot
-        print "Generating plots..."
+        print("Generating plots...")
         # Add colors according to differently expressed or not (needs a p-value parameter)
         colors = ["red" if p <= fdr else "blue" for p in dea_results["padj"]]
         fig, a = plt.subplots(figsize=(30, 30))
@@ -193,7 +196,7 @@ def main(counts_table_files, data_classes,
         a.set_ylabel("-log10(pvalue)")
         a.set_title("Volcano plot", size=10)
         a.scatter(x_points, y_points, c=colors, edgecolor="none")  
-        for x,y,text in izip(x_points_conf,y_points_conf,names_conf):
+        for x,y,text in zip(x_points_conf,y_points_conf,names_conf):
             a.text(x,y,text,size="x-small")
         fig.savefig(os.path.join(outdir, "volcano_dataset{}_region{}_vs_dataset{}_region{}.pdf"
                                  .format(dataset_a, region_a, dataset_b, region_b)), dpi=300)
@@ -225,9 +228,14 @@ if __name__ == '__main__':
                         help="One of more tuples that represent what classes and datasets will be compared for DEA.\n" \
                         "The notation is simple, DATASET_NUMBER1:REGION_NUMBER1-DATASET_NUMBER2:REGION_NUMBER2.\n" \
                         "For example 0:1-1:2 1:1-1:3 0:2-0:1. Note that dataset number starts by 0.")
+    parser.add_argument("--num-exp-genes", default=5, metavar="[INT]", type=int, choices=range(0, 100),
+                        help="The number of expressed genes (!= 0) a spot must have to be kept (default: %(default)s)")
+    parser.add_argument("--num-exp-spots", default=5, metavar="[INT]", type=int, choices=range(0, 100),
+                        help="The number of expressed spots (!= 0) a gene must have to be kept (default: %(default)s)")
     parser.add_argument("--fdr", type=float, default=0.01,
                         help="The FDR minimum confidence threshold (default: %(default)s)")
     parser.add_argument("--outdir", help="Path to output dir")
     args = parser.parse_args()
     main(args.counts_table_files, args.data_classes, args.conditions_tuples, 
-         args.outdir, args.fdr, args.normalization)
+         args.outdir, args.fdr, args.normalization, args.num_exp_spots,
+         args.num_exp_genes)

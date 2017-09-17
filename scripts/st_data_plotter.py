@@ -70,7 +70,6 @@ def main(input_data,
         for gene in norm_counts_table.columns:
             for regex in filter_genes:
                 if re.match(regex, gene):
-                    print gene
                     genes_to_keep.append(gene)
                     break                         
     else: 
