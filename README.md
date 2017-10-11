@@ -192,6 +192,6 @@ Where CONDITION must be one of the CONDITIONS given in the previous list.
 The scripts allows for different normalization methods and
 different D.E.A. algorithms (see --help). An example run would be:
 
-    differential_analysis.py --input-data stdata_region1.tsv stdata_region2.tsv --comparisons 0-1
+    differential_analysis.py --input-data stdata_region1.tsv stdata_region2.tsv --conditions 0:A 1:B --comparisons A-B
     
 To know more about the parameters you can type --help
