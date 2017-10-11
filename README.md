@@ -49,7 +49,6 @@ Where each a correspondonds to a cell of the affine transformation matrix.
 
 ### Installation
 
-Note that the ST Analysis package requires R (https://cran.r-project.org/) installed in your system.
 We recommend that you install the latest version 3.4.x. Once you have installed R you can open
 a R terminal or Rstudio and type the following:
 
@@ -96,7 +95,11 @@ Note: we advice to install and update the developer tools packages
 
 A bunch of scripts (described behind) will then be available in your system.
 Note that you can always type script_name.py --help to get more information
-about how the script works.
+about how the script works. 
+The ST Analysis package is compatible with Python 2 and 3 and we recomend to use
+a virtual environment to make the installation of the dependencies easier. 
+
+* Due to compatibility issues with rpy2 and R (specially in OSX), we recomend to use an R version older than 3.4. 
 
 ## Analysis tools
 
