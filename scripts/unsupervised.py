@@ -1,9 +1,8 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-A script that does unsupervised
-classification on single cell data (Mainly used for Spatial Transcriptomics)
-It takes a list of data frames as input and outputs :
+A script that does unsupervised Spatial Transcriptomics datasets (matrix of counts)
+It takes a list of datasets as input and outputs :
 
  - a scatter plot with the predicted classes (coulored) for each spot 
  - the spots plotted onto the images (if given) with the predicted class/color
@@ -17,7 +16,8 @@ appended. For instance if two datasets are given the indexes will
 be (1 and 2). 
 
 The user can select what clustering algorithm to use
-and what dimensionality reduction technique to use. 
+and what dimensionality reduction technique to use and normalization
+method to use. 
 
 Noisy spots (very few genes expressed) are removed using a parameter.
 Noisy genes (expressed in very few spots) are removed using a parameter.
@@ -38,46 +38,8 @@ from sklearn.cluster import AgglomerativeClustering
 from stanalysis.visualization import scatter_plot, scatter_plot3d, histogram
 from stanalysis.preprocessing import *
 from stanalysis.alignment import parseAlignmentMatrix
-from stanalysis.normalization import RimportLibrary
+from stanalysis.analysis import Rtsne, linear_conv, computeNClusters
 import matplotlib.pyplot as plt
-import rpy2.robjects.packages as rpackages
-from rpy2.robjects import pandas2ri, r, globalenv
-base = rpackages.importr("base")
-
-def linear_conv(old, min, max, new_min, new_max):
-    return ((old - min) / (max - min)) * ((new_max - new_min) + new_min)
-    
-def Rtsne(counts, dimensions):
-    """Performs dimensionality reduction
-    using the R package Rtsne"""
-    pandas2ri.activate()
-    r_counts = pandas2ri.py2ri(counts)
-    tsne = RimportLibrary("Rtsne")    
-    as_matrix = r["as.matrix"]
-    tsne_out = tsne.Rtsne(as_matrix(counts), 
-                          dims=dimensions, 
-                          theta=0.5, 
-                          check_duplicates=False, 
-                          pca=True, 
-                          initial_dims=50, 
-                          perplexity=30, 
-                          max_iter=1000, 
-                          verbose=False)
-    pandas_tsne_out = pandas2ri.ri2py(tsne_out.rx2('Y'))
-    pandas2ri.deactivate()
-    return pandas_tsne_out
-
-def computeNClusters(counts, min_size=20):
-    """Computes the number of clusters
-    from the data using Scran::quickCluster"""
-    pandas2ri.activate()
-    r_counts = pandas2ri.py2ri(counts.transpose())
-    scran = RimportLibrary("scran")    
-    as_matrix = r["as.matrix"]
-    clusters = scran.quickCluster(as_matrix(r_counts), min_size)
-    n_clust = len(set(clusters))
-    pandas2ri.deactivate()
-    return n_clust
   
 def main(counts_table_files, 
          normalization, 
@@ -94,7 +56,9 @@ def main(counts_table_files,
          spot_size,
          top_genes_criteria,
          outdir,
-         use_adjusted_log):
+         use_adjusted_log,
+         tsne_perplexity,
+         tsne_theta):
 
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
@@ -112,21 +76,25 @@ def main(counts_table_files,
         sys.stderr.write("Error, the number of alignments given as " \
         "input is not the same as the number of images\n")
         sys.exit(1)   
-       
+         
     if use_adjusted_log and use_log_scale:
         sys.stdout.write("Warning, both log and adjusted log are enabled " \
                          "only adjusted log will be used\n")
         use_log_scale = False
-                          
+      
+    if tsne_theta < 0.0 or tsne_theta > 1.0:
+        sys.stdout.write("Warning, invalid value for theta. Using default..\n")
+        tsne_theta = 0.5
+                                    
     if outdir is None or not os.path.isdir(outdir): 
         outdir = os.getcwd()
     outdir = os.path.abspath(outdir)
-    
+                
     # Merge input datasets (Spots are rows and genes are columns)
     counts = aggregate_datatasets(counts_table_files)
 
     # Remove noisy spots and genes (Spots are rows and genes are columns)
-    counts = remove_noise(counts, num_exp_genes / 100.0, num_exp_spots / 100.0)
+    counts = remove_noise(counts, num_exp_genes / 100.0, num_exp_spots / 100.0, min_expression=2)
     
     if num_clusters is None:
         num_clusters = computeNClusters(counts)
@@ -149,7 +117,7 @@ def main(counts_table_files,
            
     if "tSNE" in dimensionality:
         #NOTE the Scipy tsne seems buggy so we use the R one instead
-        reduced_data = Rtsne(norm_counts, num_dimensions)
+        reduced_data = Rtsne(norm_counts, num_dimensions, theta=tsne_theta, perplexity=tsne_perplexity)
     elif "PCA" in dimensionality:
         # n_components = None, number of mle to estimate optimal
         decomp_model = PCA(n_components=num_dimensions, whiten=True, copy=True)
@@ -187,7 +155,7 @@ def main(counts_table_files,
     
     # Write the spots and their classes to a file
     file_writers = [open(os.path.join(outdir,"computed_classes_{}.txt".format(i)),"w") 
-                    for i in xrange(len(counts_table_files))]
+                    for i in range(len(counts_table_files))]
     # Write the coordinates and the label/class that they belong to
     for i,bc in enumerate(norm_counts.index):
         tokens = bc.split("x")
@@ -240,7 +208,7 @@ def main(counts_table_files,
     # Plot the spots with colors corresponding to the predicted class
     # Use the HE image as background if the image is given
     tot_spots = norm_counts.index
-    for i in xrange(len(counts_table_files)):
+    for i in range(len(counts_table_files)):
         # Get the list of spot coordinates and colors to plot for each dataset
         x_points = list()
         y_points = list()
@@ -315,10 +283,10 @@ if __name__ == '__main__':
                         help="The number of clusters/regions expected to be found.\n" \
                         "If not given the number of clusters will be computed.")
     parser.add_argument("--num-exp-genes", default=10, metavar="[INT]", type=int, choices=range(0, 100),
-                        help="The percentage of number of expressed genes (!= 0) a spot\n" \
+                        help="The percentage of number of expressed genes (> 1) a spot\n" \
                         "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
     parser.add_argument("--num-exp-spots", default=1, metavar="[INT]", type=int, choices=range(0, 100),
-                        help="The percentage of number of expressed spots (!= 0) a gene " \
+                        help="The percentage of number of expressed spots a gene " \
                         "must have to be kept from the total number of spots (default: %(default)s)")
     parser.add_argument("--num-genes-keep", default=20, metavar="[INT]", type=int, choices=range(0, 100),
                         help="The percentage of genes to discard from the distribution of all the genes\n" \
@@ -335,12 +303,17 @@ if __name__ == '__main__':
     parser.add_argument("--use-log-scale", action="store_true", default=False,
                         help="Use log2(counts + 1) values in the dimensionality reduction step")
     parser.add_argument("--alignment-files", default=None, nargs='+', type=str,
-                        help="One or more tab delimited files containing and alignment matrix for the images\n" \
-                        "(array coordinates to pixel coordinates) as a 3x3 matrix in one row.\n" \
+                        help="One or more tab delimited files containing and alignment matrix for the images as\n" \
+                        "\t a11 a12 a13 a21 a22 a23 a31 a32 a33\n" \
                         "Only useful is the image has extra borders, for instance not cropped to the array corners\n" \
                         "or if you want the keep the original image size in the plots.")
+    parser.add_argument("--coordinate-files", default=None, nargs='+', type=str,
+                        help="One or more tab delimited files containing spot coordinates as\n" \
+                        "\t spot_x  spot_y  new_spot_x  new_spot_y  pixel_x  pixel-y \n" \
+                        "If provided the spot coordinates of each dataset will be updated and only the spots"
+                        "present in the file will be kept.")
     parser.add_argument("--image-files", default=None, nargs='+', type=str,
-                        help="When given the data will plotted on top of the image\n" \
+                        help="When provided the data will plotted on top of the image\n" \
                         "It can be one ore more, ideally one for each input dataset\n " \
                         "It is desirable that the image is cropped to the array\n" \
                         "corners otherwise an alignment file is needed")
@@ -356,7 +329,12 @@ if __name__ == '__main__':
     parser.add_argument("--use-adjusted-log", action="store_true", default=False,
                         help="Use adjusted log normalized counts (R Scater::normalized()) "
                         "in the dimensionality reduction step (recommended with SCRAN normalization)")
+    parser.add_argument("--tsne-perplexity", default=30, metavar="[INT]", type=int, choices=[10,500],
+                        help="The value of the perplexity for the t-sne method. (default: %(default)s)")
+    parser.add_argument("--tsne-theta", default=0.5, metavar="[FLOAT]", type=float,
+                        help="The value of theta for the t-sne method. (default: %(default)s)")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
+    
     args = parser.parse_args()
     main(args.counts_table_files, 
          args.normalization, 
@@ -373,5 +351,7 @@ if __name__ == '__main__':
          args.spot_size,
          args.top_genes_criteria,
          args.outdir,
-         args.use_adjusted_log)
+         args.use_adjusted_log,
+         args.tsne_perplexity,
+         args.tsne_theta)
 

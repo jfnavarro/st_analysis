@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 """ 
-Script that takes a matrix of counts
+Script that takes ST dataset (matrix of counts)
 where the columns are genes and the rows
 are spot coordinates
         gene    gene    
@@ -8,7 +8,9 @@ XxY
 XxY
 
 And removes the columns of genes
-matching the reg-exp given as input.
+matching the regular expression given as input.
+
+@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
 
 import argparse
@@ -24,7 +26,7 @@ def main(counts_matrix, reg_exps, outfile):
         sys.exit(1)
      
     if not outfile:
-        outfile = "filtered_{}".format(os.path.basename(counts_matrix))
+        outfile = "filtered_{}".format(os.path.basename(counts_matrix).split(".")[0])
     
     # Read the data frame (genes as columns)
     counts_table = pd.read_table(counts_matrix, sep="\t", header=0, index_col=0)

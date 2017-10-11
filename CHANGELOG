@@ -9,12 +9,12 @@ Version 0.3.0
 * Bug fixes
 * Optimized the normalization
 * Unsupervised allows to center size factors by mean
-* Unsupervised allows to computed adjuted log normalized counts
+* Unsupervised allows to computed adjusted log normalized counts
 * Unsupervised allows to compute the number of clusters automatically
 * Supervised allows to normalize the data
 * Supervised allows to input train/classes with different spots
   than in the train/test data and in different order
-* st_data_plotter allows to highlith selected spots
+* st_data_plotter allows to highlight selected spots
 * st_data_plotter only plots the spots where the gene is present
   when a gene reg-exp is given
 * st_data_plotter allows to normalize the data
@@ -36,3 +36,9 @@ Version 0.4.1
 
 Version 0.4.2
 * Added compatibility with Python 3
+
+Version 0.4.5
+* Added merge_replicates.py script
+* Added slice_regions_matrix.py script
+* Optimized and improved differential_analysis.py
+* Added compatibility with R 3.4 and rpy2 latest versions

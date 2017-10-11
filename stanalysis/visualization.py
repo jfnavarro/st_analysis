@@ -13,6 +13,32 @@ color_map = ["red", "green", "blue", "orange", "cyan", "yellow", "orchid",
              "saddlebrown", "darkcyan", "gray", "darkred", "darkgreen", "darkblue", 
              "antiquewhite", "bisque", "black"]
 
+def volcano(dea_results, fdr, outfile):
+    """ Generates a volcano plot for the given DEA results
+    :param dea_results: a data frame that must contains a padj 
+    and a log2FoldChange columns
+    :param fdr: the fdr threshold to apply (0-1)
+    :param outfile: the name of the output file
+    """
+    fig, a = plt.subplots(figsize=(30, 30))
+    colors = ["red" if p <= fdr else "blue" for p in dea_results["padj"]]
+    x_points = dea_results["log2FoldChange"]
+    y_points = -np.log10(dea_results["pvalue"])
+    x_points_conf = dea_results.ix[dea_results["padj"] <= fdr]["log2FoldChange"]
+    y_points_conf = -np.log10(dea_results.ix[dea_results["padj"] <= fdr]["pvalue"])
+    names_conf = dea_results.ix[dea_results["padj"] <= fdr].index
+    # Scale axes
+    OFFSET = 0.1
+    a.set_xlim([min(x_points) - OFFSET, max(x_points) + OFFSET])
+    a.set_ylim([min(y_points) - OFFSET, max(y_points) + OFFSET])
+    a.set_xlabel("Log2FoldChange")
+    a.set_ylabel("-log10(pvalue)")
+    a.set_title("Volcano plot", size=10)
+    a.scatter(x_points, y_points, c=colors, edgecolor="none")  
+    for x,y,text in zip(x_points_conf,y_points_conf,names_conf):
+        a.text(x,y,text,size="x-small")
+    fig.savefig(outfile, dpi=300)
+    
 def histogram(x_points, output, title="Histogram", xlabel="X", color="blue"):
     """ This function generates a simple density histogram
     with the points given as input.

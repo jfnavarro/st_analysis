@@ -1,30 +1,27 @@
 #! /usr/bin/env python
 """ 
 This script performs Differential Expression Analysis 
-using DESeq2 on a table with gene counts with the following format:
+using DESeq2 or Scran + DESeq2 on ST datasets.
+
+The script can take one or several datasets with the following format:
 
       GeneA   GeneB   GeneC
 1x1   
 1x2
 ...
 
-The script can take one or several datasets.
-The script also requires a file where spots are mapped
-to a class for each dataset. 
-This file is a tab delimited file like this:
+Ideally, each dataset (matrix) would correspond to a region
+of interest (Selection) to be compared. 
 
-CLASS SPOT 
+The script also needs the list of comparisons to make (1 vs 2, etc..)
+Each comparison will be performed between datasets and the input should be:
 
-The script also requires a  list of dataset:region-dataset:region 
-tuples to perform differential expression analysis. 
-For example 0:1-1:2 or 0:1-0:3.
-Where 0:1 represents dataset number 0 (inputted)
-and region 1 (from the classess tab delimited file)
+DATASET-DATASET DATASET-DATASET ...
 
-The script will output the list of up-regulated and down-regulated
-for each DEA comparison as well as a set of plots.
+The script will output the list of up-regulated and down-regulated genes
+for each possible DEA comparison (between tables) as well as a set of volcano plots.
 
-The script allows to normalize the data with different methods.
+NOTE: soon Monocle and edgeR will be added 
 
 @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
@@ -34,57 +31,16 @@ import os
 import numpy as np
 import pandas as pd
 from stanalysis.normalization import RimportLibrary
-from stanalysis.preprocessing import compute_size_factors, aggregate_datatasets
-import rpy2.robjects as robjects
-from rpy2.robjects import pandas2ri, r, numpy2ri
-robjects.conversion.py2ri = numpy2ri
+from stanalysis.preprocessing import compute_size_factors, aggregate_datatasets, remove_noise
+from stanalysis.visualization import volcano
+from stanalysis.analysis import dea
 import matplotlib.pyplot as plt
-   
-def dea(counts, conds, size_factors=None):
-    """Makes a call to DESeq2 to
-    perform D.E.A. in the given
-    counts matrix with the given conditions
-    """
-    try:
-        pandas2ri.activate()
-        deseq2 = RimportLibrary("DESeq2")
-        r("suppressMessages(library(DESeq2))")
-        # Create the R conditions and counts data
-        r_counts = pandas2ri.py2ri(counts)
-        cond = robjects.DataFrame({"conditions": robjects.StrVector(conds)})
-        design = r('formula(~ conditions)')
-        dds = r.DESeqDataSetFromMatrix(countData=r_counts, colData=cond, design=design)
-        if size_factors is None:
-            dds = r.DESeq(dds)
-        else:
-            assign_sf = r["sizeFactors<-"]
-            dds = assign_sf(object=dds, value=robjects.FloatVector(size_factors))
-            dds = r.estimateDispersions(dds)
-            dds = r.nbinomWaldTest(dds)
-        results = r.results(dds, contrast=r.c("conditions", "A", "B"))
-        results = pandas2ri.ri2py_dataframe(r['as.data.frame'](results))
-        results.index = counts.index
-        # Return the DESeq2 DEA results object
-        pandas2ri.deactivate()
-    except Exception as e:
-        raise e
-    return results
-              
-def main(counts_table_files, data_classes, 
-         conditions_tuples, outdir, fdr, normalization, num_exp_spots,
-         num_exp_genes):
+    
+def main(counts_table_files, comparisons, outdir, fdr, 
+         normalization, num_exp_spots, num_exp_genes):
 
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
-        sys.stderr.write("Error, input file/s not present or invalid format\n")
-        sys.exit(1)
-        
-    if len(data_classes) == 0 or \
-    any([not os.path.isfile(f) for f in counts_table_files]):
-        sys.stderr.write("Error, input file/s not present or invalid format\n")
-        sys.exit(1)
-        
-    if len(data_classes) != len(counts_table_files):
         sys.stderr.write("Error, input file/s not present or invalid format\n")
         sys.exit(1)
      
@@ -96,119 +52,66 @@ def main(counts_table_files, data_classes,
     # Merge input datasets (Spots are rows and genes are columns)
     counts = aggregate_datatasets(counts_table_files)
     
-    # loads all the classes for the spots
-    spot_classes = dict()
-    for i,class_file in enumerate(data_classes):
-        with open(class_file) as filehandler:
-            for line in filehandler.readlines():
-                tokens = line.split()
-                assert(len(tokens) == 2)
-                spot_classes["{}_{}".format(i,tokens[0])] = str(tokens[1])  
+    # Remove noisy spots and genes (Spots are rows and genes are columns)
+    counts = remove_noise(counts, num_exp_genes / 100.0, num_exp_spots / 100.0, min_expression=2)
+        
+    # Get the comparisons as tuples
+    comparisons = [c.split("-") for c in comparisons]
     
-    # Spots as columns
-    counts = counts.transpose()  
-    # Iterate the conditions and create a new data frame
-    # with the datasets/regions specified in each condition
-    # NOTE this could be done more elegantly using slicing
-    for cond in conditions_tuples:
-        new_counts = counts.copy()
-        tokens = cond.split("-")
-        assert(len(tokens) == 2)
-        tokens_a = tokens[0].split(":")
-        assert(len(tokens_a) == 2)
-        tokens_b = tokens[1].split(":")
-        assert(len(tokens_b) == 2)
-        dataset_a = str(tokens_a[0])
-        dataset_b = str(tokens_b[0])
-        region_a = str(tokens_a[1])
-        region_b = str(tokens_b[1])
-        conds = list()
-        for spot in new_counts.columns:
-            try:
-                spot_class = spot_classes[spot]
-                spot_dataset = spot.split("_")[0]
-                if spot_dataset == dataset_a and spot_class == region_a:
-                    conds.append("A")
-                elif spot_dataset == dataset_b and spot_class == region_b:
-                    conds.append("B")
-                else:
-                    new_counts.drop(spot, axis=1, inplace=True)
-            except KeyError:
-                new_counts.drop(spot, axis=1, inplace=True)
-        # Make the DEA call
-        print("Doing DEA for the conditions {} with {} spots and {} genes".format(cond,
-                                                                                  len(new_counts.columns), 
-                                                                                  len(new_counts.index)))
+    # Get the conditions (each dataset will be one condition)
+    conds = [spot.split("_")[0] for spot in counts.index]
         
-        # Spots as rows
-        new_counts = new_counts.transpose()
-        
-        # Remove noise (spots)
-        num_spots = len(new_counts.index)
-        keep_indexes = (new_counts != 0).sum(axis=1) >= num_exp_genes
-        new_counts = new_counts[keep_indexes]
-        conds = np.asarray(conds)[np.where(keep_indexes)].tolist()
-        print("Dropped {} spots (less than {} genes detected)".
-              format(num_spots - len(new_counts.index), num_exp_genes))
-    
-        # Remove noise (genes)
-        # Spots as columns 
-        new_counts = new_counts.transpose()
-        num_genes = len(new_counts.index)
-        keep_indexes = (new_counts >= 1).sum(axis=1) >= num_exp_spots
-        new_counts = new_counts[keep_indexes]
-        print("Dropped {} genes (less than {} spots detected)".
-              format(num_genes - len(new_counts.index), num_exp_spots))
-        
-        # Compute size factors
-        size_factors = compute_size_factors(new_counts.transpose(), normalization, scran_clusters=False)
-        if all(size_factors) == 0.0 or np.isnan(size_factors).any() \
-        or np.isinf(size_factors).any(): 
-            size_factors = None
+    # Check that the comparisons are valid and if not remove the invalid ones
+    comparisons = [c for c in comparisons if c[0] in conds and c[1] in conds]
+    if len(comparisons) == 0:
+        sys.stderr.write("Error, the vector of comparisons is invalid\n")
+        sys.exit(1)
+                      
+    # Make the DEA call
+    print("Doing DEA for the comparisons {} with {} spots and {} genes".format(comparisons,
+                                                                              len(counts.index), 
+                                                                              len(counts.columns)))
 
-        # DEA call
-        try:
-            dea_results = dea(new_counts, conds, size_factors)
-        except Exception as e:
-            print("Error while performing DEA " + str(e))
-            continue
-        dea_results = dea_results[pd.notnull(dea_results)]
-        dea_results.sort_values(by=["padj"], ascending=True, inplace=True, axis=0)
-        print("Writing results to output...")
-        dea_results.ix[dea_results["padj"] <= fdr].to_csv(os.path.join(outdir, 
-                                                                       "dea_results_dataset{}_region{}_vs_dataset{}_region{}.tsv"
-                                                                       .format(dataset_a, region_a, dataset_b, region_b)), sep="\t")
+    # Compute size factors
+    size_factors = compute_size_factors(counts, normalization, scran_clusters=False)
+    if all(size_factors) == 0.0 or np.isnan(size_factors).any() \
+    or np.isinf(size_factors).any(): 
+        print("There was an error computing size factors, using the DESeq2 method instead!")
+        size_factors = None
+        
+    # Spots as columns 
+    counts = counts.transpose()
+    
+    # DEA call
+    try:
+        dea_results = dea(counts, conds, comparisons, size_factors)
+    except Exception as e:
+        sys.stderr.write("Error while performing DEA " + str(e) + "\n")
+        sys.exit(1)
+    
+    assert(len(comparisons) == len(dea_results))
+    for dea_result, comp in zip(dea_results, comparisons):
+        # Filter results
+        dea_result = dea_result.loc[pd.notnull(dea_result["padj"])]
+        #dea_result = dea_results[pd.notnull(dea_result)["padj"]]
+        dea_result = dea_result.sort_values(by=["padj"], ascending=True, axis=0)
+        print("Writing DE genes to output using a FDR cut-off of {}".format(fdr))
+        dea_result.to_csv(os.path.join(outdir,
+                                       "dea_results_dataset{}_vs_dataset{}.tsv"
+                                       .format(comp[0], comp[1])), sep="\t")
+        dea_result.ix[dea_result["padj"] <= fdr].to_csv(os.path.join(outdir,
+                                                                     "filtered_dea_results_dataset{}_vs_dataset{}.tsv"
+                                                                     .format(comp[0], comp[1])), sep="\t")
         # Volcano plot
-        print("Generating plots...")
-        # Add colors according to differently expressed or not (needs a p-value parameter)
-        colors = ["red" if p <= fdr else "blue" for p in dea_results["padj"]]
-        fig, a = plt.subplots(figsize=(30, 30))
-        x_points = dea_results["log2FoldChange"]
-        y_points = -np.log10(dea_results["pvalue"])
-        x_points_conf = dea_results.ix[dea_results["padj"] <= fdr]["log2FoldChange"]
-        y_points_conf = -np.log10(dea_results.ix[dea_results["padj"] <= fdr]["pvalue"])
-        names_conf = dea_results.ix[dea_results["padj"] <= fdr].index
-        # Scale axes
-        OFFSET = 0.1
-        a.set_xlim([min(x_points) - OFFSET, max(x_points) + OFFSET])
-        a.set_ylim([min(y_points) - OFFSET, max(y_points) + OFFSET])
-        a.set_xlabel("Log2FoldChange")
-        a.set_ylabel("-log10(pvalue)")
-        a.set_title("Volcano plot", size=10)
-        a.scatter(x_points, y_points, c=colors, edgecolor="none")  
-        for x,y,text in zip(x_points_conf,y_points_conf,names_conf):
-            a.text(x,y,text,size="x-small")
-        fig.savefig(os.path.join(outdir, "volcano_dataset{}_region{}_vs_dataset{}_region{}.pdf"
-                                 .format(dataset_a, region_a, dataset_b, region_b)), dpi=300)
-                
+        print("Writing volcano plot to output")
+        outfile = os.path.join(outdir, "volcano_dataset{}_vs_dataset{}.pdf".format(comp[0], comp[1]))
+        volcano(dea_result, fdr, outfile)  
+        
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--counts-table-files", required=True, nargs='+', type=str,
                         help="One or more matrices with gene counts per feature/spot (genes as columns)")
-    parser.add_argument("--data-classes", required=True, nargs='+', type=str,
-                        help="One or more delimited file/s with the classes mapping to the spots " \
-                        "(Class first column and spot second column)")
     parser.add_argument("--normalization", default="DESeq2", metavar="[STR]", 
                         type=str, 
                         choices=["RAW", "DESeq2", "DESeq2Linear", "DESeq2PseudoCount", 
@@ -224,18 +127,20 @@ if __name__ == '__main__':
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
-    parser.add_argument("--conditions-tuples", required=True, nargs='+', type=str,
-                        help="One of more tuples that represent what classes and datasets will be compared for DEA.\n" \
-                        "The notation is simple, DATASET_NUMBER1:REGION_NUMBER1-DATASET_NUMBER2:REGION_NUMBER2.\n" \
-                        "For example 0:1-1:2 1:1-1:3 0:2-0:1. Note that dataset number starts by 0.")
-    parser.add_argument("--num-exp-genes", default=5, metavar="[INT]", type=int, choices=range(0, 100),
-                        help="The number of expressed genes (!= 0) a spot must have to be kept (default: %(default)s)")
-    parser.add_argument("--num-exp-spots", default=5, metavar="[INT]", type=int, choices=range(0, 100),
-                        help="The number of expressed spots (!= 0) a gene must have to be kept (default: %(default)s)")
+    parser.add_argument("--comparisons", required=True, nargs='+', type=str,
+                        help="One of more tuples that represent what comparisons to make in the DEA.\n" \
+                        "The notation is simple: DATASET_NUMBER-DATASET_NUMBER DATASET_NUMBER:DATASET_NUMBER ...\n" \
+                        "For example 0-1 2-3. Note that dataset number starts by 0 and that the dataset 0\ " \
+                        "will be the 1st in the input and so.")
+    parser.add_argument("--num-exp-genes", default=10, metavar="[INT]", type=int, choices=range(0, 100),
+                        help="The percentage of number of expressed genes (> 1) a spot\n" \
+                        "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
+    parser.add_argument("--num-exp-spots", default=1, metavar="[INT]", type=int, choices=range(0, 100),
+                        help="The percentage of number of expressed spots a gene " \
+                        "must have to be kept from the total number of spots (default: %(default)s)")
     parser.add_argument("--fdr", type=float, default=0.01,
                         help="The FDR minimum confidence threshold (default: %(default)s)")
     parser.add_argument("--outdir", help="Path to output dir")
     args = parser.parse_args()
-    main(args.counts_table_files, args.data_classes, args.conditions_tuples, 
-         args.outdir, args.fdr, args.normalization, args.num_exp_spots,
-         args.num_exp_genes)
+    main(args.counts_table_files, args.comparisons, args.outdir,
+         args.fdr, args.normalization, args.num_exp_spots, args.num_exp_genes)
