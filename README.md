@@ -78,6 +78,8 @@ Note: we advice to update Xcode to the latest version.
     conda install matplotlib
     conda install pandas
     conda install scikit-learn
+    git clone https://github.com/SpatialTranscriptomicsResearch/st_analysis.git
+    cd st_analysis
     python setup.py install
 
 #### Linux
@@ -91,6 +93,8 @@ Note: we advice to install and update the developer tools packages
     conda install matplotlib
     conda install pandas
     conda install scikit-learn
+    git clone https://github.com/SpatialTranscriptomicsResearch/st_analysis.git
+    cd st_analysis
     python setup.py install
 
 A bunch of scripts (described behind) will then be available in your system.
