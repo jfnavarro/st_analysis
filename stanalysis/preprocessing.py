@@ -9,6 +9,44 @@ import math
 import os
 from stanalysis.normalization import *
 
+def merge_datasets(counts_tableA, counts_tableB, merging_action="SUM"):
+    """ This function merges two ST datasts (matrix of counts)
+    assuming that they are consecutive sections and that they
+    are aligned so each spot on the same position on the tissue
+    and the number of spots in the same.
+    The type of merging can be SUM (sum both counts) or AVG (average 
+    sum of both counts).
+    It returns the merged matrix of counts for the commong spots/genes.
+    :param counts_tableA: a ST matrix of counts
+    :param counts_tableB: a ST matrix of counts
+    :param merging_action: Either SUM or AVG (for the merging of counts)
+    :return: a ST matrix of counts with the merged counts (for common genes/spots)
+    """
+    merged_table = counts_tableA.copy()       
+    for indexA, indexB in zip(counts_tableA.index, counts_tableB.index):
+        tokens = indexA.split("x")
+        assert(len(tokens) == 2)
+        x_a = float(tokens[0])
+        y_a = float(tokens[1])
+        tokens = indexB.split("x")
+        assert(len(tokens) == 2)
+        x_b = float(tokens[0])
+        y_b = float(tokens[1]) 
+        if abs(x_a - x_b) > 0.6 or abs(y_a - y_b) > 0.6:
+            print("Spots {} and {} dot not match and will be skipped".format(indexA, indexB))
+            merged_table.drop(indexA, axis=0, inplace=True)
+            continue        
+        for geneA, geneB in zip(counts_tableA.loc[indexA], counts_tableB.loc[indexB]):
+            if geneA != geneB:
+                print("Genes {} and {} dot not match and will be skipped".format(geneA, geneB))
+                merged_table.drop(geneA, axis=1, inplace=True)
+            elif merging_action == "SUM":
+                merged_table.loc[indexA,geneA] += counts_tableB.loc[indexB, geneB]      
+            else:
+                merged_table.loc[indexA,geneA] += counts_tableB.loc[indexB, geneB]
+                merged_table.loc[indexA,geneA] /= 2
+    return merged_table
+
 def aggregate_datatasets(counts_table_files, plot_hist=False):
     """ This functions takes a list of data frames with ST data
     (genes as columns and spots as rows) and merges them into

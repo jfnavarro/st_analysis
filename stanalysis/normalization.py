@@ -94,7 +94,7 @@ def logCountsWithFactors(counts, size_factors):
         function(counts, size_factors){
           sce = newSCESet(countData=counts)
           sce@phenoData$size_factor = size_factors
-          sce = normalize(sce, recompute_cpm=FALSE)
+          sce = normalize(sce)
           norm_counts = sce@assayData$norm_exprs
           return(as.data.frame(norm_counts))
         }

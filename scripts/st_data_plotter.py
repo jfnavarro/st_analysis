@@ -1,9 +1,9 @@
 #! /usr/bin/env python
 """ 
-Script that creates a quality scatter plot from a ST-data file in matrix format
+Script that creates a scatter plot from a ST dataset in matrix format
 (genes as columns and spots as rows)
 
-The output will be a .png file with the same name as the input file if no name if given.
+The output will be an image file with the same name as the input file if no name if given.
 
 It allows to highlight spots with colors using a file with the following format : 
 
@@ -11,8 +11,7 @@ XxY INT
 
 Where INT represents a colour.
 
-When highlighting spots a new file will be created with the highlighted
-spots.
+When highlighting spots a new file will be created with the highlighted spots.
 
 It allows to choose transparency for the data points
 
