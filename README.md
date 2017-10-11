@@ -1,11 +1,11 @@
 # Spatial Transcriptomics Analysis 
 
-Different tools for visualization, data processing and analysis (supervised and un-supervised learning,
+Different tools for visualization, processing and analysis (supervised and un-supervised learning,
 differential expression analysis, etc..) of Spatial Transcriptomics datasets (can also be used for single cell data).
 
 The package is compatible with the output format of the data generated with the
 ST Pipeline (https://github.com/SpatialTranscriptomicsResearch/st_pipeline) and give full
-support to plot the data onto the tissue images but it is compatible with any single cell datasets
+support to plot the data onto the tissue images but it is compatible with any single cell dataset
 where the data is stored as a matrix of counts (genes as columns and spot/cells as rows).
 
 This package makes use of the following R packages:
@@ -49,7 +49,7 @@ Where each a correspondonds to a cell of the affine transformation matrix.
 
 ### Installation
 
-We recommend that you install the latest version 3.4.x. Once you have installed R you can open
+We recommend that you install the latest R version 3.4 Once you have installed R you can open
 a R terminal or Rstudio and type the following:
 
     source("https://bioconductor.org/biocLite.R")
@@ -61,7 +61,7 @@ a R terminal or Rstudio and type the following:
     
 Before you install the ST Analysis package we recommend that you create a Python 3 virtual
 environment. We recommend [Anaconda](https://anaconda.org/anaconda/python).
-The latest versions of rpy2 (R binder for Python) are only compatible with Python 3.
+The latest versions of rpy2 (R binder for Python) is only compatible with Python 3.
 
 #### OSX
 The following instructions are for installing the ST Analysis package with Python 3.4 and Anaconda
@@ -128,9 +128,9 @@ the predicted spots on top of the tissue image (if the image and the alignment m
 The script can take several datasets for the training set and it allows to normalize the training and testing data.
 The test/train classes file shoud look like:
 
-XxY 1
-XxY 1
-XxY 2
+    XxY 1
+    XxY 1
+    XxY 2
 
 Where X is the spot X coordinate and Y is the spot Y coordinate and 1,1 and 2 are
 spot classes (regions).
@@ -156,9 +156,9 @@ You can slice a dataset based on regions of interests (spots) obtained
 manually or with unsupervised.py. You need a file defining classes for each spot
 (unsupervised.py generates such files):
 
-XxY 1
-XxY 1
-XxY 2
+    XxY 1
+    XxY 1
+    XxY 2
 
 Where X is the spot X coordinate and Y is the spot Y coordinate and 1,1 and 2 are
 spot classes (regions).
