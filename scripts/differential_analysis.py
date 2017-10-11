@@ -36,7 +36,7 @@ from stanalysis.visualization import volcano
 from stanalysis.analysis import dea
 import matplotlib.pyplot as plt
     
-def main(counts_table_files, comparisons, outdir, fdr, 
+def main(counts_table_files, conditions, comparisons, outdir, fdr, 
          normalization, num_exp_spots, num_exp_genes):
 
     if len(counts_table_files) == 0 or \
@@ -58,9 +58,20 @@ def main(counts_table_files, comparisons, outdir, fdr,
     # Get the comparisons as tuples
     comparisons = [c.split("-") for c in comparisons]
     
-    # Get the conditions (each dataset will be one condition)
-    conds = [spot.split("_")[0] for spot in counts.index]
-        
+    # Get the conditions 
+    conds_repl = dict()
+    for cond in conditions:
+        d, c = cond.split(":")
+        conds_repl[d] = c
+    conds = list()
+    for spot in counts.index:
+        index = spot.split("_")[0]
+        try:
+            conds.append(conds_repl[index])
+        except KeyError:
+            counts.drop(spot, axis=0, inplace=True)
+            continue
+
     # Check that the comparisons are valid and if not remove the invalid ones
     comparisons = [c for c in comparisons if c[0] in conds and c[1] in conds]
     if len(comparisons) == 0:
@@ -127,11 +138,14 @@ if __name__ == '__main__':
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
+    parser.add_argument("--conditions", required=True, nargs='+', type=str,
+                        help="One of more tuples that represent what conditions to give to each dataset.\n" \
+                        "The notation is simple: DATASET:CONDITION DATASET:CONDITION ...\n" \
+                        "For example 0:A 1:A 2:B 3:C. Note that datasets numbers start by 0.")
     parser.add_argument("--comparisons", required=True, nargs='+', type=str,
                         help="One of more tuples that represent what comparisons to make in the DEA.\n" \
-                        "The notation is simple: DATASET_NUMBER-DATASET_NUMBER DATASET_NUMBER:DATASET_NUMBER ...\n" \
-                        "For example 0-1 2-3. Note that dataset number starts by 0 and that the dataset 0\ " \
-                        "will be the 1st in the input and so.")
+                        "The notation is simple: CONDITION-CONDITION CONDITION-CONDITION ...\n" \
+                        "For example A-B A-C. Note that the conditions must be the same as in the parameter --conditions.")
     parser.add_argument("--num-exp-genes", default=10, metavar="[INT]", type=int, choices=range(0, 100),
                         help="The percentage of number of expressed genes (> 1) a spot\n" \
                         "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
@@ -142,5 +156,5 @@ if __name__ == '__main__':
                         help="The FDR minimum confidence threshold (default: %(default)s)")
     parser.add_argument("--outdir", help="Path to output dir")
     args = parser.parse_args()
-    main(args.counts_table_files, args.comparisons, args.outdir,
+    main(args.counts_table_files, args.conditions, args.comparisons, args.outdir,
          args.fdr, args.normalization, args.num_exp_spots, args.num_exp_genes)

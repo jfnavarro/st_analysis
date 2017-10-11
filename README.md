@@ -61,7 +61,8 @@ a R terminal or Rstudio and type the following:
     
 Before you install the ST Analysis package we recommend that you create a Python 3 virtual
 environment. We recommend [Anaconda](https://anaconda.org/anaconda/python).
-The latest versions of rpy2 (R binder for Python) is only compatible with Python 3.
+The latest versions of rpy2 (R binder for Python) are only compatible with Python 3 and R 3.4 but
+older versions of rpy2 are compatible with Python 2 and older R versions.
 
 #### OSX
 The following instructions are for installing the ST Analysis package with Python 3.4 and Anaconda
