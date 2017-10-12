@@ -174,14 +174,24 @@ A example run would be:
 ### To perform Differential Expression Analysis (DEA)
 You can perform a D.E.A between ST datasets (most likely regions of interests)
 The scripts generates different plots and the list of D.E. genes in a text file for each comparison.
-Basically the script needs one or more matrices of counts with ST data (genes as columns) and a list
-of comparisons to make:
+Basically the script needs one or more matrices of counts with ST data (genes as columns) a list
+of condition labels for each dataset and a list of comparisons to make. 
+The condition labels list should look like:
 
-DATASET0-DATASET2 DATASET1-DATASET3 ...
+DATASET_INDEX:CONDITION DATASET_INDEX:CONDITION
 
-Where 0 refers to the first input dataset. The scripts allows for different normalization methods and
+Where DATASET_INDEX is the number (starting by 0) of the position of the dataset 
+in the input and CONDITION is any string. 
+
+The comparisons list should lool like:
+
+CONDITION-CONDITION CONDITION-CONDITION 
+
+Where CONDITION must be one of the CONDITIONS given in the previous list.
+
+The scripts allows for different normalization methods and
 different D.E.A. algorithms (see --help). An example run would be:
 
-    differential_analysis.py --input-data stdata_region1.tsv stdata_region2.tsv --comparisons 0-1
+    differential_analysis.py --input-data stdata_region1.tsv stdata_region2.tsv --conditions 0:A 1:B --comparisons A-B
     
 To know more about the parameters you can type --help
