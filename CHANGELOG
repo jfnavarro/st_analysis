@@ -37,7 +37,7 @@ Version 0.4.1
 Version 0.4.2
 * Added compatibility with Python 3
 
-Version 0.4.5
+Version 0.4.6
 * Added merge_replicates.py script
 * Added slice_regions_matrix.py script
 * Optimized and improved differential_analysis.py
