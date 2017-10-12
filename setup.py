@@ -47,6 +47,7 @@ setup(
     'Topic :: Software Development',
     'Topic :: Scientific/Engineering :: Bio-Informatics',
     'License :: MIT:: Copyright Jose Fernandez Navarro',
+    'Programming Language :: Python :: 2.7',
     'Programming Language :: Python :: 3.4',
     'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
