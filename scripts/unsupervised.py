@@ -46,6 +46,7 @@ def main(counts_table_files,
          num_clusters,
          num_exp_genes,
          num_exp_spots,
+         min_gene_expression,
          num_genes_keep,
          clustering, 
          dimensionality, 
@@ -94,7 +95,8 @@ def main(counts_table_files,
     counts = aggregate_datatasets(counts_table_files)
 
     # Remove noisy spots and genes (Spots are rows and genes are columns)
-    counts = remove_noise(counts, num_exp_genes / 100.0, num_exp_spots / 100.0, min_expression=2)
+    counts = remove_noise(counts, num_exp_genes / 100.0, num_exp_spots / 100.0, 
+                          min_expression=min_gene_expression)
     
     if num_clusters is None:
         num_clusters = computeNClusters(counts)
@@ -279,19 +281,23 @@ if __name__ == '__main__':
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
-    parser.add_argument("--num-clusters", default=None, metavar="[INT]", type=int, choices=range(2, 10),
+    parser.add_argument("--num-clusters", default=None, metavar="[INT]", type=int, choices=range(2, 16),
                         help="The number of clusters/regions expected to be found.\n" \
                         "If not given the number of clusters will be computed.")
     parser.add_argument("--num-exp-genes", default=10, metavar="[INT]", type=int, choices=range(0, 100),
-                        help="The percentage of number of expressed genes (> 1) a spot\n" \
+                        help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
                         "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
     parser.add_argument("--num-exp-spots", default=1, metavar="[INT]", type=int, choices=range(0, 100),
                         help="The percentage of number of expressed spots a gene " \
                         "must have to be kept from the total number of spots (default: %(default)s)")
+    parser.add_argument("--min-gene-expression", default=1, type=int, choices=range(1, 50),
+                        help="The minimum count (number of reads) a gene must have in a spot to be "
+                        "considered expressed (default: %(default)s)")
     parser.add_argument("--num-genes-keep", default=20, metavar="[INT]", type=int, choices=range(0, 100),
                         help="The percentage of genes to discard from the distribution of all the genes\n" \
                         "across all the spots using the variance or the top expression " \
-                        "(see --top-genes-criteria)\nLow variance or low expressed will be discarded (default: %(default)s)")
+                        "(see --top-genes-criteria)\n " \
+                        "Low variance or low expressed will be discarded (default: %(default)s)")
     parser.add_argument("--clustering", default="KMeans", metavar="[STR]", 
                         type=str, choices=["Hierarchical", "KMeans"],
                         help="What clustering algorithm to use after the dimensionality reduction " \
@@ -329,7 +335,7 @@ if __name__ == '__main__':
     parser.add_argument("--use-adjusted-log", action="store_true", default=False,
                         help="Use adjusted log normalized counts (R Scater::normalized()) "
                         "in the dimensionality reduction step (recommended with SCRAN normalization)")
-    parser.add_argument("--tsne-perplexity", default=30, metavar="[INT]", type=int, choices=[10,500],
+    parser.add_argument("--tsne-perplexity", default=30, metavar="[INT]", type=int, choices=range(5,500),
                         help="The value of the perplexity for the t-sne method. (default: %(default)s)")
     parser.add_argument("--tsne-theta", default=0.5, metavar="[FLOAT]", type=float,
                         help="The value of theta for the t-sne method. (default: %(default)s)")
@@ -341,6 +347,7 @@ if __name__ == '__main__':
          args.num_clusters,
          args.num_exp_genes,
          args.num_exp_spots,
+         args.min_gene_expression,
          args.num_genes_keep,
          args.clustering, 
          args.dimensionality, 
