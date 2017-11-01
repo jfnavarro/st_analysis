@@ -166,7 +166,10 @@ def main(counts_table_files,
         x = float(tokens[0].split("_")[1])
         index = int(tokens[0].split("_")[0])
         file_writers[index].write("{0}\t{1}\n".format("{}x{}".format(x,y), labels[i]))
-        
+    # Close the files
+    for file_writer in file_writers:
+        file_writer.close()
+           
     # Compute a color_label based on the RGB representation of the 3D dimensionality reduced
     labels_colors = list()
     x_max = max(reduced_data[:,0])

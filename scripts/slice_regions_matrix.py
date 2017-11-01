@@ -47,7 +47,11 @@ def main(counts_matrix, class_file, regions):
         for line in filehandler.readlines():
             tokens = line.split()
             assert(len(tokens) == 2)
-            spot_classes[tokens[1]].append(tokens[0])
+            # Assure  spots have two decimals
+            x = round(float(tokens[0].split("x")[0]), 2)
+            y = round(float(tokens[0].split("x")[1]), 2)
+            spot = "{}x{}".format(x,y)
+            spot_classes[tokens[1]].append(spot)
     # Iterate the regions and slice the matrix
     for region, spots in spot_classes.items():
         if region in regions:
