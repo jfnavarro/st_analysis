@@ -143,7 +143,7 @@ def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
             print("Min normalized variance a gene must have over all spots " \
             "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_var))
             counts = counts[counts.var(axis=1) >= min_genes_spot_var]
-    elif criteria == "TopRankded":
+    elif criteria == "TopRanked":
         min_genes_spot_sum = counts.sum(axis=1).quantile(num_genes_keep)
         if math.isnan(min_genes_spot_var):
             print("Computed sum is NaN! Check your normalization factors..")
