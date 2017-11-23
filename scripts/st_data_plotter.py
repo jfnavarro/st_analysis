@@ -31,6 +31,7 @@ import re
 from matplotlib import pyplot as plt
 from stanalysis.visualization import scatter_plot
 from stanalysis.preprocessing import *
+from stanalysis.alignment import parseAlignmentMatrix
 import pandas as pd
 import numpy as np
 import os
@@ -96,7 +97,10 @@ def main(input_data,
     if len(colors) == 0:
         sys.stderr.write("Error, the gene/s given are not expressed in this dataset\n")
         sys.exit(1)   
-                
+     
+    # alignment_matrix will be identity if alignment file is None
+    alignment_matrix = parseAlignmentMatrix(alignment)
+                  
     # If highlight barcodes is given then
     # parse the spots and their color and plot
     # them on top of the image if given
@@ -117,7 +121,7 @@ def main(input_data,
                      y_points=y_points_highlight,
                      colors=colors_highlight,
                      output="{}_{}".format("highlight",outfile),
-                     alignment=alignment,
+                     alignment=alignment_matrix,
                      cmap=None,
                      title=title,
                      xlabel='X',
@@ -134,7 +138,7 @@ def main(input_data,
                  y_points=y_points,
                  colors=colors,
                  output=outfile,
-                 alignment=alignment,
+                 alignment=alignment_matrix,
                  cmap=plt.get_cmap("YlOrBr"),
                  title=title,
                  xlabel='X',

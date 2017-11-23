@@ -104,7 +104,7 @@ def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=
     num_genes = len(counts.columns)
     min_genes_spot_exp = round((counts != 0).sum(axis=1).quantile(num_exp_genes))
     print("Number of expressed genes a spot must have to be kept " \
-    "({}% of total expressed genes) {}".format(num_exp_genes,min_genes_spot_exp))
+    "({}% of total expressed genes) {}".format(num_exp_genes, min_genes_spot_exp))
     counts = counts[(counts != 0).sum(axis=1) >= min_genes_spot_exp]
     print("Dropped {} spots".format(num_spots - len(counts.index)))
           
