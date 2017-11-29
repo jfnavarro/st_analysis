@@ -182,13 +182,13 @@ def compute_size_factors(counts, normalization, scran_clusters=True):
         raise RunTimeError("Error, incorrect normalization method\n")
     if np.isnan(size_factors).any() or np.isinf(size_factors).any():
         print("Warning: Computed size factors contained NaN or Inf."
-              "\nThey will be replaced by epsilon!")
-        size_factors[np.isnan(size_factors)] = np.finfo(np.float32).eps
-        size_factors[np.isinf(size_factors)] = np.finfo(np.float32).eps  
+              "\nThey will be replaced by 1.0!")
+        size_factors[np.isnan(size_factors)] = 1.0
+        size_factors[np.isinf(size_factors)] = 1.0
     if np.any(size_factors <= 0.0):
         print("Warning: Computed size factors contained zeroes or negative values."
-              "\nThey will be replaced by epsilon!")
-        size_factors[size_factors <= 0.0] = np.finfo(np.float32).eps      
+              "\nThey will be replaced by 1.0!")
+        size_factors[size_factors <= 0.0] = 1.0     
     return size_factors
 
 def normalize_data(counts, normalization, center=False, adjusted_log=False):

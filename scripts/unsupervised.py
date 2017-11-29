@@ -56,7 +56,8 @@ def main(counts_table_files,
          outdir,
          use_adjusted_log,
          tsne_perplexity,
-         tsne_theta):
+         tsne_theta,
+         color_space_plots):
 
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
@@ -138,7 +139,7 @@ def main(counts_table_files,
      
     if not "tSNE" in dimensionality:
         # Perform dimensionality reduction, outputs a bunch of 2D/3D coordinates
-        labels = decomp_model.fit_transform(norm_counts)
+        reduced_data = decomp_model.fit_transform(norm_counts)
     
     print("Performing clustering...")
     # Do clustering of the dimensionality reduced coordinates
@@ -186,12 +187,13 @@ def main(counts_table_files,
         labels_colors.append((r,g,b))
 
     # Write the spots and their classes to a file
-    file_writers = [open(os.path.join(outdir,"computed_classes_{}.txt".format(i)),"w") 
-                    for i in range(len(counts_table_files))]
+    file_writers = [open(os.path.join(outdir,
+                                      "{}_clusters.tsv".format(os.path.splitext(name)[0])),"w")
+                    for name in counts_table_files]
     # Write the coordinates and the label/class that they belong to
     spot_plot_data = defaultdict(lambda: [[],[],[],[]])
-    for i,bc in enumerate(norm_counts.index):
-        tokens = bc.split("x")
+    for i, spot in enumerate(norm_counts.index):
+        tokens = spot.split("x")
         assert(len(tokens) == 2)
         y = float(tokens[1])
         x = float(tokens[0].split("_")[1])
@@ -213,7 +215,7 @@ def main(counts_table_files,
                        y_points=reduced_data[:,1],
                        z_points=reduced_data[:,2],
                        colors=labels, 
-                       output=os.path.join(outdir,"computed_classes.pdf"), 
+                       output=os.path.join(outdir,"computed_clusters.pdf"), 
                        title='Computed classes', 
                        alpha=1.0, 
                        size=20)
@@ -221,14 +223,14 @@ def main(counts_table_files,
         scatter_plot(x_points=reduced_data[:,0], 
                      y_points=reduced_data[:,1],
                      colors=labels, 
-                     output=os.path.join(outdir,"computed_classes.pdf"), 
+                     output=os.path.join(outdir,"computed_clusters.pdf"), 
                      title='Computed classes', 
                      alpha=1.0, 
                      size=20)          
     
     # Plot the spots with colors corresponding to the predicted class
     # Use the HE image as background if the image is given
-    for i in range(len(counts_table_files)):
+    for i, name in enumerate(counts_table_files):
         # Get the list of spot coordinates and colors to plot for each dataset
         x_points = spot_plot_data[i][0]
         y_points = spot_plot_data[i][1]
@@ -248,7 +250,7 @@ def main(counts_table_files,
         scatter_plot(x_points=x_points, 
                      y_points=y_points,
                      colors=colors_classes,
-                     output=os.path.join(outdir,"computed_classes_tissue_{}.pdf".format(i)), 
+                     output=os.path.join(outdir,"{}_clusters.pdf".format(os.path.splitext(name)[0])), 
                      alignment=alignment_matrix, 
                      cmap=None, 
                      title='Computed classes tissue', 
@@ -257,18 +259,19 @@ def main(counts_table_files,
                      image=image, 
                      alpha=1.0, 
                      size=spot_size)
-        scatter_plot(x_points=x_points, 
-                     y_points=y_points,
-                     colors=colors_dimensionality, 
-                     output=os.path.join(outdir,"dimensionality_color_tissue_{}.pdf".format(i)), 
-                     alignment=alignment_matrix, 
-                     cmap=plt.get_cmap("hsv"), 
-                     title='Dimensionality color tissue', 
-                     xlabel='X', 
-                     ylabel='Y',
-                     image=image, 
-                     alpha=1.0, 
-                     size=spot_size)        
+        if color_space_plots:
+            scatter_plot(x_points=x_points, 
+                         y_points=y_points,
+                         colors=colors_dimensionality, 
+                         output=os.path.join(outdir,"{}_color_space.pdf".format(os.path.splitext(name)[0])), 
+                         alignment=alignment_matrix, 
+                         cmap=plt.get_cmap("hsv"), 
+                         title='Dimensionality color tissue', 
+                         xlabel='X', 
+                         ylabel='Y',
+                         image=image, 
+                         alpha=1.0, 
+                         size=spot_size)        
                                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
@@ -300,7 +303,7 @@ if __name__ == '__main__':
     parser.add_argument("--num-exp-spots", default=1, metavar="[INT]", type=int, choices=range(0, 100),
                         help="The percentage of number of expressed spots a gene " \
                         "must have to be kept from the total number of spots (default: %(default)s)")
-    parser.add_argument("--min-gene-expression", default=1, type=int, choices=range(1, 50),
+    parser.add_argument("--min-gene-expression", default=1, type=int, metavar="[INT]", choices=range(1, 50),
                         help="The minimum count (number of reads) a gene must have in a spot to be "
                         "considered expressed (default: %(default)s)")
     parser.add_argument("--num-genes-keep", default=20, metavar="[INT]", type=int, choices=range(0, 100),
@@ -345,7 +348,9 @@ if __name__ == '__main__':
     parser.add_argument("--tsne-theta", default=0.5, metavar="[FLOAT]", type=float,
                         help="The value of theta for the t-sne method. (default: %(default)s)")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
-    
+    parser.add_argument("--color-space-plots", action="store_true", default=False,
+                        help="Generate also plots using the representation in color space of the " \
+                        "dimensionality reduced coordinates")   
     args = parser.parse_args()
     main(args.counts_table_files, 
          args.normalization, 
@@ -365,5 +370,6 @@ if __name__ == '__main__':
          args.outdir,
          args.use_adjusted_log,
          args.tsne_perplexity,
-         args.tsne_theta)
+         args.tsne_theta,
+         args.color_space_plots)
 
