@@ -1,8 +1,9 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-A script that does unsupervised Spatial Transcriptomics datasets (matrix of counts)
-It takes a list of datasets as input and outputs :
+A script that does unsupervised learning on 
+Spatial Transcriptomics datasets (matrix of counts)
+It takes a list of datasets as input and outputs (for each given input):
 
  - a scatter plot with the predicted classes (coulored) for each spot 
  - the spots plotted onto the images (if given) with the predicted class/color
@@ -10,10 +11,6 @@ It takes a list of datasets as input and outputs :
 
 The input data frames must have the gene names as columns and
 the spots coordinates as rows (1x1).
-
-The spots in the output file will have the index of the dataset
-appended. For instance if two datasets are given the indexes will
-be (1 and 2). 
 
 The user can select what clustering algorithm to use
 and what dimensionality reduction technique to use and normalization
@@ -31,14 +28,14 @@ import numpy as np
 import pandas as pd
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA, FastICA, SparsePCA
-#from sklearn.cluster import DBSCAN
+from sklearn.cluster import DBSCAN
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
-#from sklearn.preprocessing import scale
 from stanalysis.visualization import scatter_plot, scatter_plot3d, histogram
 from stanalysis.preprocessing import *
 from stanalysis.alignment import parseAlignmentMatrix
 from stanalysis.analysis import Rtsne, linear_conv, computeNClusters
+from collections import defaultdict
 import matplotlib.pyplot as plt
   
 def main(counts_table_files, 
@@ -46,6 +43,7 @@ def main(counts_table_files,
          num_clusters,
          num_exp_genes,
          num_exp_spots,
+         min_gene_expression,
          num_genes_keep,
          clustering, 
          dimensionality, 
@@ -58,7 +56,8 @@ def main(counts_table_files,
          outdir,
          use_adjusted_log,
          tsne_perplexity,
-         tsne_theta):
+         tsne_theta,
+         color_space_plots):
 
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
@@ -89,16 +88,18 @@ def main(counts_table_files,
     if outdir is None or not os.path.isdir(outdir): 
         outdir = os.getcwd()
     outdir = os.path.abspath(outdir)
-                
+
+    print("Output directory {}".format(outdir))
+    print("Input datasets {}".format(" ".join(counts_table_files))) 
+         
     # Merge input datasets (Spots are rows and genes are columns)
     counts = aggregate_datatasets(counts_table_files)
-
-    # Remove noisy spots and genes (Spots are rows and genes are columns)
-    counts = remove_noise(counts, num_exp_genes / 100.0, num_exp_spots / 100.0, min_expression=2)
+    print("Total number of spots {}".format(len(counts.index)))
+    print("Total number of genes {}".format(len(counts.columns)))
     
-    if num_clusters is None:
-        num_clusters = computeNClusters(counts)
-        print("Computation of number of clusters obtained {} clusters...".format(num_clusters))
+    # Remove noisy spots and genes (Spots are rows and genes are columns)
+    counts = remove_noise(counts, num_exp_genes / 100.0, num_exp_spots / 100.0, 
+                          min_expression=min_gene_expression)
 
     # Normalize data
     print("Computing per spot normalization...")
@@ -109,6 +110,11 @@ def main(counts_table_files,
     # Keep top genes (variance or expressed)
     norm_counts = keep_top_genes(norm_counts, num_genes_keep / 100.0, criteria=top_genes_criteria)
        
+    # Compute the expected number of clusters
+    if num_clusters is None:
+        num_clusters = computeNClusters(counts)
+        print("Computation of number of clusters obtained {} clusters".format(num_clusters))
+        
     if use_log_scale:
         print("Using pseudo-log counts log2(counts + 1)")
         norm_counts = np.log2(norm_counts + 1)  
@@ -116,7 +122,7 @@ def main(counts_table_files,
     print("Performing dimensionality reduction...") 
            
     if "tSNE" in dimensionality:
-        #NOTE the Scipy tsne seems buggy so we use the R one instead
+        # NOTE the Scipy tsne seems buggy so we use the R one instead
         reduced_data = Rtsne(norm_counts, num_dimensions, theta=tsne_theta, perplexity=tsne_perplexity)
     elif "PCA" in dimensionality:
         # n_components = None, number of mle to estimate optimal
@@ -135,37 +141,33 @@ def main(counts_table_files,
         # Perform dimensionality reduction, outputs a bunch of 2D/3D coordinates
         reduced_data = decomp_model.fit_transform(norm_counts)
     
+    print("Performing clustering...")
     # Do clustering of the dimensionality reduced coordinates
     if "KMeans" in clustering:
-        clustering_object = KMeans(init='k-means++', n_clusters=num_clusters, n_init=10)    
+        labels = KMeans(init='k-means++',
+                        n_clusters=num_clusters,
+                        n_init=10).fit_predict(reduced_data)
     elif "Hierarchical" in clustering:
-        clustering_object = AgglomerativeClustering(n_clusters=num_clusters, 
-                                                    affinity='euclidean',
-                                                    n_components=None, linkage='ward') 
+        labels = AgglomerativeClustering(n_clusters=num_clusters,
+                                         affinity='euclidean',
+                                         linkage='ward').fit_predict(reduced_data)
+    elif "DBSCAN" in clustering:
+        labels = DBSCAN(eps=0.5, min_samples=5, 
+                        metric='euclidean', n_jobs=-1).fit_predict(reduced_data)
     else:
         sys.stderr.write("Error, incorrect clustering method\n")
         sys.exit(1)
-
-    print("Performing clustering...")
-    # Obtain predicted classes for each spot
-    labels = clustering_object.fit_predict(reduced_data)
-    if 0 in labels: labels = labels + 1
-    # Check the number of predicted labels is correct
-    assert(len(labels) == len(norm_counts.index))
-    
-    # Write the spots and their classes to a file
-    file_writers = [open(os.path.join(outdir,"computed_classes_{}.txt".format(i)),"w") 
-                    for i in range(len(counts_table_files))]
-    # Write the coordinates and the label/class that they belong to
-    for i,bc in enumerate(norm_counts.index):
-        tokens = bc.split("x")
-        assert(len(tokens) == 2)
-        y = float(tokens[1])
-        x = float(tokens[0].split("_")[1])
-        index = int(tokens[0].split("_")[0])
-        file_writers[index].write("{0}\t{1}\n".format("{}x{}".format(x,y), labels[i]))
         
-    # Compute a color_label based on the RGB representation of the 3D dimensionality reduced
+    # Check if there are -1 in the labels and that the number of labels is correct
+    if -1 in labels or len(labels) != len(norm_counts.index):
+        sys.stderr.write("Error, something went wrong in the clustering..\n")
+        sys.exit(1)
+        
+    # We do not want zeroes in the labels
+    if 0 in labels: labels = labels + 1
+
+    # Compute a color_label based on the RGB representation of the 
+    # 2D/3D dimensionality reduced coordinates
     labels_colors = list()
     x_max = max(reduced_data[:,0])
     x_min = min(reduced_data[:,0])
@@ -184,6 +186,27 @@ def main(counts_table_files,
         b = linear_conv(z, z_min, z_max, 0.0, 1.0) if num_dimensions == 3 else 1.0
         labels_colors.append((r,g,b))
 
+    # Write the spots and their classes to a file
+    file_writers = [open(os.path.join(outdir,
+                                      "{}_clusters.tsv".format(os.path.splitext(name)[0])),"w")
+                    for name in counts_table_files]
+    # Write the coordinates and the label/class that they belong to
+    spot_plot_data = defaultdict(lambda: [[],[],[],[]])
+    for i, spot in enumerate(norm_counts.index):
+        tokens = spot.split("x")
+        assert(len(tokens) == 2)
+        y = float(tokens[1])
+        x = float(tokens[0].split("_")[1])
+        index = int(tokens[0].split("_")[0])
+        spot_plot_data[index][0].append(x)
+        spot_plot_data[index][1].append(y)
+        spot_plot_data[index][2].append(labels[i])
+        spot_plot_data[index][3].append(labels_colors[i])
+        file_writers[index].write("{0}\t{1}\n".format("{}x{}".format(x,y), labels[i]))
+    # Close the files
+    for file_writer in file_writers:
+        file_writer.close()
+        
     print("Generating plots...")
      
     # Plot the clustered spots with the class color
@@ -192,7 +215,7 @@ def main(counts_table_files,
                        y_points=reduced_data[:,1],
                        z_points=reduced_data[:,2],
                        colors=labels, 
-                       output=os.path.join(outdir,"computed_classes.pdf"), 
+                       output=os.path.join(outdir,"computed_clusters.pdf"), 
                        title='Computed classes', 
                        alpha=1.0, 
                        size=20)
@@ -200,32 +223,20 @@ def main(counts_table_files,
         scatter_plot(x_points=reduced_data[:,0], 
                      y_points=reduced_data[:,1],
                      colors=labels, 
-                     output=os.path.join(outdir,"computed_classes.pdf"), 
+                     output=os.path.join(outdir,"computed_clusters.pdf"), 
                      title='Computed classes', 
                      alpha=1.0, 
                      size=20)          
     
     # Plot the spots with colors corresponding to the predicted class
     # Use the HE image as background if the image is given
-    tot_spots = norm_counts.index
-    for i in range(len(counts_table_files)):
+    for i, name in enumerate(counts_table_files):
         # Get the list of spot coordinates and colors to plot for each dataset
-        x_points = list()
-        y_points = list()
-        colors_classes = list()
-        colors_dimensionality = list()
-        for j,spot in enumerate(tot_spots):
-            if spot.startswith("{}_".format(i)):
-                # spot is i_XxY
-                tokens = spot.split("x")
-                assert(len(tokens) == 2)
-                y = float(tokens[1])
-                x = float(tokens[0].split("_")[1])
-                x_points.append(x)
-                y_points.append(y)
-                colors_classes.append(labels[j])
-                colors_dimensionality.append(labels_colors[j])
-               
+        x_points = spot_plot_data[i][0]
+        y_points = spot_plot_data[i][1]
+        colors_classes = spot_plot_data[i][2]
+        colors_dimensionality = spot_plot_data[i][3]
+
         # Retrieve alignment matrix and image if any
         image = image_files[i] if image_files is not None \
         and len(image_files) >= i else None
@@ -233,11 +244,13 @@ def main(counts_table_files,
         and len(alignment_files) >= i else None
         
         # alignment_matrix will be identity if alignment file is None
-        alignment_matrix = parseAlignmentMatrix(alignment)            
+        alignment_matrix = parseAlignmentMatrix(alignment)
+        
+        # Actually plot the data         
         scatter_plot(x_points=x_points, 
                      y_points=y_points,
                      colors=colors_classes,
-                     output=os.path.join(outdir,"computed_classes_tissue_{}.pdf".format(i)), 
+                     output=os.path.join(outdir,"{}_clusters.pdf".format(os.path.splitext(name)[0])), 
                      alignment=alignment_matrix, 
                      cmap=None, 
                      title='Computed classes tissue', 
@@ -246,18 +259,19 @@ def main(counts_table_files,
                      image=image, 
                      alpha=1.0, 
                      size=spot_size)
-        scatter_plot(x_points=x_points, 
-                     y_points=y_points,
-                     colors=colors_dimensionality, 
-                     output=os.path.join(outdir,"dimensionality_color_tissue_{}.pdf".format(i)), 
-                     alignment=alignment_matrix, 
-                     cmap=plt.get_cmap("hsv"), 
-                     title='Dimensionality color tissue', 
-                     xlabel='X', 
-                     ylabel='Y',
-                     image=image, 
-                     alpha=1.0, 
-                     size=spot_size)        
+        if color_space_plots:
+            scatter_plot(x_points=x_points, 
+                         y_points=y_points,
+                         colors=colors_dimensionality, 
+                         output=os.path.join(outdir,"{}_color_space.pdf".format(os.path.splitext(name)[0])), 
+                         alignment=alignment_matrix, 
+                         cmap=plt.get_cmap("hsv"), 
+                         title='Dimensionality color tissue', 
+                         xlabel='X', 
+                         ylabel='Y',
+                         image=image, 
+                         alpha=1.0, 
+                         size=spot_size)        
                                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
@@ -279,23 +293,28 @@ if __name__ == '__main__':
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
-    parser.add_argument("--num-clusters", default=None, metavar="[INT]", type=int, choices=range(2, 10),
+    parser.add_argument("--num-clusters", default=None, metavar="[INT]", type=int, choices=range(2, 16),
                         help="The number of clusters/regions expected to be found.\n" \
-                        "If not given the number of clusters will be computed.")
-    parser.add_argument("--num-exp-genes", default=10, metavar="[INT]", type=int, choices=range(0, 100),
-                        help="The percentage of number of expressed genes (> 1) a spot\n" \
+                        "If not given the number of clusters will be computed.\n" \
+                        "Note that this parameter has no effect with DBSCAN clustering.")
+    parser.add_argument("--num-exp-genes", default=1, metavar="[INT]", type=int, choices=range(0, 100),
+                        help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
                         "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
     parser.add_argument("--num-exp-spots", default=1, metavar="[INT]", type=int, choices=range(0, 100),
                         help="The percentage of number of expressed spots a gene " \
                         "must have to be kept from the total number of spots (default: %(default)s)")
+    parser.add_argument("--min-gene-expression", default=1, type=int, metavar="[INT]", choices=range(1, 50),
+                        help="The minimum count (number of reads) a gene must have in a spot to be "
+                        "considered expressed (default: %(default)s)")
     parser.add_argument("--num-genes-keep", default=20, metavar="[INT]", type=int, choices=range(0, 100),
                         help="The percentage of genes to discard from the distribution of all the genes\n" \
-                        "across all the spots using the variance or the top expression " \
-                        "(see --top-genes-criteria)\nLow variance or low expressed will be discarded (default: %(default)s)")
+                        "across all the spots using the variance or the top highest expressed " \
+                        "(see --top-genes-criteria)\n " \
+                        "Low variance or low expressed will be discarded (default: %(default)s)")
     parser.add_argument("--clustering", default="KMeans", metavar="[STR]", 
-                        type=str, choices=["Hierarchical", "KMeans"],
+                        type=str, choices=["Hierarchical", "KMeans", "DBSCAN"],
                         help="What clustering algorithm to use after the dimensionality reduction " \
-                        "(Hierarchical - KMeans) (default: %(default)s)")
+                        "(Hierarchical - KMeans - DBSCAN) (default: %(default)s)")
     parser.add_argument("--dimensionality", default="ICA", metavar="[STR]", 
                         type=str, choices=["tSNE", "PCA", "ICA", "SPCA"],
                         help="What dimensionality reduction algorithm to use " \
@@ -307,11 +326,6 @@ if __name__ == '__main__':
                         "\t a11 a12 a13 a21 a22 a23 a31 a32 a33\n" \
                         "Only useful is the image has extra borders, for instance not cropped to the array corners\n" \
                         "or if you want the keep the original image size in the plots.")
-    parser.add_argument("--coordinate-files", default=None, nargs='+', type=str,
-                        help="One or more tab delimited files containing spot coordinates as\n" \
-                        "\t spot_x  spot_y  new_spot_x  new_spot_y  pixel_x  pixel-y \n" \
-                        "If provided the spot coordinates of each dataset will be updated and only the spots"
-                        "present in the file will be kept.")
     parser.add_argument("--image-files", default=None, nargs='+', type=str,
                         help="When provided the data will plotted on top of the image\n" \
                         "It can be one ore more, ideally one for each input dataset\n " \
@@ -323,24 +337,27 @@ if __name__ == '__main__':
     parser.add_argument("--spot-size", default=20, metavar="[INT]", type=int, choices=range(1, 100),
                         help="The size of the spots when generating the plots. (default: %(default)s)")
     parser.add_argument("--top-genes-criteria", default="Variance", metavar="[STR]", 
-                        type=str, choices=["Variance", "TopRankded"],
+                        type=str, choices=["Variance", "TopRanked"],
                         help="What criteria to use to keep top genes before doing " \
                         "the dimensionality reduction (Variance or TopRanked) (default: %(default)s)")
     parser.add_argument("--use-adjusted-log", action="store_true", default=False,
                         help="Use adjusted log normalized counts (R Scater::normalized()) "
                         "in the dimensionality reduction step (recommended with SCRAN normalization)")
-    parser.add_argument("--tsne-perplexity", default=30, metavar="[INT]", type=int, choices=[10,500],
+    parser.add_argument("--tsne-perplexity", default=30, metavar="[INT]", type=int, choices=range(5,500),
                         help="The value of the perplexity for the t-sne method. (default: %(default)s)")
     parser.add_argument("--tsne-theta", default=0.5, metavar="[FLOAT]", type=float,
                         help="The value of theta for the t-sne method. (default: %(default)s)")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
-    
+    parser.add_argument("--color-space-plots", action="store_true", default=False,
+                        help="Generate also plots using the representation in color space of the " \
+                        "dimensionality reduced coordinates")   
     args = parser.parse_args()
     main(args.counts_table_files, 
          args.normalization, 
          args.num_clusters,
          args.num_exp_genes,
          args.num_exp_spots,
+         args.min_gene_expression,
          args.num_genes_keep,
          args.clustering, 
          args.dimensionality, 
@@ -353,5 +370,6 @@ if __name__ == '__main__':
          args.outdir,
          args.use_adjusted_log,
          args.tsne_perplexity,
-         args.tsne_theta)
+         args.tsne_theta,
+         args.color_space_plots)
 

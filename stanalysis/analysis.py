@@ -4,6 +4,7 @@ analysis of ST datasets
 from stanalysis.normalization import RimportLibrary
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib import colors as mpcolors
+from collections import Counter
 import rpy2.robjects.packages as rpackages
 import rpy2.robjects as robjects
 from rpy2.robjects import pandas2ri, r, numpy2ri, globalenv
@@ -22,10 +23,12 @@ def computeNClusters(counts, min_size=20):
     pandas2ri.deactivate()
     return n_clust
 
-def dea(counts, conds, comparisons, size_factors=None):
+def deaDESeq2(counts, conds, comparisons, size_factors=None):
     """Makes a call to DESeq2 to
     perform D.E.A. in the given
-    counts matrix with the given conditions and comparisons
+    counts matrix with the given conditions and comparisons.
+    Can be given size factors. 
+    Returns a list of DESeq2 results for each comparison
     """
     results = list()
     try:
@@ -44,6 +47,53 @@ def dea(counts, conds, comparisons, size_factors=None):
             dds = assign_sf(object=dds, value=robjects.FloatVector(size_factors))
             dds = r.estimateDispersions(dds)
             dds = r.nbinomWaldTest(dds)
+        # Perform the comparisons and store results in list
+        for A,B in comparisons:
+            result = r.results(dds, contrast=r.c("conditions", A, B))
+            result = pandas2ri.ri2py_dataframe(r['as.data.frame'](result))
+            results.append(result)
+        pandas2ri.deactivate()
+    except Exception as e:
+        raise e
+    return results
+
+def deaScranDESeq2(counts, conds, comparisons, scran_clusters=False):
+    """Makes a call to DESeq2 with SCRAN to
+    perform D.E.A. in the given
+    counts matrix with the given conditions and comparisons.
+    Returns a list of DESeq2 results for each comparison
+    """
+    results = list()
+    n_cells = len(counts.columns)
+    try:
+        pandas2ri.activate()
+        deseq2 = RimportLibrary("DESeq2")
+        scran = RimportLibrary("scran")
+        as_matrix = r["as.matrix"]
+        # Create the R conditions and counts data
+        r_counts = pandas2ri.py2ri(counts)
+        cond = robjects.StrVector(conds)
+        sce = r.newSCESet(countData=r_counts)
+        if scran_clusters:
+            r_clusters = scran.quickCluster(as_matrix(r_counts), max(n_cells/10, 10))
+            min_cluster_size = min(Counter(r_clusters).values())
+            sizes = list(set([round((min_cluster_size/2) / i) for i in [5,4,3,2,1]]))
+            sce = scran.computeSumFactors(sce, clusters=r_clusters, sizes=sizes, positive=True)
+        else:
+            sizes = list(set([round((n_cells/2) * i) for i in [0.1,0.2,0.3,0.4,0.5]]))
+            sce = scran.computeSumFactors(sce, sizes=sizes, positive=True)   
+        sce = r.normalize(sce)
+        dds = r.convertTo(sce, type="DESeq2")
+        r_call = """
+            function(dds, conditions){
+                colData(dds)$conditions = as.factor(conditions)
+                design(dds) = formula(~ conditions)
+                return(dds)
+            }
+        """
+        r_func = r(r_call)
+        dds = r_func(dds, cond)
+        dds = r.DESeq(dds)
         # Perform the comparisons and store results in list
         for A,B in comparisons:
             result = r.results(dds, contrast=r.c("conditions", A, B))

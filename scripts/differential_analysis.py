@@ -33,11 +33,11 @@ import pandas as pd
 from stanalysis.normalization import RimportLibrary
 from stanalysis.preprocessing import compute_size_factors, aggregate_datatasets, remove_noise
 from stanalysis.visualization import volcano
-from stanalysis.analysis import dea
+from stanalysis.analysis import deaDESeq2, deaScranDESeq2
 import matplotlib.pyplot as plt
     
 def main(counts_table_files, conditions, comparisons, outdir, fdr, 
-         normalization, num_exp_spots, num_exp_genes):
+         normalization, num_exp_spots, num_exp_genes, min_gene_expression):
 
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
@@ -53,7 +53,8 @@ def main(counts_table_files, conditions, comparisons, outdir, fdr,
     counts = aggregate_datatasets(counts_table_files)
     
     # Remove noisy spots and genes (Spots are rows and genes are columns)
-    counts = remove_noise(counts, num_exp_genes / 100.0, num_exp_spots / 100.0, min_expression=2)
+    counts = remove_noise(counts, num_exp_genes / 100.0, num_exp_spots / 100.0, 
+                          min_expression=min_gene_expression)
         
     # Get the comparisons as tuples
     comparisons = [c.split("-") for c in comparisons]
@@ -81,21 +82,16 @@ def main(counts_table_files, conditions, comparisons, outdir, fdr,
     # Make the DEA call
     print("Doing DEA for the comparisons {} with {} spots and {} genes".format(comparisons,
                                                                               len(counts.index), 
-                                                                              len(counts.columns)))
-
-    # Compute size factors
-    size_factors = compute_size_factors(counts, normalization, scran_clusters=False)
-    if all(size_factors) == 0.0 or np.isnan(size_factors).any() \
-    or np.isinf(size_factors).any(): 
-        print("There was an error computing size factors, using the DESeq2 method instead!")
-        size_factors = None
-        
+                                                                              len(counts.columns)))   
     # Spots as columns 
     counts = counts.transpose()
     
     # DEA call
     try:
-        dea_results = dea(counts, conds, comparisons, size_factors)
+        if normalization in "DESeq2":
+            dea_results = deaDESeq2(counts, conds, comparisons, size_factors=None)
+        else:
+            dea_results = deaScranDESeq2(counts, conds, comparisons, scran_clusters=True)
     except Exception as e:
         sys.stderr.write("Error while performing DEA " + str(e) + "\n")
         sys.exit(1)
@@ -104,18 +100,17 @@ def main(counts_table_files, conditions, comparisons, outdir, fdr,
     for dea_result, comp in zip(dea_results, comparisons):
         # Filter results
         dea_result = dea_result.loc[pd.notnull(dea_result["padj"])]
-        #dea_result = dea_results[pd.notnull(dea_result)["padj"]]
         dea_result = dea_result.sort_values(by=["padj"], ascending=True, axis=0)
         print("Writing DE genes to output using a FDR cut-off of {}".format(fdr))
         dea_result.to_csv(os.path.join(outdir,
-                                       "dea_results_dataset{}_vs_dataset{}.tsv"
+                                       "dea_results_{}_vs_{}.tsv"
                                        .format(comp[0], comp[1])), sep="\t")
         dea_result.ix[dea_result["padj"] <= fdr].to_csv(os.path.join(outdir,
-                                                                     "filtered_dea_results_dataset{}_vs_dataset{}.tsv"
+                                                                     "filtered_dea_results_{}_vs_{}.tsv"
                                                                      .format(comp[0], comp[1])), sep="\t")
         # Volcano plot
         print("Writing volcano plot to output")
-        outfile = os.path.join(outdir, "volcano_dataset{}_vs_dataset{}.pdf".format(comp[0], comp[1]))
+        outfile = os.path.join(outdir, "volcano_{}_vs_{}.pdf".format(comp[0], comp[1]))
         volcano(dea_result, fdr, outfile)  
         
 if __name__ == '__main__':
@@ -125,18 +120,10 @@ if __name__ == '__main__':
                         help="One or more matrices with gene counts per feature/spot (genes as columns)")
     parser.add_argument("--normalization", default="DESeq2", metavar="[STR]", 
                         type=str, 
-                        choices=["RAW", "DESeq2", "DESeq2Linear", "DESeq2PseudoCount", 
-                                 "DESeq2SizeAdjusted", "REL", "TMM", "RLE", "Scran"],
+                        choices=["DESeq2", "Scran"],
                         help="Normalize the counts using:\n" \
-                        "RAW = absolute counts\n" \
                         "DESeq2 = DESeq2::estimateSizeFactors(counts)\n" \
-                        "DESeq2PseudoCount = DESeq2::estimateSizeFactors(counts + 1)\n" \
-                        "DESeq2Linear = DESeq2::estimateSizeFactors(counts, linear=TRUE)\n" \
-                        "DESeq2SizeAdjusted = DESeq2::estimateSizeFactors(counts + lib_size_factors)\n" \
-                        "RLE = EdgeR RLE * lib_size\n" \
-                        "TMM = EdgeR TMM * lib_size\n" \
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
-                        "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
     parser.add_argument("--conditions", required=True, nargs='+', type=str,
                         help="One of more tuples that represent what conditions to give to each dataset.\n" \
@@ -147,14 +134,18 @@ if __name__ == '__main__':
                         "The notation is simple: CONDITION-CONDITION CONDITION-CONDITION ...\n" \
                         "For example A-B A-C. Note that the conditions must be the same as in the parameter --conditions.")
     parser.add_argument("--num-exp-genes", default=10, metavar="[INT]", type=int, choices=range(0, 100),
-                        help="The percentage of number of expressed genes (> 1) a spot\n" \
+                        help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
                         "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
     parser.add_argument("--num-exp-spots", default=1, metavar="[INT]", type=int, choices=range(0, 100),
                         help="The percentage of number of expressed spots a gene " \
                         "must have to be kept from the total number of spots (default: %(default)s)")
+    parser.add_argument("--min-gene-expression", default=1, type=int, choices=range(1, 50),
+                        help="The minimum count (number of reads) a gene must have in a spot to be "
+                        "considered expressed (default: %(default)s)")
     parser.add_argument("--fdr", type=float, default=0.01,
                         help="The FDR minimum confidence threshold (default: %(default)s)")
     parser.add_argument("--outdir", help="Path to output dir")
     args = parser.parse_args()
     main(args.counts_table_files, args.conditions, args.comparisons, args.outdir,
-         args.fdr, args.normalization, args.num_exp_spots, args.num_exp_genes)
+         args.fdr, args.normalization, args.num_exp_spots, args.num_exp_genes, 
+         args.min_gene_expression)

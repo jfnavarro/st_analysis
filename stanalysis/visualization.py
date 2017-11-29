@@ -11,7 +11,8 @@ import numpy as np
 
 color_map = ["red", "green", "blue", "orange", "cyan", "yellow", "orchid", 
              "saddlebrown", "darkcyan", "gray", "darkred", "darkgreen", "darkblue", 
-             "antiquewhite", "bisque", "black"]
+             "antiquewhite", "bisque", "black", "slategray", "gold", "floralwhite",
+             "aliceblue", "plum", "cadetblue", "coral", "olive", "khaki", "lightsalmon"]
 
 def volcano(dea_results, fdr, outfile):
     """ Generates a volcano plot for the given DEA results
@@ -93,10 +94,10 @@ def scatter_plot3d(x_points, y_points, z_points, output=None,
     fig = plt.figure()
     a = plt.subplot(projection="3d")
     color_values = None
+    unique_colors = set(colors)
     if cmap is None and colors is not None:
-        color_list = set(colors)
-        color_values = [color_map[i] for i in color_list]
-        cmap = ListedColormap(color_values)
+        color_values = [color_map[i] for i in unique_colors]
+        colors = [color_map[i] for i in colors]
     elif colors is None:
         colors = "blue"
     a.scatter(x_points, 
@@ -112,7 +113,7 @@ def scatter_plot3d(x_points, y_points, z_points, output=None,
     a.set_zlabel(zlabel)
     if color_values is not None:
         a.legend([plt.Line2D((0,1),(0,0), color=x) for x in color_values], 
-                 color_list, loc="upper right", markerscale=1.0, 
+                 unique_colors, loc="upper right", markerscale=1.0, 
                  ncol=1, scatterpoints=1, fontsize=5)
     a.set_title(title, size=10)
     # Save or show the plot
@@ -166,10 +167,10 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
         extent_size = None
     # We convert the list of color int values to color labels
     color_values = None
+    unique_colors = set(colors)
     if cmap is None and colors is not None:
-        color_list = set(colors)
-        color_values = [color_map[i] for i in color_list]
-        cmap = ListedColormap(color_values)
+        color_values = [color_map[i] for i in unique_colors]
+        colors = [color_map[i] for i in colors]
     elif colors is None:
         colors = "blue"
     # Create the scatter plot      
@@ -186,7 +187,7 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
     # Add legend
     if color_values is not None and show_legend:
         a.legend([plt.Line2D((0,1),(0,0), color=x) for x in color_values], 
-                 color_list, loc="upper right", markerscale=1.0, 
+                 unique_colors, loc="upper right", markerscale=1.0, 
                  ncol=1, scatterpoints=1, fontsize=5)
     # Add color bar
     if colors is not None and show_color_bar:

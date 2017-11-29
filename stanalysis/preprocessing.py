@@ -104,7 +104,7 @@ def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=
     num_genes = len(counts.columns)
     min_genes_spot_exp = round((counts != 0).sum(axis=1).quantile(num_exp_genes))
     print("Number of expressed genes a spot must have to be kept " \
-    "({}% of total expressed genes) {}".format(num_exp_genes,min_genes_spot_exp))
+    "({}% of total expressed genes) {}".format(num_exp_genes, min_genes_spot_exp))
     counts = counts[(counts != 0).sum(axis=1) >= min_genes_spot_exp]
     print("Dropped {} spots".format(num_spots - len(counts.index)))
           
@@ -143,7 +143,7 @@ def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
             print("Min normalized variance a gene must have over all spots " \
             "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_var))
             counts = counts[counts.var(axis=1) >= min_genes_spot_var]
-    elif criteria == "TopRankded":
+    elif criteria == "TopRanked":
         min_genes_spot_sum = counts.sum(axis=1).quantile(num_genes_keep)
         if math.isnan(min_genes_spot_var):
             print("Computed sum is NaN! Check your normalization factors..")
@@ -182,13 +182,13 @@ def compute_size_factors(counts, normalization, scran_clusters=True):
         raise RunTimeError("Error, incorrect normalization method\n")
     if np.isnan(size_factors).any() or np.isinf(size_factors).any():
         print("Warning: Computed size factors contained NaN or Inf."
-              "\nThey will be replaced by epsilon!")
-        size_factors[np.isnan(size_factors)] = np.finfo(np.float32).eps
-        size_factors[np.isinf(size_factors)] = np.finfo(np.float32).eps  
+              "\nThey will be replaced by 1.0!")
+        size_factors[np.isnan(size_factors)] = 1.0
+        size_factors[np.isinf(size_factors)] = 1.0
     if np.any(size_factors <= 0.0):
         print("Warning: Computed size factors contained zeroes or negative values."
-              "\nThey will be replaced by epsilon!")
-        size_factors[size_factors <= 0.0] = np.finfo(np.float32).eps      
+              "\nThey will be replaced by 1.0!")
+        size_factors[size_factors <= 0.0] = 1.0     
     return size_factors
 
 def normalize_data(counts, normalization, center=False, adjusted_log=False):
