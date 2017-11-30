@@ -39,8 +39,7 @@ def main(counts_table_files,
          normalization,
          filter_genes,
          outdir,
-         use_log_scale,
-         title):
+         use_log_scale):
 
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
@@ -96,13 +95,18 @@ def main(counts_table_files,
     # Create a scatter plot for each dataset
     print("Plotting data...")
     total_spots = counts.index
+    vmin = 10e6
+    vmax = -1
+    x_points = list()
+    y_points = list()
+    colors = list()
     for i, name in enumerate(counts_table_files):
         spots = filter(lambda x:'{}_'.format(i) in x, total_spots)
         # Compute the expressions for each spot
         # as the sum of all spots that pass the thresholds (Gene and counts)
-        x_points = list()
-        y_points = list()
-        colors = list()
+        x_points.append(list())
+        y_points.append(list())
+        colors.append(list())
         for spot in spots:
             tokens = spot.split("x")
             assert(len(tokens) == 2)
@@ -110,12 +114,16 @@ def main(counts_table_files,
             x = float(tokens[0].split("_")[1])
             exp = sum(count for count in counts.loc[spot,genes_to_keep] if count > cutoff)
             if exp > 0.0:
-                x_points.append(x)
-                y_points.append(y)
+                x_points[i].append(x)
+                y_points[i].append(y)
                 if use_log_scale: exp = np.log2(exp)
-                colors.append(exp)           
-           
-        if len(colors) == 0:
+                vmin = min(vmin, exp)
+                vmax = max(vmax, exp)
+                colors[i].append(exp)
+                
+    for i, name in enumerate(counts_table_files):
+        
+        if len(colors[i]) == 0:
             sys.stdount.write("Warning, the gene/s given are not expressed in {}\n".format(name))
             continue 
  
@@ -130,20 +138,22 @@ def main(counts_table_files,
     
         # Create a scatter plot for the gene data
         # If image is given plot it as a background
-        scatter_plot(x_points=x_points,
-                     y_points=y_points,
-                     colors=colors,
+        scatter_plot(x_points=x_points[i],
+                     y_points=y_points[i],
+                     colors=colors[i],
                      output=os.path.join(outdir, "{}.pdf".format(os.path.splitext(name)[0])),
                      alignment=alignment_matrix,
                      cmap=plt.get_cmap("YlOrBr"),
-                     title=title,
+                     title=name,
                      xlabel='X',
                      ylabel='Y',
                      image=image,
                      alpha=data_alpha,
                      size=dot_size,
                      show_legend=False,
-                     show_color_bar=True)
+                     show_color_bar=True,
+                     vmin=vmin,
+                     vmax=vmax)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
@@ -188,7 +198,6 @@ if __name__ == '__main__':
                         default=None,
                         type=str,
                         action='append')
-    parser.add_argument("--title", help="The title to show in the plots", default="ST Data scatter", type=str)
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     parser.add_argument("--use-log-scale", action="store_true", default=False, help="Use log2(counts + 1) values")
     args = parser.parse_args()
@@ -202,5 +211,4 @@ if __name__ == '__main__':
          args.normalization,
          args.show_genes,
          args.outdir,
-         args.use_log_scale,
-         args.title)
+         args.use_log_scale)
