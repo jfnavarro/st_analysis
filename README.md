@@ -143,18 +143,16 @@ To know more about the parameters you can type --help
 
 ### To visualize ST data (output from the ST Pipeline) 
 Use the script st_data_plotter.py to plot ST data, it can use
-filters (counts or genes) it can highlight spots with regular expressions
-of genes and it can highlight spots by giving a file with spot coordinates
-and labels. You can also normalize the data for visualization.
-You need a matrix with the gene counts and spots and optionally
-a tissue image and an optional alignment matrix. A example run would be:
+filters (counts) and it can plot only selected genes using regular expressions. 
+You can also normalize the data for visualization.
+You need one or many matrices with the gene counts and spots and optionally
+a tissue image and an alignment matrix for each dataset. A example run would be:
 
-    st_data_plotter.py --cutoff 2 --show-genes Actb* --image tissue_image.jpg data_matrix.tsv
+    st_data_plotter.py --cutoff 2 --show-genes Actb* --image-files tissue_image.jpg --counts-table-files data_matrix.tsv
     
 This will generate a scatter plot of the expression of the spots that contain a gene Actb and
 with higher expression than 2 and it will use the tissue image as background.
-You could optionally pass a list of spots with their classes (Generated with unsupervised.py)
-to highlight spots in the scatter plot. More info if you type --help
+More info if you type --help
   
 ### To slice a matrix of counts based of regions of interest
 You can slice a dataset based on regions of interests (spots) obtained
