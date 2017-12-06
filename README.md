@@ -104,7 +104,9 @@ about how the script works.
 The ST Analysis package is compatible with Python 2 and 3 and we recomend to use
 a virtual environment to make the installation of the dependencies easier. 
 
-* Due to compatibility issues with rpy2 and R (specially in OSX), it is advised to use a R version older than 3.4. 
+* NOTE that you will need to activate your Python environment before using any of the tools
+
+        source activate python3.4
 
 ## Analysis tools
 
