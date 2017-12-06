@@ -72,7 +72,7 @@ def histogram(x_points, output, title="Histogram", xlabel="X", color="blue"):
     
 def scatter_plot3d(x_points, y_points, z_points, output=None,
                    colors=None, cmap=None, title='Scatter', xlabel='X', 
-                   ylabel='Y', zlabel="Z", alpha=1.0, size=10):
+                   ylabel='Y', zlabel="Z", alpha=1.0, size=10, vmin=None, vmax=None):
     """ 
     This function makes a scatter 3d plot of a set of points (x,y,z).
     The plot will always use a predefine set of colors unless specified otherwise.
@@ -107,7 +107,9 @@ def scatter_plot3d(x_points, y_points, z_points, output=None,
               cmap=cmap, 
               edgecolor="none", 
               s=size,
-              alpha=alpha)
+              alpha=alpha,
+              vmin=vmin,
+              vmax=vmax)
     a.set_xlabel(xlabel)
     a.set_ylabel(ylabel)
     a.set_zlabel(zlabel)
@@ -129,7 +131,7 @@ def grid_plot(x_points, y_points, colors, output=None, alignment=None):
 def scatter_plot(x_points, y_points, output=None, colors=None,
                  alignment=None, cmap=None, title='Scatter', xlabel='X', 
                  ylabel='Y', image=None, alpha=1.0, size=10, 
-                 show_legend=True, show_color_bar=False):
+                 show_legend=True, show_color_bar=False, vmin=None, vmax=None):
     """ 
     This function makes a scatter plot of a set of points (x,y).
     The alignment matrix is optional to transform the coordinates
@@ -175,7 +177,8 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
         colors = "blue"
     # Create the scatter plot      
     sc = a.scatter(x_points, y_points, c=colors, edgecolor="none", 
-                   cmap=cmap, s=size, transform=base_trans, alpha=alpha)
+                   cmap=cmap, s=size, transform=base_trans, alpha=alpha,
+                   vmin=vmin, vmax=vmax)
     # Plot the image
     if image is not None and os.path.isfile(image):
         img = plt.imread(image)
@@ -195,6 +198,6 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
     # Save or show the plot
     if output is not None:
         fig.savefig("{}.pdf".format(os.path.splitext(os.path.basename(output))[0]), 
-                    format='pdf', dpi=300)
+                    format='pdf', dpi=180)
     else:
         fig.show()

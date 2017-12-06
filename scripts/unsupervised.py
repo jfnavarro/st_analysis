@@ -188,7 +188,7 @@ def main(counts_table_files,
 
     # Write the spots and their classes to a file
     file_writers = [open(os.path.join(outdir,
-                                      "{}_clusters.tsv".format(os.path.splitext(name)[0])),"w")
+                                      "{}_clusters.tsv".format(os.path.splitext(os.path.basename(name))[0])),"w")
                     for name in counts_table_files]
     # Write the coordinates and the label/class that they belong to
     spot_plot_data = defaultdict(lambda: [[],[],[],[]])
@@ -250,10 +250,10 @@ def main(counts_table_files,
         scatter_plot(x_points=x_points, 
                      y_points=y_points,
                      colors=colors_classes,
-                     output=os.path.join(outdir,"{}_clusters.pdf".format(os.path.splitext(name)[0])), 
+                     output=os.path.join(outdir,"{}_clusters.pdf".format(os.path.splitext(os.path.basename(name))[0])), 
                      alignment=alignment_matrix, 
                      cmap=None, 
-                     title='Computed classes tissue', 
+                     title=name, 
                      xlabel='X', 
                      ylabel='Y',
                      image=image, 
@@ -263,10 +263,10 @@ def main(counts_table_files,
             scatter_plot(x_points=x_points, 
                          y_points=y_points,
                          colors=colors_dimensionality, 
-                         output=os.path.join(outdir,"{}_color_space.pdf".format(os.path.splitext(name)[0])), 
+                         output=os.path.join(outdir,"{}_color_space.pdf".format(os.path.splitext(os.path.basename(name))[0])), 
                          alignment=alignment_matrix, 
                          cmap=plt.get_cmap("hsv"), 
-                         title='Dimensionality color tissue', 
+                         title=name, 
                          xlabel='X', 
                          ylabel='Y',
                          image=image, 
@@ -315,7 +315,7 @@ if __name__ == '__main__':
                         type=str, choices=["Hierarchical", "KMeans", "DBSCAN"],
                         help="What clustering algorithm to use after the dimensionality reduction " \
                         "(Hierarchical - KMeans - DBSCAN) (default: %(default)s)")
-    parser.add_argument("--dimensionality", default="ICA", metavar="[STR]", 
+    parser.add_argument("--dimensionality", default="tSNE", metavar="[STR]", 
                         type=str, choices=["tSNE", "PCA", "ICA", "SPCA"],
                         help="What dimensionality reduction algorithm to use " \
                         "(tSNE - PCA - ICA - SPCA) (default: %(default)s)")
