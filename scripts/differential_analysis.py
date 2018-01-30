@@ -89,9 +89,9 @@ def main(counts_table_files, conditions, comparisons, outdir, fdr,
     # DEA call
     try:
         if normalization in "DESeq2":
-            dea_results = deaDESeq2(counts, conds, comparisons, size_factors=None)
+            dea_results = deaDESeq2(counts, conds, comparisons, alpha=fdr, size_factors=None)
         else:
-            dea_results = deaScranDESeq2(counts, conds, comparisons, scran_clusters=True)
+            dea_results = deaScranDESeq2(counts, conds, comparisons, alpha=fdr, scran_clusters=True)
     except Exception as e:
         sys.stderr.write("Error while performing DEA " + str(e) + "\n")
         sys.exit(1)
