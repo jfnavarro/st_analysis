@@ -134,7 +134,7 @@ def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
     counts = counts.transpose()
     # Keep only the genes with higher over-all variance
     num_genes = len(counts.index)
-    print("Removing {}% of genes based on the {}".format(num_genes_keep * 100, criteria))
+    print("Removing {}% of genes based on the {}".format(num_genes_keep * 100, criteria))
     if criteria == "Variance":
         min_genes_spot_var = counts.var(axis=1).quantile(num_genes_keep)
         if math.isnan(min_genes_spot_var):
@@ -153,7 +153,7 @@ def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
             counts = counts[counts.sum(axis=1) >= min_genes_spot_var]
     else:
         raise RunTimeError("Error, incorrect criteria method\n")  
-    print("Dropped {} genes".format(num_genes - len(counts.index)))
+    print("Dropped {} genes".format(num_genes - len(counts.index)))
     return counts.transpose()
 
 def compute_size_factors(counts, normalization, scran_clusters=True):
