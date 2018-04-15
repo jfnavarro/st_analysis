@@ -50,7 +50,12 @@ def deaDESeq2(counts, conds, comparisons, alpha, size_factors=None):
         # Perform the comparisons and store results in list
         for A,B in comparisons:
             result = r.results(dds, contrast=r.c("conditions", A, B), alpha=alpha)
-            result = pandas2ri.ri2py_dataframe(r['as.data.frame'](result))
+            result = r['as.data.frame'](result)
+            genes = r['rownames'](result)
+            result = pandas2ri.ri2py_dataframe(result)
+            # There seems to be a problem parsing the rownames from R to pandas
+            # so we do it manually
+            result.index = genes
             results.append(result)
         pandas2ri.deactivate()
     except Exception as e:

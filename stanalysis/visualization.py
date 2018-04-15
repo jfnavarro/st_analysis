@@ -24,9 +24,9 @@ def volcano(dea_results, fdr, outfile):
     fig, a = plt.subplots(figsize=(30, 30))
     colors = ["red" if p <= fdr else "blue" for p in dea_results["padj"]]
     x_points = dea_results["log2FoldChange"]
-    y_points = -np.log10(dea_results["pvalue"])
+    y_points = -np.log10(dea_results["pvalue"] + np.finfo(np.float32).eps)
     x_points_conf = dea_results.ix[dea_results["padj"] <= fdr]["log2FoldChange"]
-    y_points_conf = -np.log10(dea_results.ix[dea_results["padj"] <= fdr]["pvalue"])
+    y_points_conf = -np.log10(dea_results.ix[dea_results["padj"] <= fdr]["pvalue"] + + np.finfo(np.float32).eps)
     names_conf = dea_results.ix[dea_results["padj"] <= fdr].index
     # Scale axes
     OFFSET = 0.1
