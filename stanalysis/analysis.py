@@ -23,7 +23,7 @@ def computeNClusters(counts, min_size=20):
     pandas2ri.deactivate()
     return n_clust
 
-def deaDESeq2(counts, conds, comparisons, size_factors=None):
+def deaDESeq2(counts, conds, comparisons, alpha, size_factors=None):
     """Makes a call to DESeq2 to
     perform D.E.A. in the given
     counts matrix with the given conditions and comparisons.
@@ -49,15 +49,20 @@ def deaDESeq2(counts, conds, comparisons, size_factors=None):
             dds = r.nbinomWaldTest(dds)
         # Perform the comparisons and store results in list
         for A,B in comparisons:
-            result = r.results(dds, contrast=r.c("conditions", A, B))
-            result = pandas2ri.ri2py_dataframe(r['as.data.frame'](result))
+            result = r.results(dds, contrast=r.c("conditions", A, B), alpha=alpha)
+            result = r['as.data.frame'](result)
+            genes = r['rownames'](result)
+            result = pandas2ri.ri2py_dataframe(result)
+            # There seems to be a problem parsing the rownames from R to pandas
+            # so we do it manually
+            result.index = genes
             results.append(result)
         pandas2ri.deactivate()
     except Exception as e:
         raise e
     return results
 
-def deaScranDESeq2(counts, conds, comparisons, scran_clusters=False):
+def deaScranDESeq2(counts, conds, comparisons, alpha, scran_clusters=False):
     """Makes a call to DESeq2 with SCRAN to
     perform D.E.A. in the given
     counts matrix with the given conditions and comparisons.
@@ -96,7 +101,7 @@ def deaScranDESeq2(counts, conds, comparisons, scran_clusters=False):
         dds = r.DESeq(dds)
         # Perform the comparisons and store results in list
         for A,B in comparisons:
-            result = r.results(dds, contrast=r.c("conditions", A, B))
+            result = r.results(dds, contrast=r.c("conditions", A, B), alpha=alpha)
             result = pandas2ri.ri2py_dataframe(r['as.data.frame'](result))
             results.append(result)
         pandas2ri.deactivate()

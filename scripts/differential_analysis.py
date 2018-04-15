@@ -55,7 +55,7 @@ def main(counts_table_files, conditions, comparisons, outdir, fdr,
     # Remove noisy spots and genes (Spots are rows and genes are columns)
     counts = remove_noise(counts, num_exp_genes / 100.0, num_exp_spots / 100.0, 
                           min_expression=min_gene_expression)
-        
+    
     # Get the comparisons as tuples
     comparisons = [c.split("-") for c in comparisons]
     
@@ -89,9 +89,9 @@ def main(counts_table_files, conditions, comparisons, outdir, fdr,
     # DEA call
     try:
         if normalization in "DESeq2":
-            dea_results = deaDESeq2(counts, conds, comparisons, size_factors=None)
+            dea_results = deaDESeq2(counts, conds, comparisons, alpha=fdr, size_factors=None)
         else:
-            dea_results = deaScranDESeq2(counts, conds, comparisons, scran_clusters=True)
+            dea_results = deaScranDESeq2(counts, conds, comparisons, alpha=fdr, scran_clusters=False)
     except Exception as e:
         sys.stderr.write("Error while performing DEA " + str(e) + "\n")
         sys.exit(1)
