@@ -5,6 +5,7 @@ from stanalysis.normalization import RimportLibrary
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib import colors as mpcolors
 from collections import Counter
+import multiprocessing
 import rpy2.robjects.packages as rpackages
 import rpy2.robjects as robjects
 from rpy2.robjects import pandas2ri, r, numpy2ri, globalenv
@@ -16,7 +17,9 @@ def computeNClusters(counts, min_size=20):
     from the data using Scran::quickCluster"""
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts.transpose())
-    scran = RimportLibrary("scran")    
+    scran = RimportLibrary("scran")
+    multicore = RimportLibrary("BiocParallel")
+    multicore.register(multicore.MulticoreParam(multiprocessing.cpu_count()-1))  
     as_matrix = r["as.matrix"]
     clusters = scran.quickCluster(as_matrix(r_counts), min_size)
     n_clust = len(set(clusters))
@@ -34,7 +37,8 @@ def deaDESeq2(counts, conds, comparisons, alpha, size_factors=None):
     try:
         pandas2ri.activate()
         deseq2 = RimportLibrary("DESeq2")
-        r("suppressMessages(library(DESeq2))")
+        multicore = RimportLibrary("BiocParallel")
+        multicore.register(multicore.MulticoreParam(multiprocessing.cpu_count()-1))
         # Create the R conditions and counts data
         r_counts = pandas2ri.py2ri(counts)
         cond = robjects.DataFrame({"conditions": robjects.StrVector(conds)})
@@ -74,6 +78,8 @@ def deaScranDESeq2(counts, conds, comparisons, alpha, scran_clusters=False):
         pandas2ri.activate()
         deseq2 = RimportLibrary("DESeq2")
         scran = RimportLibrary("scran")
+        multicore = RimportLibrary("BiocParallel")
+        multicore.register(multicore.MulticoreParam(multiprocessing.cpu_count()-1))
         as_matrix = r["as.matrix"]
         # Create the R conditions and counts data
         r_counts = pandas2ri.py2ri(counts)
@@ -147,7 +153,9 @@ def Rtsne(counts, dimensions, theta=0.5, dims=50, perplexity=30, max_iter=1000):
     using the R package Rtsne"""
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
-    tsne = RimportLibrary("Rtsne")    
+    tsne = RimportLibrary("Rtsne")
+    multicore = RimportLibrary("BiocParallel")
+    multicore.register(multicore.MulticoreParam(multiprocessing.cpu_count()-1))
     as_matrix = r["as.matrix"]
     tsne_out = tsne.Rtsne(as_matrix(counts), 
                           dims=dimensions, 
