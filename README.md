@@ -53,7 +53,7 @@ We recommend that you install the latest R version 3.4 Once you have installed R
 a R terminal or Rstudio and type the following:
 
     source("https://bioconductor.org/biocLite.R")
-    biocLite("monocle")
+    biocLite("BiocParallel")
     biocLite("scran")
     biocLite("DESeq2")
     biocLite("Rtsne")
