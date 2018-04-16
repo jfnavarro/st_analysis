@@ -96,13 +96,13 @@ def logCountsWithFactors(counts, size_factors):
     indexes = counts.index
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
-    scater = RimportLibrary("scater")
+    scater = RimportLibrary("scran")
     r_call = """
         function(counts, size_factors){
-          sce = newSCESet(countData=counts)
-          sce@phenoData$size_factor = size_factors
+          sce = SingleCellExperiment(assays=list(counts=as.matrix(counts)))
+          sizeFactors(sce) = size_factors
           sce = normalize(sce)
-          norm_counts = sce@assayData$norm_exprs
+          norm_counts = logcounts(sce)
           return(as.data.frame(norm_counts))
         }
     """

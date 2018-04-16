@@ -84,7 +84,14 @@ def deaScranDESeq2(counts, conds, comparisons, alpha, scran_clusters=False):
         # Create the R conditions and counts data
         r_counts = pandas2ri.py2ri(counts)
         cond = robjects.StrVector(conds)
-        sce = r.newSCESet(countData=r_counts)
+        r_call = """
+            function(r_counts) {
+                sce = SingleCellExperiment(assays=list(counts=r_counts))
+                return(sce)
+            }
+        """
+        r_func = r(r_call)
+        sce = r_func(as_matrix(r_counts))
         if scran_clusters:
             r_clusters = scran.quickCluster(as_matrix(r_counts), max(n_cells/10, 10))
             min_cluster_size = min(Counter(r_clusters).values())
