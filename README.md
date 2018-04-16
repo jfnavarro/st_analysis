@@ -91,9 +91,11 @@ Note: we advice to install and update the developer tools packages
     conda create -n python3.4 python=3.4
     source activate python3.4
     pip install rpy2
+    pip install tzlocal
     conda install matplotlib
     conda install pandas
     conda install scikit-learn
+    conda install readline
     git clone https://github.com/SpatialTranscriptomicsResearch/st_analysis.git
     cd st_analysis
     python setup.py install
