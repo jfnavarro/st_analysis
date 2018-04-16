@@ -36,7 +36,7 @@ The referred matrix format is the ST data format, a matrix of counts where spot 
 and the genes are column names. This matrix format (.TSV) is generated with the
 [ST Pipeline](https://github.com/SpatialTranscriptomicsResearch/st_pipeline)
 
-The scripts that allow you to pass the tissue HE image can optionally take a 3x3 alignment file.
+The scripts that allows you to pass the tissue HE image can optionally take a 3x3 alignment file.
 If the images are cropped to the exact array boundaries the alignment file is not needed
 unless you want to plot the image in the original image size. If the image is un-cropped
 then you need the alignment file to convert from spot coordinates to pixel coordinates.

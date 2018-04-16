@@ -4,6 +4,7 @@ Normalization functions for the st analysis package
 import numpy as np
 import pandas as pd
 from collections import Counter
+import multiprocessing
 import rpy2.robjects.packages as rpackages
 from rpy2.robjects import pandas2ri, r, numpy2ri
 import rpy2.robjects as ro
@@ -29,6 +30,8 @@ def computeTMMFactors(counts):
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
     edger = RimportLibrary("edgeR")
+    multicore = RimportLibrary("BiocParallel")
+    multicore.register(multicore.MulticoreParam(multiprocessing.cpu_count()-1))
     as_matrix = r["as.matrix"]
     dds = edger.calcNormFactors(as_matrix(r_counts), method="TMM")
     pandas_sf = pandas2ri.ri2py(dds)
@@ -45,6 +48,8 @@ def computeRLEFactors(counts):
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
     edger = RimportLibrary("edgeR")
+    multicore = RimportLibrary("BiocParallel")
+    multicore.register(multicore.MulticoreParam(multiprocessing.cpu_count()-1))
     as_matrix = r["as.matrix"]
     dds = edger.calcNormFactors(as_matrix(r_counts), method="RLE")
     pandas_sf = pandas2ri.ri2py(dds)
@@ -64,6 +69,8 @@ def computeSumFactors(counts, scran_clusters=True):
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
     scran = RimportLibrary("scran")
+    multicore = RimportLibrary("BiocParallel")
+    multicore.register(multicore.MulticoreParam(multiprocessing.cpu_count()-1))
     as_matrix = r["as.matrix"]
     if scran_clusters:
         r_clusters = scran.quickCluster(as_matrix(r_counts), max(n_cells/10, 10))
@@ -117,8 +124,10 @@ def computeSizeFactors(counts):
     """
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
-    deseq = RimportLibrary("DESeq")
-    dds = deseq.estimateSizeFactorsForMatrix(r_counts)
+    deseq2 = RimportLibrary("DESeq2")
+    multicore = RimportLibrary("BiocParallel")
+    multicore.register(multicore.MulticoreParam(multiprocessing.cpu_count()-1))
+    dds = deseq2.estimateSizeFactorsForMatrix(r_counts)
     pandas_sf = pandas2ri.ri2py(dds)
     pandas2ri.deactivate()
     return pandas_sf
@@ -146,6 +155,8 @@ def computeSizeFactorsLinear(counts):
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts)
     deseq2 = RimportLibrary("DESeq2")
+    multicore = RimportLibrary("BiocParallel")
+    multicore.register(multicore.MulticoreParam(multiprocessing.cpu_count()-1))
     vec = rpackages.importr('S4Vectors')
     bio_generics = rpackages.importr("BiocGenerics")
     cond = vec.DataFrame(condition=base.factor(base.c(base.colnames(r_counts))))
