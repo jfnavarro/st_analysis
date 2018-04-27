@@ -45,7 +45,7 @@ def deaDESeq2(counts, conds, comparisons, alpha, size_factors=None):
         design = r('formula(~ conditions)')
         dds = r.DESeqDataSetFromMatrix(countData=r_counts, colData=cond, design=design)
         if size_factors is None:
-            dds = r.DESeq(dds)
+            dds = r.DESeq(dds, parallel=True)
         else:
             assign_sf = r["sizeFactors<-"]
             dds = assign_sf(object=dds, value=robjects.FloatVector(size_factors))
