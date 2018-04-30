@@ -47,3 +47,7 @@ Version 0.5.0
 * Fixed bugs
 * Added support for biocparalell
 * Added extract_spots.py script
+
+Version 0.5.1
+* Small bug fixes
+* Plots can be now generated in computers with not graphic card
