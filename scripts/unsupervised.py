@@ -93,10 +93,7 @@ def main(counts_table_files,
     print("Input datasets {}".format(" ".join(counts_table_files))) 
          
     # Merge input datasets (Spots are rows and genes are columns)
-    if len(counts_table_files) > 1:
-        counts = aggregate_datatasets(counts_table_files)
-    else:
-        counts = pd.read_table(counts_table_files[0], sep="\t", header=0, index_col=0)
+    counts = aggregate_datatasets(counts_table_files)
     print("Total number of spots {}".format(len(counts.index)))
     print("Total number of genes {}".format(len(counts.columns)))
     
@@ -200,23 +197,25 @@ def main(counts_table_files,
         assert(len(tokens) == 2)
         y = float(tokens[1])
         tokens2 = tokens[0].split("_")
-        if len(tokens2) == 2 and len(counts_table_files) > 1:
-            x = float(tokens2[1])
-            index = int(tokens2[0])
+        # This is to account for the cases where the spots already contain a tag (separated by "_")
+        if len(tokens2) == 3:
+            x = float(tokens2[2])
         elif len(tokens2) == 2:
             x = float(tokens2[1])
-            index = 0
-        elif len(tokens2) == 1:
-            x = float(tokens[0])
-            index = 0
         else:
             sys.stderr.write("Error, the spots in the input data have the wrong format {}\n.".format(spot))
-            sys.exit(1)  
+            sys.exit(1)
+        index = int(tokens2[0])
         spot_plot_data[index][0].append(x)
         spot_plot_data[index][1].append(y)
         spot_plot_data[index][2].append(labels[i])
         spot_plot_data[index][3].append(labels_colors[i])
-        file_writers[index].write("{0}\t{1}\n".format("{}x{}".format(x,y), labels[i]))
+        # This is to account for the cases where the spots already contain a tag (separated by "_")
+        if len(tokens2) == 3:
+            spot_str = "{}_{}x{}".format(tokens2[1],x,y)
+        else:
+            spot_str = "{}x{}".format(x,y)
+        file_writers[index].write("{0}\t{1}\n".format(spot_str, labels[i]))
     # Close the files
     for file_writer in file_writers:
         file_writer.close()
