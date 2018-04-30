@@ -93,7 +93,10 @@ def main(counts_table_files,
     print("Input datasets {}".format(" ".join(counts_table_files))) 
          
     # Merge input datasets (Spots are rows and genes are columns)
-    counts = aggregate_datatasets(counts_table_files)
+    if len(counts_table_files) > 1:
+        counts = aggregate_datatasets(counts_table_files)
+    else:
+        counts = pd.read_table(counts_table_files[0], sep="\t", header=0, index_col=0)
     print("Total number of spots {}".format(len(counts.index)))
     print("Total number of genes {}".format(len(counts.columns)))
     
@@ -196,8 +199,19 @@ def main(counts_table_files,
         tokens = spot.split("x")
         assert(len(tokens) == 2)
         y = float(tokens[1])
-        x = float(tokens[0].split("_")[1])
-        index = int(tokens[0].split("_")[0])
+        tokens2 = tokens[0].split("_")
+        if len(tokens2) == 2 and len(counts_table_files) > 1:
+            x = float(tokens2[1])
+            index = int(tokens2[0])
+        elif len(tokens2) == 2:
+            x = float(tokens2[1])
+            index = 0
+        elif len(tokens2) == 1:
+            x = float(tokens[0])
+            index = 0
+        else:
+            sys.stderr.write("Error, the spots in the input data have the wrong format {}\n.".format(spot))
+            sys.exit(1)  
         spot_plot_data[index][0].append(x)
         spot_plot_data[index][1].append(y)
         spot_plot_data[index][2].append(labels[i])
