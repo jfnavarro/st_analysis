@@ -210,7 +210,8 @@ def normalize_data(counts, normalization, center=False, adjusted_log=False):
     # Spots as columns and genes as rows
     counts = counts.transpose()
     # Center and/or adjust log the size_factors and counts
-    if center: size_factors = size_factors / np.mean(size_factors)
+    if center: 
+        size_factors = size_factors / np.mean(size_factors)
     if adjusted_log:
         norm_counts = logCountsWithFactors(counts, size_factors)
     else:
