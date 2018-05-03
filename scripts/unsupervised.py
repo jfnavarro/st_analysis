@@ -232,6 +232,12 @@ def main(counts_table_files,
                        title='Computed classes', 
                        alpha=1.0, 
                        size=20)
+        with open("computed_clusters_3D.tsv", "w") as filehandler: 
+            for x,y,z,l in zip(reduced_data[:,0], 
+                               reduced_data[:,1], 
+                               reduced_data[:,2], 
+                               labels):
+                filehandler.write("{}\t{}\t{}\t{}\n".format(x,y,z,l))   
     else:
         scatter_plot(x_points=reduced_data[:,0], 
                      y_points=reduced_data[:,1],
@@ -239,7 +245,12 @@ def main(counts_table_files,
                      output=os.path.join(outdir,"computed_clusters.pdf"), 
                      title='Computed classes', 
                      alpha=1.0, 
-                     size=20)          
+                     size=20)
+        with open("computed_clusters_2D.tsv", "w") as filehandler: 
+            for x,y,l in zip(reduced_data[:,0], 
+                             reduced_data[:,1], 
+                             labels):
+                filehandler.write("{}\t{}\t{}\n".format(x,y,l))          
     
     # Plot the spots with colors corresponding to the predicted class
     # Use the HE image as background if the image is given
