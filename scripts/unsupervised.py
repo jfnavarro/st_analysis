@@ -31,6 +31,7 @@ from sklearn.decomposition import PCA, FastICA, SparsePCA
 from sklearn.cluster import DBSCAN
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
+from sklearn.mixture import GaussianMixture
 from stanalysis.visualization import scatter_plot, scatter_plot3d, histogram
 from stanalysis.preprocessing import *
 from stanalysis.alignment import parseAlignmentMatrix
@@ -154,6 +155,10 @@ def main(counts_table_files,
     elif "DBSCAN" in clustering:
         labels = DBSCAN(eps=0.5, min_samples=5, 
                         metric='euclidean', n_jobs=-1).fit_predict(reduced_data)
+    elif "Gaussian" in clustering:
+        gm = GaussianMixture(n_components=num_clusters,
+                             covariance_type='full').fit(reduced_data)
+        labels = gm.predict(reduced_data)
     else:
         sys.stderr.write("Error, incorrect clustering method\n")
         sys.exit(1)
@@ -325,24 +330,32 @@ if __name__ == '__main__':
                         help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
                         "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
     parser.add_argument("--num-exp-spots", default=1, metavar="[INT]", type=int, choices=range(0, 100),
-                        help="The percentage of number of expressed spots a gene " \
+                        help="The percentage of number of expressed spots a gene\n" \
                         "must have to be kept from the total number of spots (default: %(default)s)")
     parser.add_argument("--min-gene-expression", default=1, type=int, metavar="[INT]", choices=range(1, 50),
-                        help="The minimum count (number of reads) a gene must have in a spot to be "
+                        help="The minimum count (number of reads) a gene must have in a spot to be\n"
                         "considered expressed (default: %(default)s)")
     parser.add_argument("--num-genes-keep", default=20, metavar="[INT]", type=int, choices=range(0, 100),
                         help="The percentage of genes to discard from the distribution of all the genes\n" \
-                        "across all the spots using the variance or the top highest expressed " \
+                        "across all the spots using the variance or the top highest expressed\n" \
                         "(see --top-genes-criteria)\n " \
                         "Low variance or low expressed will be discarded (default: %(default)s)")
     parser.add_argument("--clustering", default="KMeans", metavar="[STR]", 
-                        type=str, choices=["Hierarchical", "KMeans", "DBSCAN"],
-                        help="What clustering algorithm to use after the dimensionality reduction " \
-                        "(Hierarchical - KMeans - DBSCAN) (default: %(default)s)")
+                        type=str, choices=["Hierarchical", "KMeans", "DBSCAN", "Gaussian"],
+                        help="What clustering algorithm to use after the dimensionality reduction:\n" \
+                        "Hierarchical = Hierarchical Clustering (Ward)\n" \
+                        "KMeans = Suitable for small number of clusters\n" \
+                        "DBSCAN = Number of clusters will be automatically inferred\n" \
+                        "Gaussian = Gaussian Mixtures Model\n" \
+                        "(default: %(default)s)")
     parser.add_argument("--dimensionality", default="tSNE", metavar="[STR]", 
                         type=str, choices=["tSNE", "PCA", "ICA", "SPCA"],
-                        help="What dimensionality reduction algorithm to use " \
-                        "(tSNE - PCA - ICA - SPCA) (default: %(default)s)")
+                        help="What dimensionality reduction algorithm to use:\n" \
+                        "tSNE = t-distributed stochastic neighbor embedding\n" \
+                        "PCA = Principal Component Analysis\n" \
+                        "ICA = Independent Component Analysis\n" \
+                        "SPCA = Sparse Principal Component Analysis\n" \
+                        "(default: %(default)s)")
     parser.add_argument("--use-log-scale", action="store_true", default=False,
                         help="Use log2(counts + 1) values in the dimensionality reduction step")
     parser.add_argument("--alignment-files", default=None, nargs='+', type=str,
@@ -362,10 +375,10 @@ if __name__ == '__main__':
                         help="The size of the spots when generating the plots. (default: %(default)s)")
     parser.add_argument("--top-genes-criteria", default="Variance", metavar="[STR]", 
                         type=str, choices=["Variance", "TopRanked"],
-                        help="What criteria to use to keep top genes before doing " \
+                        help="What criteria to use to keep top genes before doing\n" \
                         "the dimensionality reduction (Variance or TopRanked) (default: %(default)s)")
     parser.add_argument("--use-adjusted-log", action="store_true", default=False,
-                        help="Use adjusted log normalized counts (R Scater::normalized()) "
+                        help="Use adjusted log normalized counts (R Scater::normalized())\n"
                         "in the dimensionality reduction step (recommended with SCRAN normalization)")
     parser.add_argument("--tsne-perplexity", default=30, metavar="[INT]", type=int, choices=range(5,500),
                         help="The value of the perplexity for the t-sne method. (default: %(default)s)")
@@ -373,7 +386,7 @@ if __name__ == '__main__':
                         help="The value of theta for the t-sne method. (default: %(default)s)")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     parser.add_argument("--color-space-plots", action="store_true", default=False,
-                        help="Generate also plots using the representation in color space of the " \
+                        help="Generate also plots using the representation in color space of the\n" \
                         "dimensionality reduced coordinates")   
     args = parser.parse_args()
     main(args.counts_table_files, 

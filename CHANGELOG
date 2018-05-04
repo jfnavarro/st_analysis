@@ -51,3 +51,4 @@ Version 0.5.0
 Version 0.5.1
 * Small bug fixes
 * Plots can be now generated in computers with not graphic card
+* Improved the unsupervised.py script with a new clustering method
