@@ -73,6 +73,11 @@ def main(counts_table_files, conditions, comparisons, outdir, fdr,
             counts.drop(spot, axis=0, inplace=True)
             continue
 
+    # Write the conditions to a file
+    with open("conditions.txt", "w") as filehandler:
+        for cond in conds:
+            filehandler.write("{}\n".format(cond))
+            
     # Check that the comparisons are valid and if not remove the invalid ones
     comparisons = [c for c in comparisons if c[0] in conds and c[1] in conds]
     if len(comparisons) == 0:
@@ -82,7 +87,10 @@ def main(counts_table_files, conditions, comparisons, outdir, fdr,
     # Make the DEA call
     print("Doing DEA for the comparisons {} with {} spots and {} genes".format(comparisons,
                                                                               len(counts.index), 
-                                                                              len(counts.columns)))   
+                                                                              len(counts.columns)))
+    # Print the DE 
+    counts.to_csv(os.path.join(outdir, "merged_matrix.tsv"), sep="\t")
+    
     # Spots as columns 
     counts = counts.transpose()
     

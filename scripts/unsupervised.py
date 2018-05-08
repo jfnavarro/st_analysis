@@ -85,7 +85,11 @@ def main(counts_table_files,
     if tsne_theta < 0.0 or tsne_theta > 1.0:
         sys.stdout.write("Warning, invalid value for theta. Using default..\n")
         tsne_theta = 0.5
-                                    
+                 
+    if num_exp_genes <= 0 or num_exp_spots <= 0:
+        sys.stdout.write("Error, min_exp_genes and min_exp_spots must be > 0.\n")
+        sys.exit(1) 
+                    
     if outdir is None or not os.path.isdir(outdir): 
         outdir = os.getcwd()
     outdir = os.path.abspath(outdir)
@@ -102,6 +106,10 @@ def main(counts_table_files,
     counts = remove_noise(counts, num_exp_genes / 100.0, num_exp_spots / 100.0, 
                           min_expression=min_gene_expression)
 
+    if len(counts.index) < 5 or len(counts.columns) < 10:
+        sys.stdout.write("Error, too many spots/genes were filtered.\n")
+        sys.exit(1) 
+                
     # Normalize data
     print("Computing per spot normalization...")
     center_size_factors = not use_adjusted_log
@@ -193,7 +201,8 @@ def main(counts_table_files,
 
     # Write the spots and their classes to a file
     file_writers = [open(os.path.join(outdir,
-                                      "{}_clusters.tsv".format(os.path.splitext(os.path.basename(name))[0])),"w")
+                                      "{}_clusters.tsv".format(
+                                      os.path.splitext(os.path.basename(name))[0])),"w")
                     for name in counts_table_files]
     # Write the coordinates and the label/class that they belong to
     spot_plot_data = defaultdict(lambda: [[],[],[],[]])
@@ -208,7 +217,8 @@ def main(counts_table_files,
         elif len(tokens2) == 2:
             x = float(tokens2[1])
         else:
-            sys.stderr.write("Error, the spots in the input data have the wrong format {}\n.".format(spot))
+            sys.stderr.write("Error, the spots in the input data have "
+                             "the wrong format {}\n.".format(spot))
             sys.exit(1)
         index = int(tokens2[0])
         spot_plot_data[index][0].append(x)
@@ -237,7 +247,7 @@ def main(counts_table_files,
                        title='Computed classes', 
                        alpha=1.0, 
                        size=20)
-        with open("computed_clusters_3D.tsv", "w") as filehandler: 
+        with open(os.path.join(outdir,"computed_clusters_3D.tsv"), "w") as filehandler: 
             for x,y,z,l in zip(reduced_data[:,0], 
                                reduced_data[:,1], 
                                reduced_data[:,2], 
@@ -251,7 +261,7 @@ def main(counts_table_files,
                      title='Computed classes', 
                      alpha=1.0, 
                      size=20)
-        with open("computed_clusters_2D.tsv", "w") as filehandler: 
+        with open(os.path.join(outdir,"computed_clusters_2D.tsv"), "w") as filehandler: 
             for x,y,l in zip(reduced_data[:,0], 
                              reduced_data[:,1], 
                              labels):
@@ -279,7 +289,9 @@ def main(counts_table_files,
         scatter_plot(x_points=x_points, 
                      y_points=y_points,
                      colors=colors_classes,
-                     output=os.path.join(outdir,"{}_clusters.pdf".format(os.path.splitext(os.path.basename(name))[0])), 
+                     output=os.path.join(outdir,
+                                         "{}_clusters.pdf".format(
+                                          os.path.splitext(os.path.basename(name))[0])), 
                      alignment=alignment_matrix, 
                      cmap=None, 
                      title=name, 
@@ -292,7 +304,9 @@ def main(counts_table_files,
             scatter_plot(x_points=x_points, 
                          y_points=y_points,
                          colors=colors_dimensionality, 
-                         output=os.path.join(outdir,"{}_color_space.pdf".format(os.path.splitext(os.path.basename(name))[0])), 
+                         output=os.path.join(outdir,
+                                             "{}_color_space.pdf".format(
+                                             os.path.splitext(os.path.basename(name))[0])), 
                          alignment=alignment_matrix, 
                          cmap=plt.get_cmap("hsv"), 
                          title=name, 
@@ -326,16 +340,16 @@ if __name__ == '__main__':
                         help="The number of clusters/regions expected to be found.\n" \
                         "If not given the number of clusters will be computed.\n" \
                         "Note that this parameter has no effect with DBSCAN clustering.")
-    parser.add_argument("--num-exp-genes", default=1, metavar="[INT]", type=int, choices=range(0, 100),
+    parser.add_argument("--num-exp-genes", default=1, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
                         "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
-    parser.add_argument("--num-exp-spots", default=1, metavar="[INT]", type=int, choices=range(0, 100),
+    parser.add_argument("--num-exp-spots", default=1, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed spots a gene\n" \
                         "must have to be kept from the total number of spots (default: %(default)s)")
     parser.add_argument("--min-gene-expression", default=1, type=int, metavar="[INT]", choices=range(1, 50),
                         help="The minimum count (number of reads) a gene must have in a spot to be\n"
                         "considered expressed (default: %(default)s)")
-    parser.add_argument("--num-genes-keep", default=20, metavar="[INT]", type=int, choices=range(0, 100),
+    parser.add_argument("--num-genes-keep", default=20, metavar="[INT]", type=int, choices=range(0, 99),
                         help="The percentage of genes to discard from the distribution of all the genes\n" \
                         "across all the spots using the variance or the top highest expressed\n" \
                         "(see --top-genes-criteria)\n " \
