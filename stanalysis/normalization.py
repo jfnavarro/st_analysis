@@ -57,6 +57,31 @@ def computeRLEFactors(counts):
     pandas2ri.deactivate()
     return pandas_sf * pandas_cm
 
+def computeMnnBatchCorrection(counts):
+    """Computes batch correction to a list of batches (data frames)
+    where each data frame represents a batch (animal for instance).
+    The batch correction is computed using Scrans::mnnCorrect()
+    from Marioni et al.
+    :param counts: a list of matrices of counts
+    :return returns a list of batch corrected matrices of counts
+    """
+    pandas2ri.activate()
+    as_matrix = r["as.matrix"]
+    r_counts = [as_matrix(pandas2ri.py2ri(x)) for x in counts]
+    scran = RimportLibrary("scran")
+    multicore = RimportLibrary("BiocParallel")
+    r_call = """
+        function(counts){
+           norm_counts = do.call(mnnCorrect, c(counts, k=20, cos.norm.out=FALSE));
+           return(lapply(norm_counts$corrected, as.data.frame))
+        }
+    """
+    r_func = r(r_call)
+    r_norm_counts = r_func(r_counts)
+    norm_counts = [pandas2ri.ri2py(x) for x in r_norm_counts]
+    pandas2ri.deactivate()
+    return norm_counts
+
 def computeSumFactors(counts, scran_clusters=True):
     """ Compute normalization factors
     using the deconvolution method
@@ -73,14 +98,15 @@ def computeSumFactors(counts, scran_clusters=True):
     multicore.register(multicore.MulticoreParam(multiprocessing.cpu_count()-1))
     as_matrix = r["as.matrix"]
     if scran_clusters:
-        r_clusters = scran.quickCluster(as_matrix(r_counts), max(n_cells/10, 10))
+        r_clusters = scran.quickCluster(as_matrix(r_counts), max(n_cells/10, 10), method="igraph")
         min_cluster_size = min(Counter(r_clusters).values())
-        sizes = list(set([round((min_cluster_size/2) / i) for i in [5,4,3,2,1]]))
-        dds = scran.computeSumFactors(as_matrix(r_counts), 
-                                      clusters=r_clusters, sizes=sizes, positive=True)
+        sizes = list(range(min(min_cluster_size/4, 10), min(min_cluster_size/2, 100), 10))
+        #sizes = list(set([round((min_cluster_size/2) / i) for i in [5,4,3,2,1]]))
+        dds = scran.computeSumFactors(as_matrix(r_counts), clusters=r_clusters, sizes=sizes)
     else:
-        sizes = list(set([round((n_cells/2) * i) for i in [0.1,0.2,0.3,0.4,0.5]]))
-        dds = scran.computeSumFactors(as_matrix(r_counts), sizes=sizes, positive=True)        
+        sizes = list(range(min(n_cells/4, 10), min(n_cells/2, 100), 10))
+        #sizes = list(set([round((n_cells/2) * i) for i in [0.1,0.2,0.3,0.4,0.5]]))
+        dds = scran.computeSumFactors(as_matrix(r_counts), sizes=sizes)        
     pandas_sf = pandas2ri.ri2py(dds)
     pandas2ri.deactivate()
     return pandas_sf

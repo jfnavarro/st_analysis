@@ -52,3 +52,8 @@ Version 0.5.1
 * Small bug fixes
 * Plots can be now generated in computers with not graphic card
 * Improved the unsupervised.py script with a new clustering method
+
+Version 0.5.2
+* Added batch correction option to unsupervised.py
+* Small improvements in unsupervised.py
+* st_data_plotter3D.py can plot clusters

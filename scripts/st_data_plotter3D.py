@@ -34,7 +34,8 @@ def main(counts_table,
          normalization,
          genes,
          outdir,
-         use_log_scale):
+         use_log_scale,
+         clusters):
 
     if not os.path.isfile(counts_table) or not os.path.isfile(meta_info):
         sys.stderr.write("Error, input file/s not present or invalid format\n")
@@ -55,6 +56,17 @@ def main(counts_table,
     print("Total number of spots (meta data) {}".format(len(meta.index)))
     print("Total number of columns (meta data) {}".format(len(meta.columns)))
     
+    # Clusters table
+    valid_clusters = False
+    if clusters is not None and os.path.isfile(clusters):
+        clusters_dict = dict()
+        with open(clusters, "r") as filehandler:
+            for line in filehandler.readlines():
+                tokens = line.split()
+                assert(len(tokens) == 2)
+                clusters_dict[tokens[0]] = tokens[1]
+        valid_clusters = len(clusters_dict) > 0
+            
     # Remove noisy spots and genes (Spots are rows and genes are columns)
     counts = remove_noise(counts, 1 / 100.0, 1 / 100.0, min_expression=1)
     
@@ -63,8 +75,8 @@ def main(counts_table,
     counts = normalize_data(counts, normalization)      
     
     # Create a 3D scatter plot for each gene
-    print("Plotting data...")
-    for gene in genes:
+    for gene in genes if genes is not None else []:
+        print("Plotting gene {} ...".format(gene))
         vmin = 10e6
         vmax = -1
         x = list()
@@ -84,7 +96,7 @@ def main(counts_table,
                     exp = np.log2(exp)
                 vmin = min(vmin, exp)
                 vmax = max(vmax, exp)
-                colors.append(exp)     
+                colors.append(exp)
         trace = Scatter3d(x=x, y=y, z=z,
                           mode='markers',
                           marker=dict(size=dot_size,
@@ -93,20 +105,52 @@ def main(counts_table,
                                       color=colors,
                                       colorbar=ColorBar(title='Colorbar'),
                                       colorscale='Jet',
-                                      opacity=data_alpha))        
+                                      opacity=data_alpha))
+        if valid_clusters:
+            trace2 = Scatter3d(x=x2, y=y2, z=z2,
+                               mode='markers',
+                               marker=dict(size=dot_size,
+                                           color=clusters_colors,
+                                           opacity=data_alpha))
+              
         layout = Layout(margin=dict(l=0,r=0,b=0,t=0), 
                         title=gene,
                         scene=dict(xaxis=dict(title='x = Medial-lateral (mm)', range=[0, 5],),
                                    yaxis=dict(title='y = Anterior-posterior (mm)', range=[-5.9, 3],),
                                    zaxis=dict(title='z = Dorsal-ventral (mm)', range=[-7.9, 0],),))
-        plotly.offline.plot({"data": [trace],"layout": layout})
+        plotly.offline.plot({"data": [trace],"layout": layout}, filename='{}-plot.html'.format(gene))
+
+            
+    if valid_clusters:
+        print("Plotting clusters...")
+        x = list()
+        y = list()
+        z = list()
+        clusters_colors = list()
+        for spot in counts.index:
+            if clusters_dict.has_key(spot):
+                clusters_colors.append(clusters_dict[spot])
+                x.append(float(meta.at[spot,"ML"]))
+                y.append(float(meta.at[spot,"AP"]))
+                z.append(float(meta.at[spot,"DV"]))
+        trace = Scatter3d(x=x, y=y, z=z,
+                          mode='markers',
+                          marker=dict(size=dot_size,
+                                      color=clusters_colors,
+                                      opacity=data_alpha))
+          
+        layout = Layout(margin=dict(l=0,r=0,b=0,t=0), title="Clusters",
+                        scene=dict(xaxis=dict(title='x = Medial-lateral (mm)', range=[0, 5],),
+                                   yaxis=dict(title='y = Anterior-posterior (mm)', range=[-5.9, 3],),
+                                   zaxis=dict(title='z = Dorsal-ventral (mm)', range=[-7.9, 0],),))
+        plotly.offline.plot({"data": [trace],"layout": layout}, filename='clusters-plot.html')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--counts-table", required=True, type=str,
                         help="Matrix with gene counts per feature/spot (genes as columns)")
-    parser.add_argument("--meta-info", default=None, type=str,
+    parser.add_argument("--meta-info", required=True, type=str,
                         help="Matrix with the meta info registration for each spot")
     parser.add_argument("--cutoff", 
                         help="Do not include genes that falls below this reads cut off per spot (default: %(default)s)",
@@ -134,6 +178,8 @@ if __name__ == '__main__':
                         default=None,
                         type=str,
                         action='append')
+    parser.add_argument("--clusters", help="Create a 3D plot of the clusters per spot given in \n" \
+                        "a tab delimited file SPOT CLUSTER", default=None, type=str)
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     parser.add_argument("--use-log-scale", action="store_true", default=False, help="Use log2(counts + 1) values")
     args = parser.parse_args()
@@ -146,4 +192,5 @@ if __name__ == '__main__':
          args.normalization,
          args.show_genes,
          args.outdir,
-         args.use_log_scale)
+         args.use_log_scale,
+         args.clusters)

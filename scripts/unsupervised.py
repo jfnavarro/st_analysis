@@ -1,13 +1,14 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-A script that does unsupervised learning on 
-Spatial Transcriptomics datasets (matrix of counts)
+This tool performs unsupervised learning on one or more
+Spatial Transcriptomics datasets (matrices of counts)
 It takes a list of datasets as input and outputs (for each given input):
 
  - a scatter plot with the predicted classes (coulored) for each spot 
  - the spots plotted onto the images (if given) with the predicted class/color
  - a file containing two columns (SPOT and CLASS) for each dataset
+ - a file containing the dimensionality reduced coordinates
 
 The input data frames must have the gene names as columns and
 the spots coordinates as rows (1x1).
@@ -27,7 +28,7 @@ import os
 import numpy as np
 import pandas as pd
 from sklearn.manifold import TSNE
-from sklearn.decomposition import PCA, FastICA, SparsePCA
+from sklearn.decomposition import PCA, FastICA, SparsePCA, FactorAnalysis
 from sklearn.cluster import DBSCAN
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
@@ -58,7 +59,11 @@ def main(counts_table_files,
          use_adjusted_log,
          tsne_perplexity,
          tsne_theta,
-         color_space_plots):
+         color_space_plots,
+         pca_auto_components,
+         dbscan_min_size,
+         dbscan_eps,
+         batch_correction):
 
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
@@ -75,7 +80,13 @@ def main(counts_table_files,
     and len(alignment_files) != len(image_files):
         sys.stderr.write("Error, the number of alignments given as " \
         "input is not the same as the number of images\n")
-        sys.exit(1)   
+        sys.exit(1)
+
+    if batch_correction is not None and len(batch_correction) > 0 \
+    and len(batch_correction) != len(counts_table_files):
+        sys.stderr.write("Error, the number of batch-corrections given as " \
+        "input is not the same as the number of datasets\n")
+        sys.exit(1) 
          
     if use_adjusted_log and use_log_scale:
         sys.stdout.write("Warning, both log and adjusted log are enabled " \
@@ -89,7 +100,15 @@ def main(counts_table_files,
     if num_exp_genes <= 0 or num_exp_spots <= 0:
         sys.stdout.write("Error, min_exp_genes and min_exp_spots must be > 0.\n")
         sys.exit(1) 
-                    
+        
+    if pca_auto_components is not None and (pca_auto_components <= 0.0 or pca_auto_components > 1.0):
+        sys.stdout.write("Error, pca_auto_components must be > 0 and <= 1.0.\n")
+        sys.exit(1)
+                
+    if dbscan_eps <= 0.0:
+        sys.stdout.write("Warning, invalid value for DBSCAN eps. Using default..\n")
+        dbscan_eps = 0.5
+                 
     if outdir is None or not os.path.isdir(outdir): 
         outdir = os.getcwd()
     outdir = os.path.abspath(outdir)
@@ -112,36 +131,50 @@ def main(counts_table_files,
                 
     # Normalize data
     print("Computing per spot normalization...")
-    center_size_factors = not use_adjusted_log
     norm_counts = normalize_data(counts, normalization, 
-                                 center=center_size_factors, adjusted_log=use_adjusted_log)
+                                 center=False, 
+                                 adjusted_log=use_adjusted_log)
 
-    # Keep top genes (variance or expressed)
-    norm_counts = keep_top_genes(norm_counts, num_genes_keep / 100.0, criteria=top_genes_criteria)
-       
-    # Compute the expected number of clusters
-    if num_clusters is None:
-        num_clusters = computeNClusters(counts)
-        print("Computation of number of clusters obtained {} clusters".format(num_clusters))
-        
-    if use_log_scale:
+    if use_log_scale and not use_adjusted_log and batch_correction is None:
         print("Using pseudo-log counts log2(counts + 1)")
         norm_counts = np.log2(norm_counts + 1)  
+            
+    if batch_correction is not None:
+        print("Computing per batch normalization...")
+        norm_counts = correct_batch_effects(counts, batch_correction)
+
+    # Keep top genes (variance or expressed)
+    norm_counts = keep_top_genes(norm_counts, num_genes_keep / 100.0, 
+                                 criteria=top_genes_criteria)
+       
+    # Compute the expected number of clusters
+    if num_clusters is None and "DBSCAN" not in clustering:
+        num_clusters = computeNClusters(counts)
+        print("Computation of number of clusters obtained {} clusters".format(num_clusters))
       
-    print("Performing dimensionality reduction...") 
-           
+    print("Performing dimensionality reduction...")   
     if "tSNE" in dimensionality:
         # NOTE the Scipy tsne seems buggy so we use the R one instead
-        reduced_data = Rtsne(norm_counts, num_dimensions, theta=tsne_theta, perplexity=tsne_perplexity)
+        reduced_data = Rtsne(norm_counts, num_dimensions, 
+                             theta=tsne_theta, perplexity=tsne_perplexity)
     elif "PCA" in dimensionality:
-        # n_components = None, number of mle to estimate optimal
-        decomp_model = PCA(n_components=num_dimensions, whiten=True, copy=True)
+        n_comps = num_dimensions
+        solver = "auto"
+        if pca_auto_components is not None:
+            n_comps = pca_auto_components
+            solver = "full"
+        decomp_model = PCA(n_components=n_comps, svd_solver=solver, 
+                           whiten=True, copy=True)
     elif "ICA" in dimensionality:
         decomp_model = FastICA(n_components=num_dimensions, 
                                algorithm='parallel', whiten=True,
                                fun='logcosh', w_init=None, random_state=None)
     elif "SPCA" in dimensionality:
-        decomp_model = SparsePCA(n_components=num_dimensions, alpha=1)
+        import multiprocessing
+        decomp_model = SparsePCA(n_components=num_dimensions, alpha=1, 
+                                 n_jobs=multiprocessing.cpu_count()-1)
+    elif "FactorAnalysis" in dimensionality:
+        decomp_model = FactorAnalysis(n_components=num_dimensions)
     else:
         sys.stderr.write("Error, incorrect dimensionality reduction method\n")
         sys.exit(1)
@@ -161,7 +194,7 @@ def main(counts_table_files,
                                          affinity='euclidean',
                                          linkage='ward').fit_predict(reduced_data)
     elif "DBSCAN" in clustering:
-        labels = DBSCAN(eps=0.5, min_samples=5, 
+        labels = DBSCAN(eps=dbscan_eps, min_samples=dbscan_min_size, 
                         metric='euclidean', n_jobs=-1).fit_predict(reduced_data)
     elif "Gaussian" in clustering:
         gm = GaussianMixture(n_components=num_clusters,
@@ -363,12 +396,13 @@ if __name__ == '__main__':
                         "Gaussian = Gaussian Mixtures Model\n" \
                         "(default: %(default)s)")
     parser.add_argument("--dimensionality", default="tSNE", metavar="[STR]", 
-                        type=str, choices=["tSNE", "PCA", "ICA", "SPCA"],
+                        type=str, choices=["tSNE", "PCA", "ICA", "SPCA", "FactorAnalysis"],
                         help="What dimensionality reduction algorithm to use:\n" \
                         "tSNE = t-distributed stochastic neighbor embedding\n" \
-                        "PCA = Principal Component Analysis\n" \
-                        "ICA = Independent Component Analysis\n" \
-                        "SPCA = Sparse Principal Component Analysis\n" \
+                        "PCA = Principal component analysis\n" \
+                        "ICA = Independent component analysis\n" \
+                        "SPCA = Sparse principal component analysis\n" \
+                        "FactorAnalysis = Linear model with Gaussian latent variables\n" \
                         "(default: %(default)s)")
     parser.add_argument("--use-log-scale", action="store_true", default=False,
                         help="Use log2(counts + 1) values in the dimensionality reduction step")
@@ -382,9 +416,8 @@ if __name__ == '__main__':
                         "It can be one ore more, ideally one for each input dataset\n " \
                         "It is desirable that the image is cropped to the array\n" \
                         "corners otherwise an alignment file is needed")
-    parser.add_argument("--num-dimensions", default=2, metavar="[INT]", type=int, choices=[2,3],
-                        help="The number of dimensions to use in the dimensionality " \
-                        "reduction (2 or 3). (default: %(default)s)")
+    parser.add_argument("--num-dimensions", default=2, metavar="[INT]", type=int, choices=range(2, 100),
+                        help="The number of dimensions to use in the dimensionality reduction. (default: %(default)s)")
     parser.add_argument("--spot-size", default=20, metavar="[INT]", type=int, choices=range(1, 100),
                         help="The size of the spots when generating the plots. (default: %(default)s)")
     parser.add_argument("--top-genes-criteria", default="Variance", metavar="[STR]", 
@@ -401,7 +434,18 @@ if __name__ == '__main__':
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     parser.add_argument("--color-space-plots", action="store_true", default=False,
                         help="Generate also plots using the representation in color space of the\n" \
-                        "dimensionality reduced coordinates")   
+                        "dimensionality reduced coordinates")
+    parser.add_argument("--pca-auto-components", default=None, metavar="[FLOAT]", type=float,
+                        help="For the PCA dimensionality reduction the number of dimensions\n" \
+                        "are computed so to include the percentage of variance given as input [0.1-1].")
+    parser.add_argument("--dbscan-min-size", default=5, metavar="[INT]", type=int, choices=range(5,500),
+                        help="The value of the minimum cluster sizer for DBSCAN. (default: %(default)s)")
+    parser.add_argument("--dbscan-eps", default=0.5, metavar="[FLOAT]", type=float,
+                        help="The value of eps value for DBSCAN. (default: %(default)s)")
+    parser.add_argument("--batch-correction", nargs='+', type=str,
+                        help="To apply batch correction (Scran::mnnCorrect) between a samples,\n" \
+                        "an identifier for each input dataset must be given corresponding to different individuals\n"
+                        "or another confounding effect. For example --batch-correction A1 A1 A1 A2 A2 A2.")
     args = parser.parse_args()
     main(args.counts_table_files, 
          args.normalization, 
@@ -422,5 +466,9 @@ if __name__ == '__main__':
          args.use_adjusted_log,
          args.tsne_perplexity,
          args.tsne_theta,
-         args.color_space_plots)
+         args.color_space_plots,
+         args.pca_auto_components,
+         args.dbscan_min_size,
+         args.dbscan_eps,
+         args.batch_correction)
 

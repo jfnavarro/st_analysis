@@ -47,7 +47,7 @@ def merge_datasets(counts_tableA, counts_tableB, merging_action="SUM"):
                 merged_table.loc[indexA,geneA] /= 2
     return merged_table
 
-def aggregate_datatasets(counts_table_files, plot_hist=False):
+def aggregate_datatasets(counts_table_files):
     """ This functions takes a list of data frames with ST data
     (genes as columns and spots as rows) and merges them into
     one data frame using the genes as merging criteria. 
@@ -55,22 +55,14 @@ def aggregate_datatasets(counts_table_files, plot_hist=False):
     them. Optionally, a histogram of the read/spots and gene/spots
     distributions can be generated for each dataset.
     :param counts_table_files: a list of file names of the datasets
-    :param plot_hist: True if we want to generate the histogram plots
     :return: a Pandas data frame with the merged data frames
     """
     # Spots are rows and genes are columns
     counts = pd.DataFrame()
-    sample_counts = dict()
     for i,counts_file in enumerate(counts_table_files):
         if not os.path.isfile(counts_file):
             raise IOError("Error parsing data frame", "Invalid input file")
         new_counts = pd.read_table(counts_file, sep="\t", header=0, index_col=0)
-        # Plot reads/genes distributions per spot
-        if plot_hist:
-            histogram(x_points=new_counts.sum(axis=1).values,
-                      output=os.path.join(outdir, "hist_reads_{}.png".format(i)))
-            histogram(x_points=(new_counts != 0).sum(axis=1).values, 
-                      output=os.path.join(outdir, "hist_genes_{}.png".format(i)))
         # Append dataset index to the spots (indexes) so they can be traced
         new_spots = ["{0}_{1}".format(i, spot) for spot in new_counts.index]
         new_counts.index = new_spots
@@ -156,6 +148,30 @@ def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
     print("Dropped {} genes".format(num_genes - len(counts.index)))
     return counts.transpose()
 
+def correct_batch_effects(counts, batch_correction):
+    """Function to perform batch correction using a list
+    of datasets and a list of batch identifiers (one per dataset)
+    """
+    # Split and aggregate datasets by batches
+    batches = {batch:pd.DataFrame() for batch in batch_correction}
+    for index, batch in enumerate(batch_correction):
+        slice = counts[counts.index.str.contains("{}_".format(index))]
+        batches[batch] = batches[batch].append(slice)
+    # Transpose all batches to have genes as rows
+    batches = [b.transpose() for b in batches.values()]
+    # Make the batch correction
+    split_corrected_data = computeMnnBatchCorrection(batches)
+    # Transpose all the corrected batches to have genes as columns
+    split_corrected_data = [b.transpose() for b in split_corrected_data]
+    # Aggregate corrected batches back
+    merged_counts = pd.DataFrame()
+    for new_counts in split_corrected_data:
+        merged_counts = merged_counts.append(new_counts)
+    # Replace Nan and Inf by zeroes
+    merged_counts.replace([np.inf, -np.inf], np.nan)
+    merged_counts.fillna(0.0, inplace=True)
+    return counts
+
 def compute_size_factors(counts, normalization, scran_clusters=True):
     """ Helper function to compute normalization
     size factors"""
@@ -177,18 +193,9 @@ def compute_size_factors(counts, normalization, scran_clusters=True):
     elif normalization in "RAW":
         size_factors = 1
     elif normalization in "Scran":
-        size_factors = computeSumFactors(counts, scran_clusters)         
+        size_factors = computeSumFactors(counts, scran_clusters)
     else:
-        raise RunTimeError("Error, incorrect normalization method\n")
-    if np.isnan(size_factors).any() or np.isinf(size_factors).any():
-        print("Warning: Computed size factors contained NaN or Inf."
-              "\nThey will be replaced by 1.0!")
-        size_factors[np.isnan(size_factors)] = 1.0
-        size_factors[np.isinf(size_factors)] = 1.0
-    if np.any(size_factors <= 0.0):
-        print("Warning: Computed size factors contained zeroes or negative values."
-              "\nThey will be replaced by 1.0!")
-        size_factors[size_factors <= 0.0] = 1.0     
+        raise RunTimeError("Error, incorrect normalization method\n")   
     return size_factors
 
 def normalize_data(counts, normalization, center=False, adjusted_log=False):
@@ -207,11 +214,18 @@ def normalize_data(counts, normalization, center=False, adjusted_log=False):
     size_factors = compute_size_factors(counts, normalization)
     if np.all(size_factors == 1.0):
         return counts
+    if np.isnan(size_factors).any() or np.isinf(size_factors).any() \
+    or np.any(size_factors <= 0.0):
+        print("Warning: Computed size factors contained NaN or zeroes or Inf values."
+              "\nSpots for these will be discarded!")
+        valid = (size_factors > 0) & np.isfinite(size_factors)
+        counts = counts[valid]
+        size_factors = size_factors[valid]
     # Spots as columns and genes as rows
     counts = counts.transpose()
     # Center and/or adjust log the size_factors and counts
     if center: 
-        size_factors = size_factors / np.mean(size_factors)
+        size_factors = size_factors - np.mean(size_factors)
     if adjusted_log:
         norm_counts = logCountsWithFactors(counts, size_factors)
     else:
@@ -229,7 +243,8 @@ def normalize_samples(counts, number_datasets):
     factors for each dataset using DESeq. Finally
     it will apply the factors to each dataset. 
     :param counts: a Pandas dataframe conposed of several ST Datasets
-    :param number_datasets: the number of different datasets merged in the input data frame
+    :param number_datasets: the number of different datasets 
+    merged in the input data frame
     :return: the same dataframe as input with the counts normalized
     """
     # First store the aggregated gene counts for each dataset in a dictionary

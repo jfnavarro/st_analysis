@@ -16,7 +16,7 @@ with io.open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
   name = 'stanalysis',
-  version = "0.5.1",
+  version = "0.5.2",
   description = __doc__.split("\n", 1)[0],
   long_description = long_description,
   keywords = 'rna-seq analysis machine_learning spatial transcriptomics toolkit',
@@ -38,7 +38,8 @@ setup(
     'rpy2',
     'Pillow',
     'jinja2',
-    'tzlocal'
+    'tzlocal',
+    'plotly'
   ],
   #test_suite = 'tests',
   scripts = glob.glob('scripts/*.py'),
