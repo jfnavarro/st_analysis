@@ -34,6 +34,7 @@ import pandas as pd
 #from sklearn.feature_selection import VarianceThreshold
 from stanalysis.preprocessing import *
 from sklearn.svm import LinearSVC, SVC
+from sklearn.linear_model import LogisticRegression
 from sklearn import metrics
 from sklearn.multiclass import OneVsRestClassifier
 from stanalysis.visualization import scatter_plot, color_map
@@ -51,7 +52,8 @@ def main(train_data,
          outdir,
          alignment, 
          image,
-         spot_size):
+         spot_size,
+         classifier):
 
     if len(train_data) == 0 or any([not os.path.isfile(f) for f in train_data]) \
     or len(train_data) != len(classes_train) \
@@ -144,12 +146,35 @@ def main(train_data,
         
     # Train the classifier and predict
     # TODO optimize parameters of the classifier (kernel="rbf" or "sigmoid")
-    classifier = OneVsRestClassifier(SVC(probability=True, random_state=0, 
-                                         decision_function_shape="ovr", kernel="linear"), n_jobs=4)
+    if classifier in "SVC":
+        classifier = OneVsRestClassifier(SVC(probability=True, 
+                                             random_state=0, 
+                                             decision_function_shape="ovr", 
+                                             kernel="linear"), n_jobs=4)
+    else:
+        classifier = OneVsRestClassifier(LogisticRegression(penalty='l2', 
+                                                            dual=False, 
+                                                            tol=0.0001, 
+                                                            C=1.0, 
+                                                            fit_intercept=True, 
+                                                            intercept_scaling=1, 
+                                                            class_weight=None, 
+                                                            random_state=0, 
+                                                            solver='liblinear', 
+                                                            max_iter=100, 
+                                                            multi_class='ovr', 
+                                                            warm_start=False), n_jobs=4)
     classifier = classifier.fit(train_counts, train_labels)
     predicted_class = classifier.predict(test_counts) 
     predicted_prob = classifier.predict_proba(test_counts)
      
+    # Print the weights for each gene
+    pd.DataFrame(data=classifier.coef_,
+                 index=sorted(set(train_labels)),
+                 columns=intersect_genes).to_csv(os.path.join(outdir,
+                                                              "genes_contributions.tsv"), 
+                                                              sep='\t')
+    
     # Compute accuracy
     if classes_test is not None:
         print("Classification report for classifier {0}:\n{1}\n".
@@ -173,8 +198,7 @@ def main(train_data,
             x_points.append(x)
             y_points.append(y)
             filehandler.write("{0}\t{1}\t{2}\n".format(labels[i], label,
-                                                       "\t".join(['{:.6f}'.format(x) for x in probs])))
-            
+                                                       "\t".join(['{:.6f}'.format(x) for x in probs])))   
     # Plot the spots with the predicted color on top of the tissue image
     # The plotted color will be taken from a linear space from 
     # all the unique colors from the classes so it shows
@@ -240,6 +264,13 @@ if __name__ == '__main__':
                         "Scran = Deconvolution Sum Factors\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
+    parser.add_argument("--classifier", default="SVC", metavar="[STR]", 
+                        type=str, 
+                        choices=["SVC", "LR"],
+                        help="The classifier to use:\n" \
+                        "SVC = Support Vector Machine\n" \
+                        "LR = Logistic Regression\n" \
+                        "(default: %(default)s)")
     parser.add_argument("--alignment", default=None,
                         help="A file containing the alignment image " \
                         "(array coordinates to pixel coordinates) as a 3x3 matrix in tab delimited format\n" \
@@ -254,5 +285,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
          args.test_classes, args.use_log_scale, args.normalization, 
-         args.outdir, args.alignment, args.image, args.spot_size)
+         args.outdir, args.alignment, args.image, args.spot_size, args.classifier)
 

@@ -172,13 +172,14 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
         extent_size = None
     # We convert the list of color int values to color labels
     color_values = None
-    unique_colors = set(colors)
-    if cmap is None and colors is not None:
+    unique_colors = None
+    if cmap is None and colors is not None and type(colors[0]) is int:
+        unique_colors = set(colors)
         color_values = [color_map[i] for i in unique_colors]
         colors = [color_map[i] for i in colors]
     elif colors is None:
         colors = "blue"
-    # Create the scatter plot      
+    # Create the scatter plot
     sc = a.scatter(x_points, y_points, c=colors, edgecolor="none", 
                    cmap=cmap, s=size, transform=base_trans, alpha=alpha,
                    vmin=vmin, vmax=vmax)
@@ -191,7 +192,7 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
     a.set_ylabel(ylabel)
     a.set_title(title, size=10)
     # Add legend
-    if color_values is not None and show_legend:
+    if color_values is not None and unique_colors is not None and show_legend:
         a.legend([plt.Line2D((0,1),(0,0), color=x) for x in color_values], 
                  unique_colors, loc="upper right", markerscale=1.0, 
                  ncol=1, scatterpoints=1, fontsize=5)
