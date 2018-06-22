@@ -53,7 +53,8 @@ def main(train_data,
          alignment, 
          image,
          spot_size,
-         classifier):
+         classifier,
+         svc_kernel):
 
     if len(train_data) == 0 or any([not os.path.isfile(f) for f in train_data]) \
     or len(train_data) != len(classes_train) \
@@ -150,7 +151,7 @@ def main(train_data,
         classifier = OneVsRestClassifier(SVC(probability=True, 
                                              random_state=0, 
                                              decision_function_shape="ovr", 
-                                             kernel="linear"), n_jobs=4)
+                                             kernel=svc_kernel), n_jobs=4)
     else:
         classifier = OneVsRestClassifier(LogisticRegression(penalty='l2', 
                                                             dual=False, 
@@ -271,6 +272,15 @@ if __name__ == '__main__':
                         "SVC = Support Vector Machine\n" \
                         "LR = Logistic Regression\n" \
                         "(default: %(default)s)")
+    parser.add_argument("--svc-kernel", default="linear", metavar="[STR]", 
+                        type=str, 
+                        choices=["linear", "poly", "rbf", "sigmoid"],
+                        help="What kernel to use with the SVC classifier:\n" \
+                        "linear = a linear kernel\n" \
+                        "poly = a polynomial kernel\n" \
+                        "rbf = a rbf kernel\n" \
+                        "sigmoid = a sigmoid kernel\n" \
+                        "(default: %(default)s)")
     parser.add_argument("--alignment", default=None,
                         help="A file containing the alignment image " \
                         "(array coordinates to pixel coordinates) as a 3x3 matrix in tab delimited format\n" \
@@ -285,5 +295,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
          args.test_classes, args.use_log_scale, args.normalization, 
-         args.outdir, args.alignment, args.image, args.spot_size, args.classifier)
+         args.outdir, args.alignment, args.image, args.spot_size, 
+         args.classifier, args.svc_kernel)
 
