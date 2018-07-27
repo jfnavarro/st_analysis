@@ -47,7 +47,7 @@ def merge_datasets(counts_tableA, counts_tableB, merging_action="SUM"):
                 merged_table.loc[indexA,geneA] /= 2
     return merged_table
 
-def aggregate_datatasets(counts_table_files):
+def aggregate_datatasets(counts_table_files, add_index=True):
     """ This functions takes a list of data frames with ST data
     (genes as columns and spots as rows) and merges them into
     one data frame using the genes as merging criteria. 
@@ -55,6 +55,7 @@ def aggregate_datatasets(counts_table_files):
     them. Optionally, a histogram of the read/spots and gene/spots
     distributions can be generated for each dataset.
     :param counts_table_files: a list of file names of the datasets
+    :param add_index: add the dataset index to the spot's
     :return: a Pandas data frame with the merged data frames
     """
     # Spots are rows and genes are columns
@@ -64,8 +65,9 @@ def aggregate_datatasets(counts_table_files):
             raise IOError("Error parsing data frame", "Invalid input file")
         new_counts = pd.read_table(counts_file, sep="\t", header=0, index_col=0)
         # Append dataset index to the spots (indexes) so they can be traced
-        new_spots = ["{0}_{1}".format(i, spot) for spot in new_counts.index]
-        new_counts.index = new_spots
+        if add_index:
+            new_spots = ["{0}_{1}".format(i, spot) for spot in new_counts.index]
+            new_counts.index = new_spots
         counts = counts.append(new_counts)
     # Replace Nan and Inf by zeroes
     counts.replace([np.inf, -np.inf], np.nan)

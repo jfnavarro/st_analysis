@@ -106,12 +106,6 @@ def main(counts_table,
                                       colorbar=ColorBar(title='Colorbar'),
                                       colorscale='Jet',
                                       opacity=data_alpha))
-        if valid_clusters:
-            trace2 = Scatter3d(x=x2, y=y2, z=z2,
-                               mode='markers',
-                               marker=dict(size=dot_size,
-                                           color=clusters_colors,
-                                           opacity=data_alpha))
               
         layout = Layout(margin=dict(l=0,r=0,b=0,t=0), 
                         title=gene,
@@ -137,6 +131,8 @@ def main(counts_table,
                           mode='markers',
                           marker=dict(size=dot_size,
                                       color=clusters_colors,
+                                      colorbar=ColorBar(title='Colorbar'), 
+                                      colorscale='Rainbow',
                                       opacity=data_alpha))
           
         layout = Layout(margin=dict(l=0,r=0,b=0,t=0), title="Clusters",

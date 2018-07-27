@@ -25,6 +25,10 @@ NOTE: soon Monocle and edgeR will be added
 
 @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
+
+#TODO Add option to do pair-wise comparison
+#TODO Add option to choose random spots for each sample (To save computational time)
+
 import argparse
 import sys
 import os
@@ -97,9 +101,11 @@ def main(counts_table_files, conditions, comparisons, outdir, fdr,
     # DEA call
     try:
         if normalization in "DESeq2":
-            dea_results = deaDESeq2(counts, conds, comparisons, alpha=fdr, size_factors=None)
+            dea_results = deaDESeq2(counts, conds, comparisons, 
+                                    alpha=fdr, size_factors=None)
         else:
-            dea_results = deaScranDESeq2(counts, conds, comparisons, alpha=fdr, scran_clusters=False)
+            dea_results = deaScranDESeq2(counts, conds, comparisons, 
+                                         alpha=fdr, scran_clusters=False)
     except Exception as e:
         sys.stderr.write("Error while performing DEA " + str(e) + "\n")
         sys.exit(1)

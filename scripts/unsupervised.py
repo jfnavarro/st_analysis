@@ -59,11 +59,12 @@ def main(counts_table_files,
          use_adjusted_log,
          tsne_perplexity,
          tsne_theta,
-         color_space_plots,
          pca_auto_components,
          dbscan_min_size,
          dbscan_eps,
-         batch_correction):
+         batch_correction,
+         joint_plot,
+         num_columns):
 
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
@@ -212,26 +213,6 @@ def main(counts_table_files,
     # We do not want zeroes in the labels
     if 0 in labels: labels = labels + 1
 
-    # Compute a color_label based on the RGB representation of the 
-    # 2D/3D dimensionality reduced coordinates
-    labels_colors = list()
-    x_max = max(reduced_data[:,0])
-    x_min = min(reduced_data[:,0])
-    y_max = max(reduced_data[:,1])
-    y_min = min(reduced_data[:,1])
-    x_p = reduced_data[:,0]
-    y_p = reduced_data[:,1]
-    z_p = y_p
-    if num_dimensions == 3:
-        z_p = reduced_data[:,2]
-        z_max = max(reduced_data[:,2])
-        z_min = min(reduced_data[:,2])
-    for x,y,z in zip(x_p,y_p,z_p):
-        r = linear_conv(x, x_min, x_max, 0.0, 1.0)
-        g = linear_conv(y, y_min, y_max, 0.0, 1.0)
-        b = linear_conv(z, z_min, z_max, 0.0, 1.0) if num_dimensions == 3 else 1.0
-        labels_colors.append((r,g,b))
-
     # Write the spots and their classes to a file
     file_writers = [open(os.path.join(outdir,
                                       "{}_clusters.tsv".format(
@@ -257,7 +238,6 @@ def main(counts_table_files,
         spot_plot_data[index][0].append(x)
         spot_plot_data[index][1].append(y)
         spot_plot_data[index][2].append(labels[i])
-        spot_plot_data[index][3].append(labels_colors[i])
         # This is to account for the cases where the spots already contain a tag (separated by "_")
         if len(tokens2) == 3:
             spot_str = "{}_{}x{}".format(tokens2[1],x,y)
@@ -302,6 +282,10 @@ def main(counts_table_files,
     
     # Plot the spots with colors corresponding to the predicted class
     # Use the HE image as background if the image is given
+    n_col = min(num_columns, len(counts_table_files)) if joint_plot else 1
+    n_row = max(int(len(counts_table_files) / n_col), 1) if joint_plot else 1
+    if joint_plot:
+        print("Generating a multiplot of {} rows and {} columns".format(n_row, n_col))
     for i, name in enumerate(counts_table_files):
         # Get the list of spot coordinates and colors to plot for each dataset
         x_points = spot_plot_data[i][0]
@@ -310,60 +294,47 @@ def main(counts_table_files,
         colors_dimensionality = spot_plot_data[i][3]
 
         # Retrieve alignment matrix and image if any
-        image = image_files[i] if image_files is not None \
-        and len(image_files) >= i else None
-        alignment = alignment_files[i] if alignment_files is not None \
-        and len(alignment_files) >= i else None
+        image = image_files[i] if image_files is not None else None
+        alignment = alignment_files[i] if alignment_files is not None else None
         
         # alignment_matrix will be identity if alignment file is None
         alignment_matrix = parseAlignmentMatrix(alignment)
         
-        # Actually plot the data         
+        # Actually plot the data      
+        outfile = os.path.join(outdir,
+                               "{}_clusters.pdf".format(
+                                          os.path.splitext(os.path.basename(name))[0])) if not joint_plot else None   
         scatter_plot(x_points=x_points, 
                      y_points=y_points,
                      colors=colors_classes,
-                     output=os.path.join(outdir,
-                                         "{}_clusters.pdf".format(
-                                          os.path.splitext(os.path.basename(name))[0])), 
+                     output=outfile, 
                      alignment=alignment_matrix, 
                      cmap=None, 
                      title=name, 
-                     xlabel='X', 
-                     ylabel='Y',
+                     xlabel=None, 
+                     ylabel=None,
                      image=image, 
                      alpha=1.0, 
-                     size=spot_size)
-        if color_space_plots:
-            scatter_plot(x_points=x_points, 
-                         y_points=y_points,
-                         colors=colors_dimensionality, 
-                         output=os.path.join(outdir,
-                                             "{}_color_space.pdf".format(
-                                             os.path.splitext(os.path.basename(name))[0])), 
-                         alignment=alignment_matrix, 
-                         cmap=plt.get_cmap("hsv"), 
-                         title=name, 
-                         xlabel='X', 
-                         ylabel='Y',
-                         image=image, 
-                         alpha=1.0, 
-                         size=spot_size)        
+                     size=spot_size,
+                     n_col=n_col,
+                     n_row=n_row,
+                     n_index=i+1 if joint_plot else 1)
+        
+    if joint_plot:
+        fig = plt.gcf()
+        fig.savefig("joint_plot_clusters.pdf", format='pdf', dpi=180)     
                                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--counts-table-files", required=True, nargs='+', type=str,
                         help="One or more matrices with gene counts per feature/spot (genes as columns)")
-    parser.add_argument("--normalization", default="DESeq2", metavar="[STR]", 
+    parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, 
-                        choices=["RAW", "DESeq2", "DESeq2Linear", "DESeq2PseudoCount", 
-                                 "DESeq2SizeAdjusted", "REL", "TMM", "RLE", "Scran"],
+                        choices=["RAW", "DESeq2", "REL", "TMM", "RLE", "Scran"],
                         help="Normalize the counts using:\n" \
                         "RAW = absolute counts\n" \
                         "DESeq2 = DESeq2::estimateSizeFactors(counts)\n" \
-                        "DESeq2PseudoCount = DESeq2::estimateSizeFactors(counts + 1)\n" \
-                        "DESeq2Linear = DESeq2::estimateSizeFactors(counts, linear=TRUE)\n" \
-                        "DESeq2SizeAdjusted = DESeq2::estimateSizeFactors(counts + lib_size_factors)\n" \
                         "RLE = EdgeR RLE * lib_size\n" \
                         "TMM = EdgeR TMM * lib_size\n" \
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
@@ -425,27 +396,28 @@ if __name__ == '__main__':
                         help="What criteria to use to keep top genes before doing\n" \
                         "the dimensionality reduction (Variance or TopRanked) (default: %(default)s)")
     parser.add_argument("--use-adjusted-log", action="store_true", default=False,
-                        help="Use adjusted log normalized counts (R Scater::normalized())\n"
+                        help="Use adjusted log normalized counts (Scater::normalized())\n"
                         "in the dimensionality reduction step (recommended with SCRAN normalization)")
     parser.add_argument("--tsne-perplexity", default=30, metavar="[INT]", type=int, choices=range(5,500),
                         help="The value of the perplexity for the t-sne method. (default: %(default)s)")
     parser.add_argument("--tsne-theta", default=0.5, metavar="[FLOAT]", type=float,
                         help="The value of theta for the t-sne method. (default: %(default)s)")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
-    parser.add_argument("--color-space-plots", action="store_true", default=False,
-                        help="Generate also plots using the representation in color space of the\n" \
-                        "dimensionality reduced coordinates")
     parser.add_argument("--pca-auto-components", default=None, metavar="[FLOAT]", type=float,
                         help="For the PCA dimensionality reduction the number of dimensions\n" \
                         "are computed so to include the percentage of variance given as input [0.1-1].")
     parser.add_argument("--dbscan-min-size", default=5, metavar="[INT]", type=int, choices=range(5,500),
                         help="The value of the minimum cluster sizer for DBSCAN. (default: %(default)s)")
     parser.add_argument("--dbscan-eps", default=0.5, metavar="[FLOAT]", type=float,
-                        help="The value of eps value for DBSCAN. (default: %(default)s)")
+                        help="The value of the EPS parameter for DBSCAN. (default: %(default)s)")
     parser.add_argument("--batch-correction", nargs='+', type=str,
-                        help="To apply batch correction (Scran::mnnCorrect) between a samples,\n" \
+                        help="Apply batch correction (Scran::mnnCorrect) between samples,\n" \
                         "an identifier for each input dataset must be given corresponding to different individuals\n"
-                        "or another confounding effect. For example --batch-correction A1 A1 A1 A2 A2 A2.")
+                        "or other confounding effects. For example --batch-correction A1 A1 A1 A2 A2 A2.")
+    parser.add_argument("--joint-plot", action="store_true", default=False, 
+                        help="Generate one figure for all the datasets instead of one figure per dataset.")
+    parser.add_argument("--num-columns", default=1, type=int, metavar="[INT]",
+                        help="The number of columns when using --joint-plot (default: %(default)s)")
     args = parser.parse_args()
     main(args.counts_table_files, 
          args.normalization, 
@@ -466,9 +438,10 @@ if __name__ == '__main__':
          args.use_adjusted_log,
          args.tsne_perplexity,
          args.tsne_theta,
-         args.color_space_plots,
          args.pca_auto_components,
          args.dbscan_min_size,
          args.dbscan_eps,
-         args.batch_correction)
+         args.batch_correction,
+         args.joint_plot,
+         args.num_columns)
 

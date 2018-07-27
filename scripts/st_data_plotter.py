@@ -4,14 +4,14 @@
 Script that creates a scatter plot from one or more ST datasets in matrix format
 (genes as columns and spots as rows)
 
-The output will be an image file with the same name as the input file/s if no name if given.
-
-It allows to choose transparency for the data points
+It allows to choose transparency and size for the data points
 
 It allows to pass images so the spots are plotted on top of it (an alignment file
 can be passed along to convert spot coordinates to pixel coordinates)
 
 It allows to normalize the counts using different algorithms
+
+It allows to apply different thresholds
 
 It allows to filter out by gene counts or gene names (following a reg-exp pattern) 
 what spots to plot
@@ -39,7 +39,13 @@ def main(counts_table_files,
          normalization,
          filter_genes,
          outdir,
-         use_log_scale):
+         use_log_scale,
+         num_exp_genes,
+         num_exp_spots,
+         min_gene_expression,
+         joint_plot,
+         use_global_scale,
+         num_columns):
 
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
@@ -71,11 +77,15 @@ def main(counts_table_files,
     print("Total number of genes {}".format(len(counts.columns)))
 
     # Remove noisy spots and genes (Spots are rows and genes are columns)
-    counts = remove_noise(counts, 1 / 100.0, 1 / 100.0, min_expression=1)
+    counts = remove_noise(counts, num_exp_genes / 100.0, num_exp_spots / 100.0,
+                          min_expression=min_gene_expression)
     
     # Normalization
     print("Computing per spot normalization...")
-    counts = normalize_data(counts, normalization)
+    counts = normalize_data(counts, 
+                            normalization,
+                            center=False,
+                            adjusted_log=False)
                          
     # Extract the list of the genes that must be shown
     genes_to_keep = list()
@@ -94,66 +104,62 @@ def main(counts_table_files,
     
     # Create a scatter plot for each dataset
     print("Plotting data...")
+    n_col = min(num_columns, len(counts_table_files)) if joint_plot else 1
+    n_row = max(int(len(counts_table_files) / n_col), 1) if joint_plot else 1
+    if joint_plot:
+        print("Generating a multiplot of {} rows and {} columns".format(n_row, n_col))
     total_spots = counts.index
-    vmin = 10e6
-    vmax = -1
-    x_points = list()
-    y_points = list()
-    colors = list()
+    counts = counts.loc[:,genes_to_keep]
+    global_sum = np.log2(counts[counts > cutoff]).sum(1) if use_log_scale else counts[counts > cutoff].sum(1)
+    vmin_global = global_sum.min()
+    vmax_global = global_sum.max()
     for i, name in enumerate(counts_table_files):
-        spots = filter(lambda x:'{}_'.format(i) in x, total_spots)
+        spots = list(filter(lambda x:'{}_'.format(i) in x, total_spots))
         # Compute the expressions for each spot
         # as the sum of all spots that pass the thresholds (Gene and counts)
-        x_points.append(list())
-        y_points.append(list())
-        colors.append(list())
-        for spot in spots:
-            tokens = spot.split("x")
-            assert(len(tokens) == 2)
-            y = float(tokens[1])
-            x = float(tokens[0].split("_")[1])
-            exp = sum(count for count in counts.loc[spot,genes_to_keep] if count > cutoff)
-            if exp > 0.0:
-                x_points[i].append(x)
-                y_points[i].append(y)
-                if use_log_scale: exp = np.log2(exp)
-                vmin = min(vmin, exp)
-                vmax = max(vmax, exp)
-                colors[i].append(exp)
-                
-    for i, name in enumerate(counts_table_files):
-        
-        if len(colors[i]) == 0:
+        slice = counts.loc[spots]
+        x,y = zip(*map(lambda s: (float(s.split("x")[0].split("_")[1]),float(s.split("x")[1])), spots))
+        rel_sum = np.log2(slice[slice > cutoff]).sum(1) if use_log_scale else slice[slice > cutoff].sum(1)
+        if not rel_sum.any():
             sys.stdount.write("Warning, the gene/s given are not expressed in {}\n".format(name))
             continue 
+        vmin = vmin_global if use_global_scale else rel_sum.min() 
+        vmax = vmax_global if use_global_scale else rel_sum.max()
  
         # Retrieve alignment matrix and image if any
-        image = image_files[i] if image_files is not None \
-        and len(image_files) >= i else None
-        alignment = alignment_files[i] if alignment_files is not None \
-        and len(alignment_files) >= i else None
+        image = image_files[i] if image_files is not None else None
+        alignment = alignment_files[i] if alignment_files is not None else None
                 
         # alignment_matrix will be identity if alignment file is None
         alignment_matrix = parseAlignmentMatrix(alignment) 
     
         # Create a scatter plot for the gene data
         # If image is given plot it as a background
-        scatter_plot(x_points=x_points[i],
-                     y_points=y_points[i],
-                     colors=colors[i],
-                     output=os.path.join(outdir, "{}.pdf".format(os.path.splitext(os.path.basename(name))[0])),
+        outfile = os.path.join(outdir, "{}.pdf".format(
+            os.path.splitext(os.path.basename(name))[0])) if not joint_plot else None
+        scatter_plot(x_points=x,
+                     y_points=y,
+                     colors=rel_sum,
+                     output=outfile,
                      alignment=alignment_matrix,
                      cmap=plt.get_cmap("YlOrBr"),
                      title=name,
-                     xlabel='X',
-                     ylabel='Y',
+                     xlabel=None,
+                     ylabel=None,
                      image=image,
                      alpha=data_alpha,
                      size=dot_size,
                      show_legend=False,
                      show_color_bar=True,
                      vmin=vmin,
-                     vmax=vmax)
+                     vmax=vmax,
+                     n_col=n_col,
+                     n_row=n_row,
+                     n_index=i+1 if joint_plot else 1)
+    
+    if joint_plot:
+        fig = plt.gcf()
+        fig.savefig("joint_plot.pdf", format='pdf', dpi=180)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
@@ -170,8 +176,17 @@ if __name__ == '__main__':
                         "It can be one ore more, ideally one for each input dataset\n " \
                         "It is desirable that the image is cropped to the array\n" \
                         "corners otherwise an alignment file is needed")
+    parser.add_argument("--num-exp-genes", default=1, metavar="[FLOAT]", type=float,
+                        help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
+                        "must have to be kept from the distribution of all expressed genes (default: %(default)s)")
+    parser.add_argument("--num-exp-spots", default=1, metavar="[FLOAT]", type=float,
+                        help="The percentage of number of expressed spots a gene\n" \
+                        "must have to be kept from the total number of spots (default: %(default)s)")
+    parser.add_argument("--min-gene-expression", default=1, type=int, metavar="[INT]", choices=range(1, 50),
+                        help="The minimum count (number of reads) a gene must have in a spot to be\n"
+                        "considered expressed (default: %(default)s)")
     parser.add_argument("--cutoff", 
-                        help="Do not include genes that falls below this reads cut off per spot (default: %(default)s)",
+                        help="Do not include genes that fall below this reads cut off per spot (default: %(default)s)",
                         type=float, default=0.0, metavar="[FLOAT]", choices=range(0, 100))
     parser.add_argument("--data-alpha", type=float, default=1.0, metavar="[FLOAT]",
                         help="The transparency level for the data points, 0 min and 1 max (default: %(default)s)")
@@ -179,16 +194,10 @@ if __name__ == '__main__':
                         help="The size of the dots (default: %(default)s)")
     parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, 
-                        choices=["RAW", "DESeq2", "DESeq2Linear", "DESeq2PseudoCount", 
-                                 "DESeq2SizeAdjusted", "REL", "TMM", "RLE", "Scran"],
+                        choices=["RAW", "DESeq2", "REL", "Scran"],
                         help="Normalize the counts using:\n" \
                         "RAW = absolute counts\n" \
                         "DESeq2 = DESeq2::estimateSizeFactors(counts)\n" \
-                        "DESeq2PseudoCount = DESeq2::estimateSizeFactors(counts + 1)\n" \
-                        "DESeq2Linear = DESeq2::estimateSizeFactors(counts, linear=TRUE)\n" \
-                        "DESeq2SizeAdjusted = DESeq2::estimateSizeFactors(counts + lib_size_factors)\n" \
-                        "RLE = EdgeR RLE * lib_size\n" \
-                        "TMM = EdgeR TMM * lib_size\n" \
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
@@ -199,7 +208,14 @@ if __name__ == '__main__':
                         type=str,
                         action='append')
     parser.add_argument("--outdir", default=None, help="Path to output dir")
-    parser.add_argument("--use-log-scale", action="store_true", default=False, help="Use log2(counts + 1) values")
+    parser.add_argument("--use-log-scale", action="store_true", default=False, 
+                        help="Plot expression in log space (log2)")
+    parser.add_argument("--joint-plot", action="store_true", default=False, 
+                        help="Generate one figure for all the datasets instead of one figure per dataset.")
+    parser.add_argument("--use-global-scale", action="store_true", default=False, 
+                        help="Use a global scale instead of a relative one when plotting several datasets.")
+    parser.add_argument("--num-columns", default=1, type=int, metavar="[INT]",
+                        help="The number of columns when using --joint-plot (default: %(default)s)")
     args = parser.parse_args()
 
     main(args.counts_table_files,
@@ -211,4 +227,10 @@ if __name__ == '__main__':
          args.normalization,
          args.show_genes,
          args.outdir,
-         args.use_log_scale)
+         args.use_log_scale,
+         args.num_exp_genes,
+         args.num_exp_spots,
+         args.min_gene_expression,
+         args.joint_plot,
+         args.use_global_scale,
+         args.num_columns)

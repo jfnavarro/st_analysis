@@ -57,3 +57,9 @@ Version 0.5.2
 * Added batch correction option to unsupervised.py
 * Small improvements in unsupervised.py
 * st_data_plotter3D.py can plot clusters
+
+Version 0.5.3
+* st_data_plotter.py can generate multiplots
+* improvements in st_data_plotter.py 
+* unsupervised.py can generate multiplots
+* remove color-space plots in unsupervised.py

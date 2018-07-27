@@ -134,7 +134,8 @@ def grid_plot(x_points, y_points, colors, output=None, alignment=None):
 def scatter_plot(x_points, y_points, output=None, colors=None,
                  alignment=None, cmap=None, title='Scatter', xlabel='X', 
                  ylabel='Y', image=None, alpha=1.0, size=10, 
-                 show_legend=True, show_color_bar=False, vmin=None, vmax=None):
+                 show_legend=True, show_color_bar=False, 
+                 vmin=None, vmax=None, n_col=1, n_row=1, n_index=1):
     """ 
     This function makes a scatter plot of a set of points (x,y).
     The alignment matrix is optional to transform the coordinates
@@ -156,10 +157,15 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
     :param size: the size of the dots
     :param show_legend: True draws a legend with the unique colors
     :param show_color_bar: True draws the color bar distribution
+    :param vmin: minimum value for the color scale
+    :param vmax: maximum value for the color scale
+    :param n_col: number of columns for multiplot
+    :param n_row: number of rows for multiplot
+    :param n_index: image index in case of multiplot
     :raises: RuntimeError
     """
     # Plot spots with the color class in the tissue image
-    fig, a = plt.subplots()
+    a = plt.subplot(n_row, n_col, n_index)
     base_trans = a.transData
     # Extend (left, right, bottom, top)
     # The location, in data-coordinates, of the lower-left and upper-right corners. 
@@ -188,8 +194,16 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
         img = plt.imread(image)
         a.imshow(img, extent=extent_size)
     # Add labels and title
-    a.set_xlabel(xlabel)
-    a.set_ylabel(ylabel)
+    if xlabel is not None:
+        a.set_xlabel(xlabel)
+    else:
+        a.set_xticklabels([])
+        a.axes.get_xaxis().set_visible(False)
+    if ylabel is not None:
+        a.set_ylabel(ylabel)
+    else:
+        a.set_xticklabels([])
+        a.axes.get_yaxis().set_visible(False)
     a.set_title(title, size=10)
     # Add legend
     if color_values is not None and unique_colors is not None and show_legend:
@@ -198,10 +212,9 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
                  ncol=1, scatterpoints=1, fontsize=5)
     # Add color bar
     if colors is not None and show_color_bar:
-        plt.colorbar(sc)
-    # Save or show the plot
+        plt.colorbar(sc, shrink=0.5)
+    # Save the plot in a file if the file name is given
     if output is not None:
-        fig.savefig("{}.pdf".format(os.path.splitext(os.path.basename(output))[0]), 
-                    format='pdf', dpi=180)
-    else:
-        fig.show()
+        fig = plt.gcf()
+        fig.savefig(output, format='pdf', dpi=180)
+        plt.figure()
