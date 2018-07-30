@@ -101,6 +101,8 @@ def main(counts_table_files,
     if len(genes_to_keep) == 0:
         sys.stderr.write("Error, no genes found with the reg-exp given\n")
         sys.exit(1)        
+    counts = counts.loc[:,genes_to_keep]
+    counts = counts.loc[(counts!=0).any(axis=1)]
     
     # Create a scatter plot for each dataset
     print("Plotting data...")
@@ -109,23 +111,22 @@ def main(counts_table_files,
     if joint_plot:
         print("Generating a multiplot of {} rows and {} columns".format(n_row, n_col))
     total_spots = counts.index
-    counts = counts.loc[:,genes_to_keep]
     global_sum = np.log2(counts[counts > cutoff]).sum(1) if use_log_scale else counts[counts > cutoff].sum(1)
     vmin_global = global_sum.min()
     vmax_global = global_sum.max()
     for i, name in enumerate(counts_table_files):
         spots = list(filter(lambda x:'{}_'.format(i) in x, total_spots))
         # Compute the expressions for each spot
-        # as the sum of all spots that pass the thresholds (Gene and counts)
-        slice = counts.loc[spots]
+        # as the sum of the counts above threshold
+        slice = counts.reindex(spots)
+        slice = slice.loc[(slice!=0).any(axis=1)]
         x,y = zip(*map(lambda s: (float(s.split("x")[0].split("_")[1]),float(s.split("x")[1])), spots))
         rel_sum = np.log2(slice[slice > cutoff]).sum(1) if use_log_scale else slice[slice > cutoff].sum(1)
         if not rel_sum.any():
-            sys.stdount.write("Warning, the gene/s given are not expressed in {}\n".format(name))
-            continue 
+            sys.stdout.write("Warning, the gene/s given are not expressed in {}\n".format(name))
         vmin = vmin_global if use_global_scale else rel_sum.min() 
         vmax = vmax_global if use_global_scale else rel_sum.max()
- 
+        
         # Retrieve alignment matrix and image if any
         image = image_files[i] if image_files is not None else None
         alignment = alignment_files[i] if alignment_files is not None else None
@@ -150,7 +151,7 @@ def main(counts_table_files,
                      alpha=data_alpha,
                      size=dot_size,
                      show_legend=False,
-                     show_color_bar=True,
+                     show_color_bar=False,
                      vmin=vmin,
                      vmax=vmax,
                      n_col=n_col,
@@ -158,8 +159,14 @@ def main(counts_table_files,
                      n_index=i+1 if joint_plot else 1)
     
     if joint_plot:
+        #plt.subplots_adjust(left=0.125, 
+        #                    bottom=0.9, 
+        #                    right=0.1, 
+        #                    top=0.9,
+        #                    wspace=0.3, 
+        #                    hspace=0.3)
         fig = plt.gcf()
-        fig.savefig("joint_plot.pdf", format='pdf', dpi=180)
+        fig.savefig(os.path.join(outdir,"joint_plot.pdf"), format='pdf', dpi=180)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,

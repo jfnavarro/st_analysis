@@ -204,7 +204,7 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
     else:
         a.set_xticklabels([])
         a.axes.get_yaxis().set_visible(False)
-    a.set_title(title, size=10)
+    a.set_title(title, size=5)
     # Add legend
     if color_values is not None and unique_colors is not None and show_legend:
         a.legend([plt.Line2D((0,1),(0,0), color=x) for x in color_values], 
@@ -212,7 +212,7 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
                  ncol=1, scatterpoints=1, fontsize=5)
     # Add color bar
     if colors is not None and show_color_bar:
-        plt.colorbar(sc, shrink=0.5)
+        plt.colorbar(sc)
     # Save the plot in a file if the file name is given
     if output is not None:
         fig = plt.gcf()

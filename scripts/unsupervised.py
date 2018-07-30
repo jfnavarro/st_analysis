@@ -322,7 +322,7 @@ def main(counts_table_files,
         
     if joint_plot:
         fig = plt.gcf()
-        fig.savefig("joint_plot_clusters.pdf", format='pdf', dpi=180)     
+        fig.savefig(os.path.join(outdir,"joint_plot_clusters.pdf"), format='pdf', dpi=180)     
                                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
