@@ -200,7 +200,8 @@ def compute_size_factors(counts, normalization, scran_clusters=True):
         raise RunTimeError("Error, incorrect normalization method\n")   
     return size_factors
 
-def normalize_data(counts, normalization, center=False, adjusted_log=False):
+def normalize_data(counts, normalization, center=False, 
+                   adjusted_log=False, scran_clusters=True):
     """This functions takes a data frame as input
     with ST data (genes as columns and spots as rows) and 
     returns a data frame with the normalized counts using
@@ -210,10 +211,11 @@ def normalize_data(counts, normalization, center=False, adjusted_log=False):
     :param center: if True the size factors will be centered by their mean
     :param adjusted_log: return adjusted logged normalized counts if True
     (DESeq2, DESeq2Linear, DESeq2PseudoCount, DESeq2SizeAdjusted,RLE, REL, RAW, TMM, Scran)
+    :param scran_clusters: performs clustering for cell pooling in Scran
     :return: a Pandas data frame with the normalized counts (genes as columns)
     """
     # Compute the size factors
-    size_factors = compute_size_factors(counts, normalization)
+    size_factors = compute_size_factors(counts, normalization, scran_clusters)
     if np.all(size_factors == 1.0):
         return counts
     if np.isnan(size_factors).any() or np.isinf(size_factors).any() \

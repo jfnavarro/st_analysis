@@ -93,16 +93,16 @@ def deaScranDESeq2(counts, conds, comparisons, alpha, scran_clusters=False):
         """
         r_func = r(r_call)
         sce = r_func(as_matrix(r_counts))
-        if scran_clusters:
+        if scran_clusters and n_cells >= 50:
             r_clusters = scran.quickCluster(as_matrix(r_counts), 
-                                            max(n_cells/10, 50), method="igraph")
+                                            min(n_cells/10, 10), 
+                                            method="igraph")
             min_cluster_size = min(Counter(r_clusters).values())
-            sizes = list(range(min(min_cluster_size/4, 10), min(min_cluster_size/2, 50), 10))
-            #sizes = list(set([round((min_cluster_size/2) / i) for i in [5,4,3,2,1]]))
+            sizes = list(range(min(int(min_cluster_size/4), 10), 
+                               min(int(min_cluster_size/2), 50), 5))
             sce = scran.computeSumFactors(sce, clusters=r_clusters, sizes=sizes)
         else:
-            sizes = list(range(min(n_cells/4, 10), min(n_cells/2, 50), 10))
-            #sizes = list(set([round((n_cells/2) * i) for i in [0.1,0.2,0.3,0.4,0.5]]))
+            sizes = list(range(min(n_cells/4, 10), min(n_cells/2, 50), 5))
             sce = scran.computeSumFactors(sce, sizes=sizes)   
         sce = r.normalize(sce)
         dds = r.convertTo(sce, type="DESeq2")
