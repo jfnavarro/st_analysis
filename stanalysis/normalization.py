@@ -107,7 +107,8 @@ def computeSumFactors(counts, scran_clusters=True):
         dds = scran.computeSumFactors(as_matrix(r_counts), 
                                       clusters=r_clusters, sizes=sizes)
     else:
-        sizes = list(range(min(n_cells/4, 10), min(n_cells/2, 50), 5))
+        sizes = list(range(min(int(n_cells/4), 10), 
+                           min(int(n_cells/2), 50), 5))
         dds = scran.computeSumFactors(as_matrix(r_counts), sizes=sizes)        
     pandas_sf = pandas2ri.ri2py(dds)
     pandas2ri.deactivate()

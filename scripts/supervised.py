@@ -54,12 +54,12 @@ def main(train_data,
          image,
          spot_size,
          classifier,
-         svc_kernel):
+         svc_kernel,
+         batch_correction):
 
     if len(train_data) == 0 or any([not os.path.isfile(f) for f in train_data]) \
     or len(train_data) != len(classes_train) \
-    or len(classes_train) == 0 or any([not os.path.isfile(f) for f in classes_train]) \
-    or not os.path.isfile(classes_test):
+    or len(classes_train) == 0 or any([not os.path.isfile(f) for f in classes_train]):
         sys.stderr.write("Error, input file/s not present or invalid format\n")
         sys.exit(1)
      
@@ -69,7 +69,9 @@ def main(train_data,
     print("Output folder {}".format(outdir))
   
     # Merge input train datasets (Spots are rows and genes are columns)
+    print("Loading train data set/s...")
     train_data_frame = aggregate_datatasets(train_data)
+    train_data_frame = remove_noise(train_data_frame, 0.1, 0.1, min_expression=1)
     train_genes = list(train_data_frame.columns.values)
     
     # loads all the classes for the training set
@@ -94,7 +96,9 @@ def main(train_data,
          
     # loads the test set
     # spots are rows and genes are columns
-    test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0)    
+    print("Loading test data set...")
+    test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0)
+    test_data_frame = remove_noise(test_data_frame, 0.1, 0.1, min_expression=1)
     test_genes = list(test_data_frame.columns.values)
     
     # loads all the classes for the test set
@@ -137,11 +141,17 @@ def main(train_data,
     # Get the normalized counts
     train_data_frame = normalize_data(train_data_frame, normalization)
     test_data_frame = normalize_data(test_data_frame, normalization)
+    if batch_correction:
+        print("Performing batch correction...")
+        batches = [b.transpose() for b in [train_data_frame,test_data_frame]]
+        batch_corrected = computeMnnBatchCorrection(batches)
+        train_data_frame = batch_corrected[0].transpose()
+        test_data_frame = batch_corrected[1].transpose()
     test_counts = test_data_frame.values 
     train_counts = train_data_frame.values 
     
     # Log the counts
-    if use_log_scale:
+    if use_log_scale and not batch_correction:
         train_counts = np.log2(train_counts + 1)
         test_counts = np.log2(test_counts + 1)
         
@@ -193,9 +203,9 @@ def main(train_data,
             probs = predicted_prob[i].tolist()
             merged_prob_colors.append(composite_colors(unique_colors, probs))
             tokens = labels[i].split("x")
-            assert(len(tokens) == 2)
-            y = float(tokens[1])
-            x = float(tokens[0])
+            assert(len(tokens) in [2,3])
+            y = float(tokens[-1])
+            x = float(tokens[0]) if len(tokens) == 2 else float(tokens[1])
             x_points.append(x)
             y_points.append(y)
             filehandler.write("{0}\t{1}\t{2}\n".format(labels[i], label,
@@ -250,6 +260,8 @@ if __name__ == '__main__':
                         help="One file with the class of each spot in the test data as: XxY INT")
     parser.add_argument("--use-log-scale", action="store_true", default=False,
                         help="Use log2 + 1 for the training and test set instead of raw/normalized counts.")
+    parser.add_argument("--batch-correction", action="store_true", default=False,
+                        help="Perform batch-correction (Scran::Mnncorrect()) between train and test set.")
     parser.add_argument("--normalization", default="DESeq2", metavar="[STR]", 
                         type=str, 
                         choices=["RAW", "DESeq2", "DESeq2Linear", "DESeq2PseudoCount", 
@@ -296,5 +308,5 @@ if __name__ == '__main__':
     main(args.train_data, args.test_data, args.train_classes, 
          args.test_classes, args.use_log_scale, args.normalization, 
          args.outdir, args.alignment, args.image, args.spot_size, 
-         args.classifier, args.svc_kernel)
+         args.classifier, args.svc_kernel, args.batch_correction)
 

@@ -18,17 +18,13 @@ It allows to plot multiple genes (one plot per gene)
 import argparse
 import re
 from matplotlib import pyplot as plt
-from matplotlib.widgets import Slider, Button, RadioButtons
 from stanalysis.preprocessing import *
 import pandas as pd
 import numpy as np
 import os
 import sys
 
-def normalize(counts, normalization, cutoff=1):
-    counts[counts < cutoff] = 0
-    counts = counts.loc[:,(counts!=0).any(axis=0)]
-    counts = counts.loc[(counts!=0).any(axis=1)]
+def normalize(counts, normalization):
     return normalize_data(counts,
                           normalization,
                           center=False,
@@ -48,7 +44,8 @@ def filter_data_genes(counts, filter_genes):
         genes_to_keep = counts.columns
     # Check that we hit some genes
     if len(genes_to_keep) == 0:
-        sys.stderr.write("Warning, no genes found with the reg-exp given\n")
+        sys.stderr.write("Warning, no genes found with the " \
+                         "reg-exps given\n{}\n".format(' '.join([x for x in filter_genes])))
     else:
         counts = counts.loc[:,genes_to_keep]
         counts = counts.loc[(counts!=0).any(axis=1)]
@@ -60,34 +57,39 @@ def filter_data(counts, num_exp_genes, num_exp_spots, min_gene_expression):
     return remove_noise(counts, num_exp_genes, num_exp_spots,
                         min_expression=min_gene_expression)
 
-def compute_plotting_data(counts, names, cutoff, use_log_scale, use_global_scale):
+def compute_plotting_data(counts, names, cutoff_lower, 
+                          cutoff_upper, use_log_scale, use_global_scale):
     plotting_data = list()
     # counts should be a vector and cutoff should be a percentage (0.0 - 1.0)
-    min_gene_exp = counts.quantile(cutoff)
-    print("Using cutoff of {}".format(min_gene_exp))
-    counts = counts[counts >= min_gene_exp]
+    min_gene_exp = counts.quantile(cutoff_lower)
+    max_gene_exp = counts.quantile(cutoff_upper)
+    print("Using lower cutoff of {} percentile {} of total distribution".format(min_gene_exp, cutoff_lower))
+    print("Using upper cutoff of {} percentile {} of total distribution".format(max_gene_exp, cutoff_upper))
+    counts[counts < min_gene_exp] = 0
+    counts[counts > max_gene_exp] = 0
     global_sum = np.log2(counts) if use_log_scale else counts
     vmin_global = global_sum.min()
     vmax_global = global_sum.max()
     for i, name in enumerate(names):
-            spots = list(filter(lambda x:'{}_'.format(i) in x, counts.index))
-            # Compute the expressions for each spot
-            # as the sum of the counts above threshold
-            slice = counts.reindex(spots)
-            x,y = zip(*map(lambda s: (float(s.split("x")[0].split("_")[1]),
-                                      float(s.split("x")[1])), spots))
-            # Get the the gene values for each spot
-            rel_sum = np.log2(slice.values) if use_log_scale else slice.values
-            if not rel_sum.any():
-                sys.stdout.write("Warning, the gene given is not expressed in {}\n".format(name))
-            vmin = vmin_global if use_global_scale else rel_sum.min() 
-            vmax = vmax_global if use_global_scale else rel_sum.max()
-            plotting_data.append((x,y,rel_sum,vmin,vmax,name))
+        r = re.compile("^{}_".format(i))
+        spots = list(filter(r.match, counts.index))
+        # Compute the expressions for each spot
+        # as the sum of the counts above threshold
+        slice = counts.reindex(spots)
+        x,y = zip(*map(lambda s: (float(s.split("x")[0].split("_")[1]),
+                                  float(s.split("x")[1])), spots))
+        # Get the the gene values for each spot
+        rel_sum = np.log2(slice.values + 1) if use_log_scale else slice.values
+        if not rel_sum.any():
+            sys.stdout.write("Warning, the gene given is not expressed in {}\n".format(name))
+        vmin = vmin_global if use_global_scale else rel_sum.min() 
+        vmax = vmax_global if use_global_scale else rel_sum.max()
+        plotting_data.append((x,y,rel_sum,vmin,vmax,name))
     return plotting_data
     
 def plot_data(plotting_data, n_col, n_row, dot_size, color_scale,
               xlim=[1,33], ylim=[1,35], invert=True, colorbar=False):
-    fig, ax = plt.subplots(n_row, n_col, figsize=(14,10)) 
+    fig, ax = plt.subplots(n_row, n_col, figsize=(4*n_col,4*n_row)) 
     fig.subplots_adjust(left = 0.1, 
                         right = 0.9,
                         bottom = 0.1,
@@ -124,6 +126,7 @@ def update_plot_data(sc, fig, plotting_data, color_scale):
     
 def main(counts_table_files,
          cutoff,
+         cutoff_upper,
          data_alpha,
          dot_size,
          normalization,
@@ -177,6 +180,7 @@ def main(counts_table_files,
         plotting_data = compute_plotting_data(counts_final.loc[:,gene], 
                                               names, 
                                               cutoff,
+                                              cutoff_upper,
                                               use_log_scale, 
                                               use_global_scale)
                 
@@ -206,6 +210,9 @@ if __name__ == '__main__':
                         "considered expressed (default: %(default)s)")
     parser.add_argument("--cutoff", default=0.1, metavar="[FLOAT]", type=float,
                         help="The percentage of reads a gene must have in a spot to be counted from" \
+                        "the distribution of reads of the gene across all the spots (0.0 - 1.0) (default: %(default)s)")
+    parser.add_argument("--cutoff-upper", default=0.9, metavar="[FLOAT]", type=float,
+                        help="The percentage of reads a gene should not have in a spot to be counted from" \
                         "the distribution of reads of the gene across all the spots (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--data-alpha", type=float, default=1.0, metavar="[FLOAT]",
                         help="The transparency level for the data points, 0 min and 1 max (default: %(default)s)")
@@ -241,6 +248,7 @@ if __name__ == '__main__':
 
     main(args.counts_table_files,
          args.cutoff,
+         args.cutoff_upper,
          args.data_alpha,
          args.dot_size,
          args.normalization,

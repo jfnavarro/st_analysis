@@ -21,7 +21,7 @@ def computeNClusters(counts, min_size=20):
     multicore = RimportLibrary("BiocParallel")
     multicore.register(multicore.MulticoreParam(multiprocessing.cpu_count()-1))  
     as_matrix = r["as.matrix"]
-    clusters = scran.quickCluster(as_matrix(r_counts), min_size)
+    clusters = scran.quickCluster(as_matrix(r_counts), min_size, method="igraph")
     n_clust = len(set(clusters))
     pandas2ri.deactivate()
     return n_clust
@@ -102,7 +102,8 @@ def deaScranDESeq2(counts, conds, comparisons, alpha, scran_clusters=False):
                                min(int(min_cluster_size/2), 50), 5))
             sce = scran.computeSumFactors(sce, clusters=r_clusters, sizes=sizes)
         else:
-            sizes = list(range(min(n_cells/4, 10), min(n_cells/2, 50), 5))
+            sizes = list(range(min(int(n_cells/4), 10), 
+                               min(int(n_cells/2), 50), 5))
             sce = scran.computeSumFactors(sce, sizes=sizes)   
         sce = r.normalize(sce)
         dds = r.convertTo(sce, type="DESeq2")
