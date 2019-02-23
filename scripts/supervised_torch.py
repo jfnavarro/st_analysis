@@ -220,8 +220,10 @@ def main(train_data,
         print("Class labels test set {}".format(sorted(set(test_labels))))
     
     # Get the normalized counts
-    train_data_frame = normalize_data(train_data_frame, normalization)
-    test_data_frame = normalize_data(test_data_frame, normalization)
+    train_data_frame = normalize_data(train_data_frame, normalization,
+                                      adjusted_log=normalization == "Scran")
+    test_data_frame = normalize_data(test_data_frame, normalization, 
+                                     adjusted_log=normalization == "Scran")
     if batch_correction:
         print("Performing batch correction...")
         batches = [b.transpose() for b in [train_data_frame,test_data_frame]]
@@ -244,7 +246,7 @@ def main(train_data,
     train_counts = train_data_frame.astype(np.float32).values
     
     # Log the counts
-    if use_log_scale and not batch_correction:
+    if use_log_scale and not batch_correction and not normalization == "Scran":
         print("Using log space for the data...")
         train_counts = np.log2(train_counts + 1)
         test_counts = np.log2(test_counts + 1)
@@ -357,7 +359,7 @@ if __name__ == '__main__':
     parser.add_argument("--batch-correction", action="store_true", default=False,
                         help="Perform batch-correction (Scran::Mnncorrect()) between train and test sets")
     parser.add_argument("--z-transformation", action="store_true", default=False,
-                        help="Apply the z-score transformation to each spot (Sij * Mean(i) / std(i))")
+                        help="Apply the z-score transformation to each spot (Sij - Mean(i) / std(i))")
     parser.add_argument("--normalization", default="DESeq2", metavar="[STR]", 
                         type=str, 
                         choices=["RAW", "DESeq2",  "REL", "Scran"],
