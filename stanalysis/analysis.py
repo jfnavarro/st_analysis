@@ -5,6 +5,7 @@ from stanalysis.normalization import RimportLibrary
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib import colors as mpcolors
 from collections import Counter
+import numpy as np
 import multiprocessing
 import rpy2.robjects.packages as rpackages
 import rpy2.robjects as robjects
@@ -45,7 +46,8 @@ def deaDESeq2(counts, conds, comparisons, alpha, size_factors=None):
         design = r('formula(~ conditions)')
         dds = r.DESeqDataSetFromMatrix(countData=r_counts, colData=cond, design=design)
         if size_factors is None:
-            dds = r.DESeq(dds, parallel=True)
+            dds = r.DESeq(dds, parallel=True, useT=True, 
+                          minmu=1e-6, minReplicatesForReplace=np.inf)
         else:
             assign_sf = r["sizeFactors<-"]
             dds = assign_sf(object=dds, value=robjects.FloatVector(size_factors))
@@ -116,7 +118,8 @@ def deaScranDESeq2(counts, conds, comparisons, alpha, scran_clusters=False):
         """
         r_func = r(r_call)
         dds = r_func(dds, cond)
-        dds = r.DESeq(dds, parallel=True)
+        dds = r.DESeq(dds, parallel=True, 
+                      minmu=1e-6, minReplicatesForReplace=np.inf)
         # Perform the comparisons and store results in list
         for A,B in comparisons:
             result = r.results(dds, contrast=r.c("conditions", A, B), 

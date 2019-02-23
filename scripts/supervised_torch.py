@@ -1,9 +1,10 @@
 #! /usr/bin/env python
+# -*- coding: utf-8 -*-
 """ 
 This script performs a supervised training and prediction for ST datasets
 
-The multi-label classification can be performed with either SVC or 
-logistic regression
+The multi-label classification is performed using a 2 layers
+neural network with the option to use CUDA
 
 The training set will be a matrix
 with counts (genes as columns and spots as rows)
@@ -25,35 +26,104 @@ methods as well as pre-filtering operations.
 
 @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
-import argparse
-import sys
+
 import os
+import sys
+import time
+import argparse
 import numpy as np
 import pandas as pd
-import pickle
 
 from stanalysis.preprocessing import *
-from sklearn.svm import LinearSVC, SVC
-from sklearn.linear_model import LogisticRegression
-from sklearn import metrics
-from sklearn.multiclass import OneVsRestClassifier
-from cProfile import label
 
-def main(train_data,
-         test_data,
+import torch
+import torch.nn as nn
+from torch.autograd import Variable
+import torch.utils.data as utils
+
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import f1_score
+from sklearn.metrics import precision_recall_fscore_support
+from sklearn.metrics import classification_report
+from sklearn.utils import shuffle
+
+import multiprocessing
+
+SEED = 666
+
+def train(model, trn_loader, optimizer, loss, use_cuda, verbose=False):
+    model.train()
+    training_loss = 0
+    training_f1 = 0
+    for data, target in trn_loader:
+        if use_cuda:
+            data, target = data.cuda(), target.cuda()
+        data, target = Variable(data), Variable(target)
+        # Forward pass
+        output = model(data)
+        tloss = loss(output, target)
+        training_loss += tloss.item()
+        # Zero the gradients
+        optimizer.zero_grad()
+        # Backward pass
+        tloss.backward()
+        # Update parameters
+        optimizer.step()
+        # Compute prediction's score
+        _, pred = torch.max(output, 1)
+        training_f1 += f1_score(target.data.cpu().numpy(),
+                                pred.data.cpu().numpy(), 
+                                average='micro')
+    if verbose:
+        print("Training set avg. loss: {:.4f}".format(training_loss / len(trn_loader.dataset)))
+        print("Training set avg. micro-f1: {:.4f}".format(training_f1 / len(trn_loader.dataset)))
+
+def test(model, tst_loader, loss, use_cuda, verbose=False):
+    model.eval()
+    test_loss = 0
+    preds = list()
+    for data, target in tst_loader:
+        if use_cuda:
+            data, target = data.cuda(), target.cuda()
+        with torch.no_grad():
+            data, target = Variable(data), Variable(target)
+            output = model(data)
+            test_loss += loss(output, target).item()
+            _, pred = torch.max(output, 1)
+            preds += pred.cpu().numpy().tolist()
+    if verbose:
+        print("Test set avg. loss: {:.4f}".format(test_loss / len(tst_loader.dataset)))
+    return preds
+
+def predict(model, X_pre, use_cuda):
+    model.eval()
+    data = X_pre
+    if use_cuda:
+        data = data.cuda()
+    with torch.no_grad():
+        data = Variable(data)
+        output = model(data)
+        _, pred = torch.max(output, 1)
+    return output, pred
+
+def main(train_data, 
+         test_data, 
          train_classes_file, 
          test_classes_file, 
          use_log_scale, 
          normalization, 
          outdir, 
-         batch_correction, 
-         z_transformation, 
+         batch_correction,
+         z_transformation,
+         batch_size,
+         test_batch_size, 
          epochs, 
+         learning_rate,
+         use_cuda,
          num_exp_genes, 
-         num_exp_spots, 
-         min_gene_expression, 
-         classifier, 
-         svc_kernel):
+         num_exp_spots,
+         min_gene_expression,
+         verbose):
 
     if not os.path.isfile(train_data):
         sys.stderr.write("Error, the training data input is not valid\n")
@@ -69,6 +139,10 @@ def main(train_data,
     
     if test_classes_file is not None and not os.path.isfile(test_classes_file):
         sys.stderr.write("Error, the test labels input is not valid\n")
+        sys.exit(1)
+      
+    if not torch.cuda.is_available() and use_cuda:
+        sys.stderr.write("Error, CUDA is not available in this computer\n")
         sys.exit(1)
           
     if not outdir or not os.path.isdir(outdir):
@@ -174,54 +248,99 @@ def main(train_data,
         print("Using log space for the data...")
         train_counts = np.log2(train_counts + 1)
         test_counts = np.log2(test_counts + 1)
-       
-    # Train the classifier and predict
-    # TODO optimize parameters of the classifier (kernel="rbf" or "sigmoid")
-    if classifier in "SVC":
-        classifier = OneVsRestClassifier(SVC(probability=True, 
-                                             random_state=0,
-                                             tol=0.001,
-                                             max_iter=epochs,
-                                             decision_function_shape="ovr", 
-                                             kernel=svc_kernel), n_jobs=-1)
-    else:
-        classifier = OneVsRestClassifier(LogisticRegression(penalty='l2', 
-                                                            dual=False, 
-                                                            tol=0.0001, 
-                                                            C=1.0, 
-                                                            fit_intercept=True, 
-                                                            intercept_scaling=1, 
-                                                            class_weight=None, 
-                                                            random_state=0, 
-                                                            solver='liblinear', 
-                                                            max_iter=epochs, 
-                                                            multi_class='ovr', 
-                                                            warm_start=False), n_jobs=-1)
-    classifier = classifier.fit(train_counts, train_labels)
-    predicted_class = classifier.predict(test_counts) 
-    predicted_prob = classifier.predict_proba(test_counts)
+        
+    n_feature = train_counts.shape[1]
+    n_ele = train_counts.shape[0]
+    n_class = len(train_labels)
     
-    # Save the model
-    pickle.dump(classifier, open(os.path.join(outdir, "model.sav"), 'wb'))
+    kwargs = {'num_workers': multiprocessing.cpu_count() - 1, 'pin_memory': True}
     
-    # Print the weights for each gene
-    pd.DataFrame(data=classifier.coef_,
-                 index=sorted(set(train_labels)),
-                 columns=intersect_genes).to_csv(os.path.join(outdir,
-                                                              "genes_contributions.tsv"), 
-                                                              sep='\t')
+    # Set the SEED
+    torch.manual_seed(SEED)
+    if use_cuda:
+        torch.cuda.manual_seed(SEED)
+        
+    # Create Tensor Flow train dataset
+    print("Creating tensors...")
+    X_train = torch.tensor(train_counts)
+    y_train = torch.from_numpy(np.asarray(train_labels, dtype=np.int))
+    trn_set = utils.TensorDataset(X_train, y_train)
+    # Split train and test dasasets
+    train_size = int(0.8 * n_ele)
+    test_size = n_ele - train_size
+    print("Splitting training set into {} and {} elements for training and testing".format(train_size, test_size))
+    train_dataset, test_dataset = torch.utils.data.random_split(trn_set, [train_size, test_size])
+    y_test_list = test_dataset.dataset.tensors[1].numpy()[test_dataset.indices]
+    # Create loaders
+    trn_loader = utils.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, **kwargs)
+    tst_loader = utils.DataLoader(test_dataset, batch_size=test_batch_size, shuffle=False, **kwargs)
+
+    # Init model
+    print("Creating model...")
+    #H = int(np.sqrt(n_feature * n_class))
+    H1 = 2000
+    H2 = 500
+    print("Hidden layer 1 size {}".format(H1))
+    print("Hidden layer 2 size {}".format(H2))
+    model = torch.nn.Sequential(
+        torch.nn.Linear(n_feature, H1),
+        torch.nn.ReLU(),
+        torch.nn.Linear(H1, H2),
+        torch.nn.ReLU(),
+        torch.nn.Linear(H2, n_class),
+    )
+    loss = torch.nn.CrossEntropyLoss().cuda() if use_cuda else torch.nn.CrossEntropyLoss()
     
-    # Compute accuracy
-    if test_classes_file is not None:
+    print("CUDA Available: ",torch.cuda.is_available())
+    device = torch.device("cuda" if (use_cuda and torch.cuda.is_available()) else "cpu")
+
+    model.to(device)      
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    
+    # Train
+    best_epoch_idx = -1
+    best_f1 = 0.
+    history = list()
+    best_model = dict()
+    print("Training model...")
+    for epoch in range(epochs):
+        if verbose:
+            print('Epoch: {}'.format(epoch))
+        train(model, trn_loader, optimizer, loss, use_cuda, verbose)
+        preds = test(model, tst_loader, loss, use_cuda, verbose) 
+        conf_mat = confusion_matrix(y_test_list, preds)
+        precision, recall, f1, _ = precision_recall_fscore_support(y_test_list, preds, average='micro')
+        if verbose:
+            print("Confusion matrix:\n", conf_mat)
+            print("Precison {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))  
+        history.append((conf_mat, precision, recall, f1))
+        if f1 > best_f1: 
+            best_f1 = f1
+            best_epoch_idx = epoch
+            best_model = model.state_dict()
+
+    print("Model trained!")
+    print("Best epoch {}".format(best_epoch_idx))
+    conf_mat, precision, recall, f1 = history[best_epoch_idx]
+    print("Confusion matrix:\n", conf_mat)
+    print("Precison {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))    
+
+    # Predict
+    print("Predicting on test data..")
+    model.load_state_dict(best_model)
+    torch.save(model, os.path.join(outdir, "model.pt"))
+    X_pre = torch.tensor(test_counts)
+    y_pre = test_labels if test_classes_file is not None else None
+    out, preds = predict(model, X_pre, use_cuda)
+    if y_pre is not None:
         print("Classification report\n{}".
-              format(metrics.classification_report(test_labels, predicted_class)))
-        print("Confusion matrix:\n{}".format(metrics.confusion_matrix(test_labels, predicted_class)))
-    
+              format(classification_report(y_pre, preds)))
+        print("Confusion matrix:\n{}".format(confusion_matrix(y_pre, preds)))
     with open(os.path.join(outdir, "predicted_classes.tsv"), "w") as filehandler:
-        for spot, pred, probs in zip(test_data_frame.index, predicted_class, predicted_prob):
+        for spot, pred, probs in zip(test_data_frame.index, preds.cpu().numpy(), out.cpu().numpy()):
             filehandler.write("{0}\t{1}\t{2}\n".format(spot, np.asscalar(pred),
-                                                       "\t".join(['{:.6f}'.format(x) for x in probs.tolist()]))) 
-       
+                                                       "\t".join(['{:.6f}'.format(x) for x in probs]))) 
+        
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
@@ -248,8 +367,18 @@ if __name__ == '__main__':
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
-    parser.add_argument("--epochs", type=int, default=1000, metavar="[INT]",
+    parser.add_argument("--train-batch-size", type=int, default=1000, metavar="[INT]",
+                        help="The input batch size for training (default: %(default)s)")
+    parser.add_argument("--test-batch-size", type=int, default=1000, metavar="[INT]",
+                        help="The input batch size for testing (default: %(default)s)")
+    parser.add_argument("--epochs", type=int, default=50, metavar="[INT]",
                         help="The number of epochs to train (default: %(default)s)")
+    parser.add_argument("--learning-rate", type=float, default=0.01, metavar="[FLOAT]",
+                        help="The learning rate (default: %(default)s)")
+    parser.add_argument("--use-cuda", action="store_true", default=False,
+                        help="Whether to use CUDA (GPU computation)")
+    parser.add_argument("--verbose", action="store_true", default=False,
+                        help="Whether to show extra messages")
     parser.add_argument("--outdir", help="Path to output dir")
     parser.add_argument("--num-exp-genes", default=0.0, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
@@ -260,26 +389,9 @@ if __name__ == '__main__':
     parser.add_argument("--min-gene-expression", default=1, type=int, metavar="[INT]", choices=range(1, 50),
                         help="The minimum count (number of reads) a gene must have in a spot to be\n"
                         "considered expressed (default: %(default)s)")
-    parser.add_argument("--classifier", default="SVC", metavar="[STR]", 
-                        type=str, 
-                        choices=["SVC", "LR"],
-                        help="The classifier to use:\n" \
-                        "SVC = Support Vector Machine\n" \
-                        "LR = Logistic Regression\n" \
-                        "(default: %(default)s)")
-    parser.add_argument("--svc-kernel", default="linear", metavar="[STR]", 
-                        type=str, 
-                        choices=["linear", "poly", "rbf", "sigmoid"],
-                        help="What kernel to use with the SVC classifier:\n" \
-                        "linear = a linear kernel\n" \
-                        "poly = a polynomial kernel\n" \
-                        "rbf = a rbf kernel\n" \
-                        "sigmoid = a sigmoid kernel\n" \
-                        "(default: %(default)s)")
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
          args.test_classes, args.use_log_scale, args.normalization, 
-         args.outdir, args.batch_correction, args.z_transformation, 
-         args.epochs, args.num_exp_genes, args.num_exp_spots, 
-         args.min_gene_expression, args.classifier, args.svc_kernel)
-
+         args.outdir, args.batch_correction, args.z_transformation, args.train_batch_size,
+         args.test_batch_size, args.epochs, args.learning_rate, args.use_cuda,
+         args.num_exp_genes, args.num_exp_spots, args.min_gene_expression, args.verbose)
