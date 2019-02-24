@@ -67,6 +67,7 @@ def computeMnnBatchCorrection(counts):
     """
     pandas2ri.activate()
     as_matrix = r["as.matrix"]
+    meta = [(x.index,x.columns) for x in counts]
     r_counts = [as_matrix(pandas2ri.py2ri(x)) for x in counts]
     scran = RimportLibrary("scran")
     multicore = RimportLibrary("BiocParallel")
@@ -79,6 +80,9 @@ def computeMnnBatchCorrection(counts):
     r_func = r(r_call)
     r_norm_counts = r_func(r_counts)
     norm_counts = [pandas2ri.ri2py(x) for x in r_norm_counts]
+    for i,nc in enumerate(norm_counts):
+        nc.index = meta[i][0]
+        nc.columns = meta[i][1]
     pandas2ri.deactivate()
     return norm_counts
 
@@ -98,8 +102,8 @@ def computeSumFactors(counts, scran_clusters=True):
     multicore.register(multicore.MulticoreParam(multiprocessing.cpu_count()-1))
     as_matrix = r["as.matrix"]
     if scran_clusters and n_cells >= 50:
-        r_clusters = scran.quickCluster(as_matrix(r_counts), 
-                                        min(n_cells/10, 10), 
+        r_clusters = scran.quickCluster(as_matrix(r_counts),
+                                        min(n_cells/10, 10),
                                         method="igraph")
         min_cluster_size = min(Counter(r_clusters).values())
         sizes = list(range(min(int(min_cluster_size/4), 10), 

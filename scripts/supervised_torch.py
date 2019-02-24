@@ -46,10 +46,67 @@ from sklearn.metrics import f1_score
 from sklearn.metrics import precision_recall_fscore_support
 from sklearn.metrics import classification_report
 from sklearn.utils import shuffle
+from sklearn.model_selection import StratifiedShuffleSplit
 
 import multiprocessing
 
 SEED = 666
+
+# Borrowed this class from https://github.com/ncullen93/torchsample
+class StratifiedSampler(utils.Sampler):
+    """Stratified Sampling
+    Provides equal representation of target classes in each batch
+    """
+    def __init__(self, class_vector, batch_size):
+        """
+        Arguments
+        ---------
+        class_vector : torch tensor
+            a vector of class labels
+        batch_size : integer
+            batch_size
+        """
+        self.n_splits = int(class_vector.size(0) / batch_size)
+        self.class_vector = class_vector
+
+    def gen_sample_array(self):      
+        s = StratifiedShuffleSplit(n_splits=self.n_splits, test_size=0.5)
+        X = torch.randn(self.class_vector.size(0),2).numpy()
+        y = self.class_vector.numpy()
+        s.get_n_splits(X, y)
+        train_index, test_index = next(s.split(X, y))
+        return np.hstack([train_index, test_index])
+
+    def __iter__(self):
+        return iter(self.gen_sample_array())
+
+    def __len__(self):
+        return len(self.class_vector)
+    
+def split_dataset(dataset, labels, split_num=0.8):
+    train_indexes = list()
+    test_indexes = list()
+    train_labels = list()
+    test_labels = list()
+    label_indexes = dict()
+    # Store indexes for each cluster
+    for i,label in enumerate(labels):
+        try:
+            label_indexes[label].append(i)
+        except KeyError:
+            label_indexes[label] = [i]
+    # Split randomly indexes for each cluster into training and testing sets  
+    for label,indexes in label_indexes.items():
+        indexes = np.asarray(indexes)
+        np.random.shuffle(indexes)
+        cut = int(split_num * len(indexes))
+        training, test = indexes[:cut], indexes[cut:]
+        train_indexes += training.tolist()
+        test_indexes += test.tolist()
+        train_labels += [label] * len(training)
+        test_labels += [label] * len(test)
+    # Return the splitted datasets and their labels
+    return dataset.iloc[train_indexes,:], dataset.iloc[test_indexes,:], train_labels, test_labels
 
 def train(model, trn_loader, optimizer, loss, use_cuda, verbose=False):
     model.train()
@@ -106,6 +163,28 @@ def predict(model, X_pre, use_cuda):
         _, pred = torch.max(output, 1)
     return output, pred
 
+def update_labels(counts, labels_dict):
+    # make sure the spots in the training set data frame
+    # and the label training spots have the same order
+    # and are the same 
+    train_labels = list()
+    for spot in counts.index:
+        try:
+            train_labels.append(labels_dict[spot])
+        except KeyError:
+            counts.drop(spot, axis=0, inplace=True)
+    assert(len(train_labels) == counts.shape[0])
+    return counts, train_labels   
+    
+def load_labels(filename):
+    labels_dict = dict()
+    with open(filename) as filehandler:
+        for line in filehandler.readlines():
+            tokens = line.split()
+            assert(len(tokens) == 2)
+            labels_dict[tokens[0]] = int(tokens[1])
+    return labels_dict
+            
 def main(train_data, 
          test_data, 
          train_classes_file, 
@@ -115,7 +194,7 @@ def main(train_data,
          outdir, 
          batch_correction,
          z_transformation,
-         batch_size,
+         train_batch_size,
          test_batch_size, 
          epochs, 
          learning_rate,
@@ -141,6 +220,13 @@ def main(train_data,
         sys.stderr.write("Error, the test labels input is not valid\n")
         sys.exit(1)
       
+    if batch_correction and not normalization == "Scran":
+        sys.stderr.write("Error, batch correction can only be applied with Scran normalization\n")
+        sys.exit(1)
+       
+    if normalization == "Scran" and use_log_scale:
+        sys.stderr.write("Warning, Scran normalization converts to log space already\n")
+         
     if not torch.cuda.is_available() and use_cuda:
         sys.stderr.write("Error, CUDA is not available in this computer\n")
         sys.exit(1)
@@ -149,60 +235,30 @@ def main(train_data,
         outdir = os.getcwd()   
     print("Output folder {}".format(outdir))
     
-    print("Loading train dataset...")
+    print("Loading training dataset...")
     train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0)
-    train_data_frame = remove_noise(train_data_frame, num_exp_genes, 
-                                    num_exp_spots, min_expression=min_gene_expression)
+    train_data_frame = remove_noise(train_data_frame, 1.0, num_exp_spots, min_gene_expression)
     train_genes = list(train_data_frame.columns.values)
     
-    # loads all the classes for the training set
-    train_labels_dict = dict()
-    with open(train_classes_file) as filehandler:
-        for line in filehandler.readlines():
-            tokens = line.split()
-            train_labels_dict[tokens[0]] = int(tokens[1])
-    # make sure the spots in the training set data frame
-    # and the label training spots have the same order
-    # and are the same 
-    train_labels = list()
-    for spot in train_data_frame.index:
-        try:
-            train_labels.append(train_labels_dict[spot])
-        except KeyError:
-            train_data_frame.drop(spot, axis=0, inplace=True)
-    if len(train_labels) != len(train_data_frame.index):
-        sys.stderr.write("Error, none of the train labels were not found in the train data\n")
-        sys.exit(1)
-       
-    print("Loading test dataset...")
+    # Load all the classes for the training set
+    train_labels_dict = load_labels(train_classes_file)
+    train_data_frame, train_labels = update_labels(train_data_frame, train_labels_dict)
+    
+    print("Loading prediction dataset...")
     test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0)
-    test_data_frame = remove_noise(test_data_frame, num_exp_genes, 
-                                   num_exp_spots, min_expression=min_gene_expression)
+    test_data_frame = remove_noise(test_data_frame, 1.0, num_exp_spots, min_gene_expression)
     test_genes = list(test_data_frame.columns.values)
     
-    # loads all the classes for the test set
+    # Load all the classes for the prediction set
     if test_classes_file is not None:
-        spot_label = dict()
-        with open(test_classes_file) as filehandler:
-            for line in filehandler.readlines():
-                tokens = line.split()
-                assert(len(tokens) == 2)
-                spot_label[tokens[0]] = int(tokens[1])
-        # filter out labels whose spot is not present and
-        # also make sure that the order of the labels is the same in the data frame
-        test_labels = list()
-        for spot in test_data_frame.index:
-            try:
-                test_labels.append(spot_label[spot])
-            except KeyError:
-                test_data_frame.drop(spot, axis=0, inplace=True)
-        if len(test_labels) != len(test_data_frame.index):
-            sys.stderr.write("Error, none of the test labels were not found in the test data\n")
-            sys.exit(1)  
+        test_labels_dict = load_labels(test_classes_file)
+        test_data_frame, test_labels = update_labels(test_data_frame, test_labels_dict)
           
-    # Keep only the record in the training set that intersects with the test set
-    print("Training genes {}".format(len(train_genes)))
-    print("Test genes {}".format(len(test_genes)))
+    # Keep only the record in the training set that intersects with the prediction set
+    print("Genes in training set {}".format(train_data_frame.shape[1]))
+    print("Spots in training set {}".format(train_data_frame.shape[0]))
+    print("Genes in prediction set {}".format(test_data_frame.shape[1]))
+    print("Spots in prediction set {}".format(test_data_frame.shape[0]))
     intersect_genes = np.intersect1d(train_genes, test_genes)
     if len(intersect_genes) == 0:
         sys.stderr.write("Error, there are no genes intersecting the train and test datasets\n")
@@ -212,18 +268,16 @@ def main(train_data,
     train_data_frame = train_data_frame.ix[:,intersect_genes]
     test_data_frame = test_data_frame.ix[:,intersect_genes]
     
-    # Classes in test and train must be the same
-    print("Training elements {}".format(len(train_labels)))
-    print("Class labels training set {}".format(sorted(set(train_labels))))
-    if test_classes_file is not None:
-        print("Test elements {}".format(len(test_labels)))
-        print("Class labels test set {}".format(sorted(set(test_labels))))
-    
-    # Get the normalized counts
+    # Get the normalized counts (prior removing noisy spots/genes)
+    train_data_frame = remove_noise(train_data_frame, num_exp_genes, 1.0, min_gene_expression)
     train_data_frame = normalize_data(train_data_frame, normalization,
                                       adjusted_log=normalization == "Scran")
+    
+    test_data_frame = remove_noise(test_data_frame, num_exp_genes, 1.0, min_gene_expression)
     test_data_frame = normalize_data(test_data_frame, normalization, 
                                      adjusted_log=normalization == "Scran")
+    
+    # Perform batch correction (Batches are training and prediction set)
     if batch_correction:
         print("Performing batch correction...")
         batches = [b.transpose() for b in [train_data_frame,test_data_frame]]
@@ -240,50 +294,89 @@ def main(train_data,
         std_test = test_data_frame.std(axis=1)
         train_data_frame = (train_data_frame - means_train) / std_train
         test_data_frame = (test_data_frame - means_test) / std_test
-        
-    # PyTorch needs floats
-    test_counts = test_data_frame.astype(np.float32).values
-    train_counts = train_data_frame.astype(np.float32).values
+
+    # Update labels again
+    train_data_frame, train_labels = update_labels(train_data_frame, train_labels_dict)
+    if test_classes_file is not None:
+        test_data_frame, test_labels = update_labels(test_data_frame, test_labels_dict)
+            
+    # Update labels so to ensure they go for 0-N secuentally
+    labels_index_map = dict()
+    index_label_map = dict()
+    for i,label in enumerate(sorted(set(train_labels))):
+        labels_index_map[label] = i
+        index_label_map[i] = label
+    print("Mapping of labels:")
+    print(index_label_map)
+    train_labels = [labels_index_map[x] for x in train_labels]
     
+    # Split train and test dasasets
+    print("Splitting training set into training and test sets (equally balancing clusters)...")
+    train_counts_x, train_counts_y, train_labels_x, train_labels_y = split_dataset(train_data_frame, 
+                                                                                   train_labels, 0.8)
+    
+    print("Training set {}".format(train_counts_x.shape[0]))
+    print("Test set {}".format(train_counts_y.shape[0]))
+    
+    # PyTorch needs floats
+    train_counts = train_counts_x.astype(np.float32).values
+    test_counts = train_counts_y.astype(np.float32).values
+    predict_counts = test_data_frame.astype(np.float32).values
+  
     # Log the counts
     if use_log_scale and not batch_correction and not normalization == "Scran":
-        print("Using log space for the data...")
+        print("Transforming datasets to log space (log2 + 1)...")
         train_counts = np.log2(train_counts + 1)
         test_counts = np.log2(test_counts + 1)
+        predict_counts = np.log2(predict_counts + 1)
         
+    # Input and output sizes
     n_feature = train_counts.shape[1]
-    n_ele = train_counts.shape[0]
-    n_class = len(train_labels)
+    n_class = max(set(train_labels)) + 1
     
     kwargs = {'num_workers': multiprocessing.cpu_count() - 1, 'pin_memory': True}
-    
     # Set the SEED
     torch.manual_seed(SEED)
     if use_cuda:
         torch.cuda.manual_seed(SEED)
-        
+
     # Create Tensor Flow train dataset
     print("Creating tensors...")
     X_train = torch.tensor(train_counts)
-    y_train = torch.from_numpy(np.asarray(train_labels, dtype=np.int))
+    X_test = torch.tensor(test_counts)
+    y_train = torch.from_numpy(np.asarray(train_labels_x, dtype=np.int))
+    y_test = torch.from_numpy(np.asarray(train_labels_y, dtype=np.int))
+    
+    # Create tensor datasets (train + test)
     trn_set = utils.TensorDataset(X_train, y_train)
-    # Split train and test dasasets
-    train_size = int(0.8 * n_ele)
-    test_size = n_ele - train_size
-    print("Splitting training set into {} and {} elements for training and testing".format(train_size, test_size))
-    train_dataset, test_dataset = torch.utils.data.random_split(trn_set, [train_size, test_size])
-    y_test_list = test_dataset.dataset.tensors[1].numpy()[test_dataset.indices]
-    # Create loaders
-    trn_loader = utils.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, **kwargs)
-    tst_loader = utils.DataLoader(test_dataset, batch_size=test_batch_size, shuffle=False, **kwargs)
+    tst_set = utils.TensorDataset(X_test, y_test)
+    
+    # Create loaders with balanced labels
+    if train_batch_size < (train_counts.shape[0] / 2):
+        print("Using a stratified sampler for training set...")
+        trn_sampler = StratifiedSampler(class_vector=y_train, batch_size=train_batch_size)
+    else:
+        print("The training batch size is almost as big as the training set...")
+        trn_sampler = None
+    if test_batch_size < (test_counts.shape[0] / 2):
+        print("Using a stratified sampler for test set...")
+        tst_sampler = StratifiedSampler(class_vector=y_test, batch_size=test_batch_size)
+    else:
+        print("The test batch size is almost as big as the test set...")
+        tst_sampler = None
+    trn_loader = utils.DataLoader(trn_set, sampler=trn_sampler, 
+                                  batch_size=train_batch_size, shuffle=False, **kwargs)
+    tst_loader = utils.DataLoader(tst_set, sampler=tst_sampler, 
+                                  batch_size=test_batch_size, shuffle=False, **kwargs)
 
     # Init model
-    print("Creating model...")
-    #H = int(np.sqrt(n_feature * n_class))
     H1 = 2000
     H2 = 500
+    print("Creating NN model...")
+    print("Input size {}".format(n_feature))
     print("Hidden layer 1 size {}".format(H1))
     print("Hidden layer 2 size {}".format(H2))
+    print("Output size {}".format(n_class))
     model = torch.nn.Sequential(
         torch.nn.Linear(n_feature, H1),
         torch.nn.ReLU(),
@@ -309,9 +402,9 @@ def main(train_data,
         if verbose:
             print('Epoch: {}'.format(epoch))
         train(model, trn_loader, optimizer, loss, use_cuda, verbose)
-        preds = test(model, tst_loader, loss, use_cuda, verbose) 
-        conf_mat = confusion_matrix(y_test_list, preds)
-        precision, recall, f1, _ = precision_recall_fscore_support(y_test_list, preds, average='micro')
+        preds = test(model, tst_loader, loss, use_cuda, verbose)
+        conf_mat = confusion_matrix(train_labels_y, preds)
+        precision, recall, f1, _ = precision_recall_fscore_support(train_labels_y, preds, average='micro')
         if verbose:
             print("Confusion matrix:\n", conf_mat)
             print("Precison {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))  
@@ -331,16 +424,17 @@ def main(train_data,
     print("Predicting on test data..")
     model.load_state_dict(best_model)
     torch.save(model, os.path.join(outdir, "model.pt"))
-    X_pre = torch.tensor(test_counts)
+    X_pre = torch.tensor(predict_counts)
     y_pre = test_labels if test_classes_file is not None else None
     out, preds = predict(model, X_pre, use_cuda)
+    preds = [index_label_map[np.asscalar(x)] for x in preds.cpu().numpy()]
     if y_pre is not None:
         print("Classification report\n{}".
               format(classification_report(y_pre, preds)))
         print("Confusion matrix:\n{}".format(confusion_matrix(y_pre, preds)))
     with open(os.path.join(outdir, "predicted_classes.tsv"), "w") as filehandler:
-        for spot, pred, probs in zip(test_data_frame.index, preds.cpu().numpy(), out.cpu().numpy()):
-            filehandler.write("{0}\t{1}\t{2}\n".format(spot, np.asscalar(pred),
+        for spot, pred, probs in zip(test_data_frame.index, preds, out.cpu().numpy()):
+            filehandler.write("{0}\t{1}\t{2}\n".format(spot, pred,
                                                        "\t".join(['{:.6f}'.format(x) for x in probs]))) 
         
 if __name__ == '__main__':
@@ -382,10 +476,10 @@ if __name__ == '__main__':
     parser.add_argument("--verbose", action="store_true", default=False,
                         help="Whether to show extra messages")
     parser.add_argument("--outdir", help="Path to output dir")
-    parser.add_argument("--num-exp-genes", default=0.0, metavar="[FLOAT]", type=float,
+    parser.add_argument("--num-exp-genes", default=0.01, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
                         "must have to be kept from the distribution of all expressed genes (0.0 - 1.0) (default: %(default)s)")
-    parser.add_argument("--num-exp-spots", default=0.0, metavar="[FLOAT]", type=float,
+    parser.add_argument("--num-exp-spots", default=0.01, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed spots a gene\n" \
                         "must have to be kept from the total number of spots (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--min-gene-expression", default=1, type=int, metavar="[INT]", choices=range(1, 50),

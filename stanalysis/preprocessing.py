@@ -96,23 +96,26 @@ def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=
     # How many spots do we keep based on the number of genes expressed?
     num_spots = len(counts.index)
     num_genes = len(counts.columns)
-    min_genes_spot_exp = round((counts >= min_expression).sum(axis=1).quantile(num_exp_genes))
-    print("Number of expressed genes (count of at least {}) a spot must have to be kept " \
-    "({}% of total expressed genes) {}".format(min_expression, num_exp_genes, min_genes_spot_exp))
-    counts = counts[(counts >= min_expression).sum(axis=1) >= min_genes_spot_exp]
-    print("Dropped {} spots".format(num_spots - len(counts.index)))
-          
-    # Spots are columns and genes are rows
-    counts = counts.transpose()
-  
-    # Remove noisy genes
-    min_features_gene = round(len(counts.columns) * num_exp_spots) 
-    print("Removing genes that are expressed in less than {} " \
-    "spots with a count of at least {}".format(min_features_gene, min_expression))
-    counts = counts[(counts >= min_expression).sum(axis=1) >= min_features_gene]
-    print("Dropped {} genes".format(num_genes - len(counts.index)))
     
-    return counts.transpose()
+    if num_exp_genes not in [0.0,1.0]:
+        min_genes_spot_exp = round((counts >= min_expression).sum(axis=1).quantile(num_exp_genes))
+        print("Number of expressed genes (count of at least {}) a spot must have to be kept " \
+        "({}% of total expressed genes) {}".format(min_expression, num_exp_genes, min_genes_spot_exp))
+        counts = counts[(counts >= min_expression).sum(axis=1) >= min_genes_spot_exp]
+        print("Dropped {} spots".format(num_spots - len(counts.index)))
+        
+    if num_exp_spots not in [0.0,1.0]:  
+        # Spots are columns and genes are rows
+        counts = counts.transpose()
+        # Remove noisy genes
+        min_features_gene = round(len(counts.columns) * num_exp_spots) 
+        print("Removing genes that are expressed in less than {} " \
+        "spots with a count of at least {}".format(min_features_gene, min_expression))
+        counts = counts[(counts >= min_expression).sum(axis=1) >= min_features_gene]
+        print("Dropped {} genes".format(num_genes - len(counts.index)))
+        counts = counts.transpose()
+    
+    return counts 
     
 def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
     """ This function takes a Pandas data frame
@@ -216,6 +219,7 @@ def normalize_data(counts, normalization, center=False,
     """
     # Compute the size factors
     size_factors = compute_size_factors(counts, normalization, scran_clusters)
+    assert(len(size_factors) == counts.shape[0])
     if np.all(size_factors == 1.0):
         return counts
     if np.isnan(size_factors).any() or np.isinf(size_factors).any() \
