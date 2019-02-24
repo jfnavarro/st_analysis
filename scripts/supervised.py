@@ -92,10 +92,6 @@ def main(train_data,
     if test_classes_file is not None and not os.path.isfile(test_classes_file):
         sys.stderr.write("Error, the test labels input is not valid\n")
         sys.exit(1)
- 
-    if batch_correction and not normalization == "Scran":
-        sys.stderr.write("Error, batch correction can only be applied with Scran normalization\n")
-        sys.exit(1)
        
     if normalization == "Scran" and use_log_scale:
         sys.stderr.write("Warning, Scran normalization converts to log space already\n")
