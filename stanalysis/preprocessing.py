@@ -219,7 +219,6 @@ def normalize_data(counts, normalization, center=False,
     """
     # Compute the size factors
     size_factors = compute_size_factors(counts, normalization, scran_clusters)
-    assert(len(size_factors) == counts.shape[0])
     if np.all(size_factors == 1.0):
         return counts
     if np.isnan(size_factors).any() or np.isinf(size_factors).any() \
