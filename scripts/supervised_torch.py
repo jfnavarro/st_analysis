@@ -288,8 +288,8 @@ def main(train_data,
         means_test = test_data_frame.mean(axis=1)
         std_train = train_data_frame.std(axis=1)
         std_test = test_data_frame.std(axis=1)
-        train_data_frame = (train_data_frame - means_train) / std_train
-        test_data_frame = (test_data_frame - means_test) / std_test
+        train_data_frame = train_data_frame.subtract(means_train, axis=0).div(std_train, axis=0)
+        test_data_frame = test_data_frame.subtract(means_test, axis=0).div(std_test, axis=0)
 
     # Update labels again
     train_data_frame, train_labels = update_labels(train_data_frame, train_labels_dict)
