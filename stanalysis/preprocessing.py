@@ -9,44 +9,16 @@ import math
 import os
 from stanalysis.normalization import *
 
-def merge_datasets(counts_tableA, counts_tableB, merging_action="SUM"):
-    """ This function merges two ST datasts (matrix of counts)
-    assuming that they are consecutive sections and that they
-    are aligned so each spot on the same position on the tissue
-    and the number of spots in the same.
-    The type of merging can be SUM (sum both counts) or AVG (average 
-    sum of both counts).
-    It returns the merged matrix of counts for the commong spots/genes.
-    :param counts_tableA: a ST matrix of counts
-    :param counts_tableB: a ST matrix of counts
-    :param merging_action: Either SUM or AVG (for the merging of counts)
-    :return: a ST matrix of counts with the merged counts (for common genes/spots)
+def ztransformation(counts):
+    """ Applies a zimple z-score transformation
+    which consists of substracting to each count the 
+    the mean of its row (spot) and then divide it by
+    the std of its row
     """
-    merged_table = counts_tableA.copy()       
-    for indexA, indexB in zip(counts_tableA.index, counts_tableB.index):
-        tokens = indexA.split("x")
-        assert(len(tokens) == 2)
-        x_a = float(tokens[0])
-        y_a = float(tokens[1])
-        tokens = indexB.split("x")
-        assert(len(tokens) == 2)
-        x_b = float(tokens[0])
-        y_b = float(tokens[1]) 
-        if abs(x_a - x_b) > 0.6 or abs(y_a - y_b) > 0.6:
-            print("Spots {} and {} dot not match and will be skipped".format(indexA, indexB))
-            merged_table.drop(indexA, axis=0, inplace=True)
-            continue        
-        for geneA, geneB in zip(counts_tableA.loc[indexA], counts_tableB.loc[indexB]):
-            if geneA != geneB:
-                print("Genes {} and {} dot not match and will be skipped".format(geneA, geneB))
-                merged_table.drop(geneA, axis=1, inplace=True)
-            elif merging_action == "SUM":
-                merged_table.loc[indexA,geneA] += counts_tableB.loc[indexB, geneB]      
-            else:
-                merged_table.loc[indexA,geneA] += counts_tableB.loc[indexB, geneB]
-                merged_table.loc[indexA,geneA] /= 2
-    return merged_table
-
+    means = counts.mean(axis=1)
+    stds = counts.std(axis=1)
+    return counts.subtract(means, axis=0).div(stds, axis=0)
+    
 def aggregate_datatasets(counts_table_files, add_index=True):
     """ This functions takes a list of data frames with ST data
     (genes as columns and spots as rows) and merges them into
@@ -58,6 +30,8 @@ def aggregate_datatasets(counts_table_files, add_index=True):
     :param add_index: add the dataset index to the spot's
     :return: a Pandas data frame with the merged data frames
     """
+    if len(counts_table_files) == 1:
+        return pd.read_table(counts_table_files[0], sep="\t", header=0, index_col=0)
     # Spots are rows and genes are columns
     counts = pd.DataFrame()
     for i,counts_file in enumerate(counts_table_files):
@@ -98,10 +72,12 @@ def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=
     num_genes = len(counts.columns)
     
     if num_exp_genes not in [0.0,1.0]:
-        min_genes_spot_exp = round((counts >= min_expression).sum(axis=1).quantile(num_exp_genes))
+        gene_sums = (counts >= min_expression).sum(axis=1)
+        min_genes_spot_exp = round(gene_sums.quantile(num_exp_genes))
         print("Number of expressed genes (count of at least {}) a spot must have to be kept " \
         "({}% of total expressed genes) {}".format(min_expression, num_exp_genes, min_genes_spot_exp))
-        counts = counts[(counts >= min_expression).sum(axis=1) >= min_genes_spot_exp]
+        counts = counts[gene_sums >= min_genes_spot_exp]
+        counts.fillna(value=0, inplace=True)
         print("Dropped {} spots".format(num_spots - len(counts.index)))
         
     if num_exp_spots not in [0.0,1.0]:  
@@ -112,6 +88,7 @@ def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=
         print("Removing genes that are expressed in less than {} " \
         "spots with a count of at least {}".format(min_features_gene, min_expression))
         counts = counts[(counts >= min_expression).sum(axis=1) >= min_features_gene]
+        counts.fillna(value=0, inplace=True)
         print("Dropped {} genes".format(num_genes - len(counts.index)))
         counts = counts.transpose()
     
@@ -133,21 +110,25 @@ def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
     num_genes = len(counts.index)
     print("Removing {}% of genes based on the {}".format(num_genes_keep * 100, criteria))
     if criteria == "Variance":
-        min_genes_spot_var = counts.var(axis=1).quantile(num_genes_keep)
+        var = counts.var(axis=1)
+        min_genes_spot_var = var.quantile(num_genes_keep)
         if math.isnan(min_genes_spot_var):
             print("Computed variance is NaN! Check your normalization factors..")
         else:
             print("Min normalized variance a gene must have over all spots " \
             "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_var))
-            counts = counts[counts.var(axis=1) >= min_genes_spot_var]
+            counts = counts[var >= min_genes_spot_var]
+            counts.fillna(value=0, inplace=True)
     elif criteria == "TopRanked":
-        min_genes_spot_sum = counts.sum(axis=1).quantile(num_genes_keep)
+        sum = counts.sum(axis=1)
+        min_genes_spot_sum = sum.quantile(num_genes_keep)
         if math.isnan(min_genes_spot_var):
             print("Computed sum is NaN! Check your normalization factors..")
         else:
             print("Min normalized total count a gene must have over all spots " \
             "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_sum))
-            counts = counts[counts.sum(axis=1) >= min_genes_spot_var]
+            counts = counts[sum >= min_genes_spot_var]
+            counts.fillna(value=0, inplace=True)
     else:
         raise RunTimeError("Error, incorrect criteria method\n")  
     print("Dropped {} genes".format(num_genes - len(counts.index)))

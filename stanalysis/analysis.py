@@ -19,8 +19,6 @@ def computeNClusters(counts, min_size=20):
     pandas2ri.activate()
     r_counts = pandas2ri.py2ri(counts.transpose())
     scran = RimportLibrary("scran")
-    multicore = RimportLibrary("BiocParallel")
-    multicore.register(multicore.MulticoreParam(multiprocessing.cpu_count()-1))  
     as_matrix = r["as.matrix"]
     clusters = scran.quickCluster(as_matrix(r_counts), min_size, method="igraph")
     n_clust = len(set(clusters))

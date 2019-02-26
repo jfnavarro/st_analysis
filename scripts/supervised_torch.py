@@ -261,8 +261,8 @@ def main(train_data,
         sys.exit(1)  
             
     print("Intersected genes {}".format(len(intersect_genes)))
-    train_data_frame = train_data_frame.ix[:,intersect_genes]
-    test_data_frame = test_data_frame.ix[:,intersect_genes]
+    train_data_frame = train_data_frame.loc[:,intersect_genes]
+    test_data_frame = test_data_frame.loc[:,intersect_genes]
     
     # Get the normalized counts (prior removing noisy spots/genes)
     train_data_frame = remove_noise(train_data_frame, num_exp_genes, 1.0, min_gene_expression)
@@ -284,12 +284,8 @@ def main(train_data,
     # Apply the z-transformation
     if z_transformation:
         print("Applying z-score transformation...")
-        means_train = train_data_frame.mean(axis=1)
-        means_test = test_data_frame.mean(axis=1)
-        std_train = train_data_frame.std(axis=1)
-        std_test = test_data_frame.std(axis=1)
-        train_data_frame = train_data_frame.subtract(means_train, axis=0).div(std_train, axis=0)
-        test_data_frame = test_data_frame.subtract(means_test, axis=0).div(std_test, axis=0)
+        train_data_frame = ztransformation(train_data_frame)
+        test_data_frame = ztransformation(test_data_frame)
 
     # Update labels again
     train_data_frame, train_labels = update_labels(train_data_frame, train_labels_dict)
@@ -309,7 +305,7 @@ def main(train_data,
     # Split train and test dasasets
     print("Splitting training set into training and test sets (equally balancing clusters)...")
     train_counts_x, train_counts_y, train_labels_x, train_labels_y = split_dataset(train_data_frame, 
-                                                                                   train_labels, 0.8)
+                                                                                   train_labels, 0.7)
     
     print("Training set {}".format(train_counts_x.shape[0]))
     print("Test set {}".format(train_counts_y.shape[0]))
@@ -330,7 +326,14 @@ def main(train_data,
     n_feature = train_counts.shape[1]
     n_class = max(set(train_labels)) + 1
     
-    kwargs = {'num_workers': multiprocessing.cpu_count() - 1, 'pin_memory': True}
+    print("CUDA Available: ",torch.cuda.is_available())
+    device = torch.device("cuda" if (use_cuda and torch.cuda.is_available()) else "cpu")
+    
+    #workers = multiprocessing.cpu_count() - 1
+    workers = 0
+    print("Workers {}".format(workers))
+    kwargs = {'num_workers': workers, 'pin_memory': True}
+    
     # Set the SEED
     torch.manual_seed(SEED)
     if use_cuda:
@@ -340,8 +343,8 @@ def main(train_data,
     print("Creating tensors...")
     X_train = torch.tensor(train_counts)
     X_test = torch.tensor(test_counts)
-    y_train = torch.from_numpy(np.asarray(train_labels_x, dtype=np.int))
-    y_test = torch.from_numpy(np.asarray(train_labels_y, dtype=np.int))
+    y_train = torch.from_numpy(np.asarray(train_labels_x, dtype=np.longlong))
+    y_test = torch.from_numpy(np.asarray(train_labels_y, dtype=np.longlong))
     
     # Create tensor datasets (train + test)
     trn_set = utils.TensorDataset(X_train, y_train)
@@ -381,9 +384,6 @@ def main(train_data,
         torch.nn.Linear(H2, n_class),
     )
     loss = torch.nn.CrossEntropyLoss().cuda() if use_cuda else torch.nn.CrossEntropyLoss()
-    
-    print("CUDA Available: ",torch.cuda.is_available())
-    device = torch.device("cuda" if (use_cuda and torch.cuda.is_available()) else "cpu")
 
     model.to(device)      
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
