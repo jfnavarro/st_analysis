@@ -16,7 +16,7 @@ with io.open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
   name = 'stanalysis',
-  version = "0.5.3",
+  version = "0.5.5",
   description = __doc__.split("\n", 1)[0],
   long_description = long_description,
   keywords = 'rna-seq analysis machine_learning spatial transcriptomics toolkit',
@@ -49,7 +49,6 @@ setup(
     'Topic :: Software Development',
     'Topic :: Scientific/Engineering :: Bio-Informatics',
     'License :: MIT:: Copyright Jose Fernandez Navarro',
-    'Programming Language :: Python :: 2.7',
     'Programming Language :: Python :: 3.4',
     'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',

@@ -77,7 +77,6 @@ def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=
         print("Number of expressed genes (count of at least {}) a spot must have to be kept " \
         "({}% of total expressed genes) {}".format(min_expression, num_exp_genes, min_genes_spot_exp))
         counts = counts[gene_sums >= min_genes_spot_exp]
-        counts.fillna(value=0, inplace=True)
         print("Dropped {} spots".format(num_spots - len(counts.index)))
         
     if num_exp_spots not in [0.0,1.0]:  
@@ -88,7 +87,6 @@ def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=
         print("Removing genes that are expressed in less than {} " \
         "spots with a count of at least {}".format(min_features_gene, min_expression))
         counts = counts[(counts >= min_expression).sum(axis=1) >= min_features_gene]
-        counts.fillna(value=0, inplace=True)
         print("Dropped {} genes".format(num_genes - len(counts.index)))
         counts = counts.transpose()
     
@@ -118,7 +116,6 @@ def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
             print("Min normalized variance a gene must have over all spots " \
             "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_var))
             counts = counts[var >= min_genes_spot_var]
-            counts.fillna(value=0, inplace=True)
     elif criteria == "TopRanked":
         sum = counts.sum(axis=1)
         min_genes_spot_sum = sum.quantile(num_genes_keep)
@@ -128,7 +125,6 @@ def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
             print("Min normalized total count a gene must have over all spots " \
             "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_sum))
             counts = counts[sum >= min_genes_spot_var]
-            counts.fillna(value=0, inplace=True)
     else:
         raise RunTimeError("Error, incorrect criteria method\n")  
     print("Dropped {} genes".format(num_genes - len(counts.index)))

@@ -48,6 +48,7 @@ from sklearn.metrics import classification_report
 from sklearn.utils import shuffle
 from sklearn.model_selection import StratifiedShuffleSplit
 
+__spec__ = None
 import multiprocessing
 
 SEED = 666
@@ -233,6 +234,7 @@ def main(train_data,
     
     print("Loading training dataset...")
     train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0)
+    # Remove noisy genes
     train_data_frame = remove_noise(train_data_frame, 1.0, num_exp_spots, min_gene_expression)
     train_genes = list(train_data_frame.columns.values)
     
@@ -242,6 +244,7 @@ def main(train_data,
     
     print("Loading prediction dataset...")
     test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0)
+    # Remove noisy genes
     test_data_frame = remove_noise(test_data_frame, 1.0, num_exp_spots, min_gene_expression)
     test_genes = list(test_data_frame.columns.values)
     
@@ -264,7 +267,7 @@ def main(train_data,
     train_data_frame = train_data_frame.loc[:,intersect_genes]
     test_data_frame = test_data_frame.loc[:,intersect_genes]
     
-    # Get the normalized counts (prior removing noisy spots/genes)
+    # Get the normalized counts (prior removing noisy spot)
     train_data_frame = remove_noise(train_data_frame, num_exp_genes, 1.0, min_gene_expression)
     train_data_frame = normalize_data(train_data_frame, normalization,
                                       adjusted_log=normalization == "Scran")
@@ -292,7 +295,7 @@ def main(train_data,
     if test_classes_file is not None:
         test_data_frame, test_labels = update_labels(test_data_frame, test_labels_dict)
             
-    # Update labels so to ensure they go for 0-N secuentally
+    # Update labels so to ensure they go for 0-N sequentially
     labels_index_map = dict()
     index_label_map = dict()
     for i,label in enumerate(sorted(set(train_labels))):
@@ -330,7 +333,8 @@ def main(train_data,
     device = torch.device("cuda" if (use_cuda and torch.cuda.is_available()) else "cpu")
     
     #workers = multiprocessing.cpu_count() - 1
-    workers = 0
+    # In Windowns we can only use 0 workers
+    workers = 4
     print("Workers {}".format(workers))
     kwargs = {'num_workers': workers, 'pin_memory': True}
     
@@ -423,6 +427,7 @@ def main(train_data,
     X_pre = torch.tensor(predict_counts)
     y_pre = test_labels if test_classes_file is not None else None
     out, preds = predict(model, X_pre, use_cuda)
+    # Map labels back to their original value
     preds = [index_label_map[np.asscalar(x)] for x in preds.cpu().numpy()]
     if y_pre is not None:
         print("Classification report\n{}".
