@@ -33,6 +33,7 @@ import time
 import argparse
 import numpy as np
 import pandas as pd
+from collections import defaultdict
 
 from stanalysis.preprocessing import *
 
@@ -40,6 +41,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import torch.utils.data as utils
+import torchvision
 
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import f1_score
@@ -48,43 +50,24 @@ from sklearn.metrics import classification_report
 from sklearn.utils import shuffle
 from sklearn.model_selection import StratifiedShuffleSplit
 
+import gc
+
+# Windows work-around
 __spec__ = None
 import multiprocessing
 
 SEED = 666
 
-# Borrowed this class from https://github.com/ncullen93/torchsample
-class StratifiedSampler(utils.Sampler):
-    """Stratified Sampling
-    Provides equal representation of target classes in each batch
-    """
-    def __init__(self, class_vector, batch_size):
-        """
-        Arguments
-        ---------
-        class_vector : torch tensor
-            a vector of class labels
-        batch_size : integer
-            batch_size
-        """
-        self.n_splits = int(class_vector.size(0) / batch_size)
-        self.class_vector = class_vector
-
-    def gen_sample_array(self):      
-        s = StratifiedShuffleSplit(n_splits=self.n_splits, test_size=0.5)
-        X = torch.randn(self.class_vector.size(0),2).numpy()
-        y = self.class_vector.numpy()
-        s.get_n_splits(X, y)
-        train_index, test_index = next(s.split(X, y))
-        return np.hstack([train_index, test_index])
-
-    def __iter__(self):
-        return iter(self.gen_sample_array())
-
-    def __len__(self):
-        return len(self.class_vector)
+def computeWeightsClasses(dataset):
+    # Distribution of labels
+    label_count = defaultdict(int)
+    for _,label in dataset:
+        label_count[label] += 1         
+    # Weight for each sample
+    weights = [1.0 / x for x in label_count.values()]
+    return torch.DoubleTensor(weights)
     
-def split_dataset(dataset, labels, split_num=0.8):
+def split_dataset(dataset, labels, split_num=0.8, min_size=50):
     train_indexes = list()
     test_indexes = list()
     train_labels = list()
@@ -98,14 +81,15 @@ def split_dataset(dataset, labels, split_num=0.8):
             label_indexes[label] = [i]
     # Split randomly indexes for each cluster into training and testing sets  
     for label,indexes in label_indexes.items():
-        indexes = np.asarray(indexes)
-        np.random.shuffle(indexes)
-        cut = int(split_num * len(indexes))
-        training, test = indexes[:cut], indexes[cut:]
-        train_indexes += training.tolist()
-        test_indexes += test.tolist()
-        train_labels += [label] * len(training)
-        test_labels += [label] * len(test)
+        if len(indexes) >= min_size:
+            indexes = np.asarray(indexes)
+            np.random.shuffle(indexes)
+            cut = int(split_num * len(indexes))
+            training, test = indexes[:cut], indexes[cut:]
+            train_indexes += training.tolist()
+            test_indexes += test.tolist()
+            train_labels += [label] * len(training)
+            test_labels += [label] * len(test)
     # Return the splitted datasets and their labels
     return dataset.iloc[train_indexes,:], dataset.iloc[test_indexes,:], train_labels, test_labels
 
@@ -131,7 +115,7 @@ def train(model, trn_loader, optimizer, loss, use_cuda, verbose=False):
         _, pred = torch.max(output, 1)
         training_f1 += f1_score(target.data.cpu().numpy(),
                                 pred.data.cpu().numpy(), 
-                                average='micro')
+                                average='weighted')
     if verbose:
         print("Training set avg. loss: {:.4f}".format(training_loss / len(trn_loader.dataset)))
         print("Training set avg. micro-f1: {:.4f}".format(training_f1 / len(trn_loader.dataset)))
@@ -199,6 +183,8 @@ def main(train_data,
          test_batch_size, 
          epochs, 
          learning_rate,
+         stratified_sampler,
+         min_class_size,
          use_cuda,
          num_exp_genes, 
          num_exp_spots,
@@ -233,7 +219,7 @@ def main(train_data,
     print("Output folder {}".format(outdir))
     
     print("Loading training dataset...")
-    train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0)
+    train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0).astype(np.float32)
     # Remove noisy genes
     train_data_frame = remove_noise(train_data_frame, 1.0, num_exp_spots, min_gene_expression)
     train_genes = list(train_data_frame.columns.values)
@@ -243,7 +229,7 @@ def main(train_data,
     train_data_frame, train_labels = update_labels(train_data_frame, train_labels_dict)
     
     print("Loading prediction dataset...")
-    test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0)
+    test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0).astype(np.float32)
     # Remove noisy genes
     test_data_frame = remove_noise(test_data_frame, 1.0, num_exp_spots, min_gene_expression)
     test_genes = list(test_data_frame.columns.values)
@@ -279,8 +265,8 @@ def main(train_data,
     # Perform batch correction (Batches are training and prediction set)
     if batch_correction:
         print("Performing batch correction...")
-        batches = [b.transpose() for b in [train_data_frame,test_data_frame]]
-        batch_corrected = computeMnnBatchCorrection(batches)
+        gc.collect()
+        batch_corrected = computeMnnBatchCorrection([b.transpose() for b in [train_data_frame,test_data_frame]])
         train_data_frame = batch_corrected[0].transpose()
         test_data_frame = batch_corrected[1].transpose()
         
@@ -306,9 +292,12 @@ def main(train_data,
     train_labels = [labels_index_map[x] for x in train_labels]
     
     # Split train and test dasasets
-    print("Splitting training set into training and test sets (equally balancing clusters)...")
+    print("Splitting training set into training and test sets (equally balancing clusters)")
     train_counts_x, train_counts_y, train_labels_x, train_labels_y = split_dataset(train_data_frame, 
-                                                                                   train_labels, 0.7)
+                                                                                   train_labels, 0.7, min_class_size)
+    
+    del train_data_frame
+    gc.collect()
     
     print("Training set {}".format(train_counts_x.shape[0]))
     print("Test set {}".format(train_counts_y.shape[0]))
@@ -317,7 +306,10 @@ def main(train_data,
     train_counts = train_counts_x.astype(np.float32).values
     test_counts = train_counts_y.astype(np.float32).values
     predict_counts = test_data_frame.astype(np.float32).values
-  
+    del train_counts_x
+    del train_counts_y
+    gc.collect()
+    
     # Log the counts
     if use_log_scale and not batch_correction and not normalization == "Scran":
         print("Transforming datasets to log space (log2 + 1)...")
@@ -327,13 +319,15 @@ def main(train_data,
         
     # Input and output sizes
     n_feature = train_counts.shape[1]
+    n_ele_train = train_counts.shape[0]
+    n_ele_test = test_counts.shape[0]
     n_class = max(set(train_labels)) + 1
     
     print("CUDA Available: ",torch.cuda.is_available())
     device = torch.device("cuda" if (use_cuda and torch.cuda.is_available()) else "cpu")
     
-    #workers = multiprocessing.cpu_count() - 1
-    # In Windowns we can only use 0 workers
+    # workers = multiprocessing.cpu_count() - 1
+    # In Windows we can only use few workers
     workers = 4
     print("Workers {}".format(workers))
     kwargs = {'num_workers': workers, 'pin_memory': True}
@@ -347,6 +341,10 @@ def main(train_data,
     print("Creating tensors...")
     X_train = torch.tensor(train_counts)
     X_test = torch.tensor(test_counts)
+    del train_counts
+    del test_counts
+    gc.collect()
+    
     y_train = torch.from_numpy(np.asarray(train_labels_x, dtype=np.longlong))
     y_test = torch.from_numpy(np.asarray(train_labels_y, dtype=np.longlong))
     
@@ -355,22 +353,23 @@ def main(train_data,
     tst_set = utils.TensorDataset(X_test, y_test)
     
     # Create loaders with balanced labels
-    if train_batch_size < (train_counts.shape[0] / 2):
-        print("Using a stratified sampler for training set...")
-        trn_sampler = StratifiedSampler(class_vector=y_train, batch_size=train_batch_size)
-    else:
+    if train_batch_size >= (n_ele_train / 2):
         print("The training batch size is almost as big as the training set...")
-        trn_sampler = None
-    if test_batch_size < (test_counts.shape[0] / 2):
-        print("Using a stratified sampler for test set...")
-        tst_sampler = StratifiedSampler(class_vector=y_test, batch_size=test_batch_size)
-    else:
+    if test_batch_size >= (n_ele_test / 2):
         print("The test batch size is almost as big as the test set...")
+    if stratified_sampler:
+        print("Using a stratified sampler for training and test set")
+        weights_train = computeWeightsClasses(trn_set)
+        trn_sampler = utils.sampler.WeightedRandomSampler(weights_train, len(weights_train)) 
+        weights_test = computeWeightsClasses(tst_set)
+        tst_sampler = utils.sampler.WeightedRandomSampler(weights_test, len(weights_test)) 
+    else:
+        trn_sampler = None                                 
         tst_sampler = None
     trn_loader = utils.DataLoader(trn_set, sampler=trn_sampler, 
-                                  batch_size=train_batch_size, shuffle=False, **kwargs)
+                                  batch_size=train_batch_size, **kwargs)
     tst_loader = utils.DataLoader(tst_set, sampler=tst_sampler, 
-                                  batch_size=test_batch_size, shuffle=False, **kwargs)
+                                  batch_size=test_batch_size, **kwargs)
 
     # Init model
     H1 = 2000
@@ -404,7 +403,7 @@ def main(train_data,
         train(model, trn_loader, optimizer, loss, use_cuda, verbose)
         preds = test(model, tst_loader, loss, use_cuda, verbose)
         conf_mat = confusion_matrix(train_labels_y, preds)
-        precision, recall, f1, _ = precision_recall_fscore_support(train_labels_y, preds, average='micro')
+        precision, recall, f1, _ = precision_recall_fscore_support(train_labels_y, preds, average='weighted')
         if verbose:
             print("Confusion matrix:\n", conf_mat)
             print("Precison {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))  
@@ -474,6 +473,10 @@ if __name__ == '__main__':
                         help="The learning rate (default: %(default)s)")
     parser.add_argument("--use-cuda", action="store_true", default=False,
                         help="Whether to use CUDA (GPU computation)")
+    parser.add_argument("--stratified-sampler", action="store_true", default=False,
+                        help="Draw samples with equal probabilities when training")
+    parser.add_argument("--min-class-size", type=int, default=50, metavar="[INT]",
+                        help="The minimum number of elements a class must has in the training set (default: %(default)s)")
     parser.add_argument("--verbose", action="store_true", default=False,
                         help="Whether to show extra messages")
     parser.add_argument("--outdir", help="Path to output dir")
@@ -490,5 +493,5 @@ if __name__ == '__main__':
     main(args.train_data, args.test_data, args.train_classes, 
          args.test_classes, args.use_log_scale, args.normalization, 
          args.outdir, args.batch_correction, args.z_transformation, args.train_batch_size,
-         args.test_batch_size, args.epochs, args.learning_rate, args.use_cuda,
-         args.num_exp_genes, args.num_exp_spots, args.min_gene_expression, args.verbose)
+         args.test_batch_size, args.epochs, args.learning_rate, args.stratified_sampler, args.min_class_size, 
+         args.use_cuda, args.num_exp_genes, args.num_exp_spots, args.min_gene_expression, args.verbose)

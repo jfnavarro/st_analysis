@@ -4,6 +4,7 @@ Normalization functions for the st analysis package
 import numpy as np
 import pandas as pd
 from collections import Counter
+import gc
 import rpy2.robjects.packages as rpackages
 from rpy2.robjects import pandas2ri, r, numpy2ri
 import rpy2.robjects as ro
@@ -55,15 +56,20 @@ def computeRLEFactors(counts):
 def computeMnnBatchCorrection(counts):
     """Computes batch correction to a list of batches (data frames)
     where each data frame represents a batch (animal for instance).
-    The batch correction is computed using Scrans::mnnCorrect()
+    The batch correction is computed using Scran::mnnCorrect()
     from Marioni et al.
     :param counts: a list of matrices of counts
     :return returns a list of batch corrected matrices of counts
     """
     pandas2ri.activate()
     as_matrix = r["as.matrix"]
-    meta = [(x.index,x.columns) for x in counts]
-    r_counts = [as_matrix(pandas2ri.py2ri(x)) for x in counts]
+    meta = list()
+    r_counts = list()
+    for x in counts:
+        meta.append((x.index,x.columns))
+        r_counts.append(as_matrix(pandas2ri.py2ri(x)))
+        del x
+        gc.collect()
     RimportLibrary("scran")
     r_call = """
         function(counts){
@@ -73,10 +79,14 @@ def computeMnnBatchCorrection(counts):
     """
     r_func = r(r_call)
     r_norm_counts = r_func(r_counts)
-    norm_counts = [pandas2ri.ri2py(x) for x in r_norm_counts]
-    for i,nc in enumerate(norm_counts):
-        nc.index = meta[i][0]
-        nc.columns = meta[i][1]
+    norm_counts = list()
+    for i,x in enumerate(r_norm_counts):
+        norm_c = pandas2ri.ri2py(x)
+        norm_c.index = meta[i][0]
+        norm_c.columns = meta[i][1]
+        norm_counts.append(norm_c)
+        del x
+        gc.collect()
     pandas2ri.deactivate()
     return norm_counts
 
