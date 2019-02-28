@@ -270,8 +270,7 @@ def main(train_data,
         batch_corrected = computeMnnBatchCorrection([b.transpose() for b in [train_data_frame,test_data_frame]])
         train_data_frame = batch_corrected[0].transpose()
         test_data_frame = batch_corrected[1].transpose()
-        del batch_corrected[0]
-        del batch_corrected[1]
+        del batch_corrected
         gc.collect()
         
     # Apply the z-transformation
