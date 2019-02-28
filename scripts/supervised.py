@@ -145,10 +145,13 @@ def main(train_data,
     # Perform batch correction (Batches are training and prediction set)
     if batch_correction:
         print("Performing batch correction...")
-        batches = [b.transpose() for b in [train_data_frame,test_data_frame]]
-        batch_corrected = computeMnnBatchCorrection(batches)
+        gc.collect()
+        batch_corrected = computeMnnBatchCorrection([b.transpose() for b in [train_data_frame,test_data_frame]])
         train_data_frame = batch_corrected[0].transpose()
         test_data_frame = batch_corrected[1].transpose()
+        del batch_corrected[0]
+        del batch_corrected[1]
+        gc.collect()
         
     # Apply the z-transformation
     if z_transformation:

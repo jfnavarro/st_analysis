@@ -101,21 +101,22 @@ def train(model, trn_loader, optimizer, loss, use_cuda, verbose=False):
         if use_cuda:
             data, target = data.cuda(), target.cuda()
         data, target = Variable(data), Variable(target)
+        # Zero the gradients
+        optimizer.zero_grad()
         # Forward pass
         output = model(data)
         tloss = loss(output, target)
         training_loss += tloss.item()
-        # Zero the gradients
-        optimizer.zero_grad()
         # Backward pass
         tloss.backward()
+         # Compute prediction's score
+        with torch.no_grad():
+            _, pred = torch.max(output, 1)
+            training_f1 += f1_score(target.data.cpu().numpy(),
+                                    pred.data.cpu().numpy(), 
+                                    average='weighted')
         # Update parameters
         optimizer.step()
-        # Compute prediction's score
-        _, pred = torch.max(output, 1)
-        training_f1 += f1_score(target.data.cpu().numpy(),
-                                pred.data.cpu().numpy(), 
-                                average='weighted')
     if verbose:
         print("Training set avg. loss: {:.4f}".format(training_loss / len(trn_loader.dataset)))
         print("Training set avg. micro-f1: {:.4f}".format(training_f1 / len(trn_loader.dataset)))
@@ -269,6 +270,9 @@ def main(train_data,
         batch_corrected = computeMnnBatchCorrection([b.transpose() for b in [train_data_frame,test_data_frame]])
         train_data_frame = batch_corrected[0].transpose()
         test_data_frame = batch_corrected[1].transpose()
+        del batch_corrected[0]
+        del batch_corrected[1]
+        gc.collect()
         
     # Apply the z-transformation
     if z_transformation:
@@ -323,8 +327,8 @@ def main(train_data,
     n_ele_test = test_counts.shape[0]
     n_class = max(set(train_labels)) + 1
     
-    print("CUDA Available: ",torch.cuda.is_available())
-    device = torch.device("cuda" if (use_cuda and torch.cuda.is_available()) else "cpu")
+    print("CUDA Available: ", torch.cuda.is_available())
+    device = torch.device("cuda" if use_cuda else "cpu")
     
     # workers = multiprocessing.cpu_count() - 1
     # In Windows we can only use few workers
@@ -381,19 +385,24 @@ def main(train_data,
     print("Output size {}".format(n_class))
     model = torch.nn.Sequential(
         torch.nn.Linear(n_feature, H1),
+        torch.nn.BatchNorm1d(num_features=H1),
         torch.nn.ReLU(),
         torch.nn.Linear(H1, H2),
+        torch.nn.BatchNorm1d(num_features=H2),
         torch.nn.ReLU(),
         torch.nn.Linear(H2, n_class),
     )
+    model.to(device) 
+    
+    # Creating loss
     loss = torch.nn.CrossEntropyLoss().cuda() if use_cuda else torch.nn.CrossEntropyLoss()
-
-    model.to(device)      
+    
+    # Creating optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     
-    # Train
+    # Train the model
     best_epoch_idx = -1
-    best_f1 = 0.
+    best_f1 = 0.0
     history = list()
     best_model = dict()
     print("Training model...")
@@ -454,7 +463,7 @@ if __name__ == '__main__':
                         help="Perform batch-correction (Scran::Mnncorrect()) between train and test sets")
     parser.add_argument("--z-transformation", action="store_true", default=False,
                         help="Apply the z-score transformation to each spot (Sij - Mean(i) / std(i))")
-    parser.add_argument("--normalization", default="DESeq2", metavar="[STR]", 
+    parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, 
                         choices=["RAW", "DESeq2",  "REL", "Scran"],
                         help="Normalize the counts using:\n" \
@@ -479,7 +488,7 @@ if __name__ == '__main__':
                         help="The minimum number of elements a class must has in the training set (default: %(default)s)")
     parser.add_argument("--verbose", action="store_true", default=False,
                         help="Whether to show extra messages")
-    parser.add_argument("--outdir", help="Path to output dir")
+    parser.add_argument("--outdir", help="Path to output directory")
     parser.add_argument("--num-exp-genes", default=0.01, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
                         "must have to be kept from the distribution of all expressed genes (0.0 - 1.0) (default: %(default)s)")
