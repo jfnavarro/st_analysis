@@ -33,11 +33,40 @@ import pandas as pd
 import pickle
 
 from stanalysis.preprocessing import *
-from sklearn.svm import LinearSVC, SVC
+
+from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
 from sklearn import metrics
 from sklearn.multiclass import OneVsRestClassifier
+from sklearn.neural_network import MLPClassifier
+
 from cProfile import label
+
+def split_dataset(dataset, labels, split_num=0.8, min_size=50):
+    train_indexes = list()
+    test_indexes = list()
+    train_labels = list()
+    test_labels = list()
+    label_indexes = dict()
+    # Store indexes for each cluster
+    for i,label in enumerate(labels):
+        try:
+            label_indexes[label].append(i)
+        except KeyError:
+            label_indexes[label] = [i]
+    # Split randomly indexes for each cluster into training and testing sets  
+    for label,indexes in label_indexes.items():
+        if len(indexes) >= min_size:
+            indexes = np.asarray(indexes)
+            np.random.shuffle(indexes)
+            cut = int(split_num * len(indexes))
+            training, test = indexes[:cut], indexes[cut:]
+            train_indexes += training.tolist()
+            test_indexes += test.tolist()
+            train_labels += [label] * len(training)
+            test_labels += [label] * len(test)
+    # Return the splitted datasets and their labels
+    return dataset.iloc[train_indexes,:], dataset.iloc[test_indexes,:], train_labels, test_labels
 
 def update_labels(counts, labels_dict):
     # make sure the spots in the training set data frame
@@ -75,7 +104,11 @@ def main(train_data,
          num_exp_spots, 
          min_gene_expression, 
          classifier, 
-         svc_kernel):
+         svc_kernel,
+         batch_size, 
+         learning_rate, 
+         stratified_sampler, 
+         min_class_size):
 
     if not os.path.isfile(train_data):
         sys.stderr.write("Error, the training data input is not valid\n")
@@ -130,8 +163,8 @@ def main(train_data,
         sys.exit(1)  
             
     print("Intersected genes {}".format(len(intersect_genes)))
-    train_data_frame = train_data_frame.ix[:,intersect_genes]
-    test_data_frame = test_data_frame.ix[:,intersect_genes]
+    train_data_frame = train_data_frame.loc[:,intersect_genes]
+    test_data_frame = test_data_frame.loc[:,intersect_genes]
     
     # Get the normalized counts (prior removing noisy spots/genes)
     train_data_frame = remove_noise(train_data_frame, num_exp_genes, 1.0, min_gene_expression)
@@ -145,12 +178,12 @@ def main(train_data,
     # Perform batch correction (Batches are training and prediction set)
     if batch_correction:
         print("Performing batch correction...")
-        gc.collect()
-        batch_corrected = computeMnnBatchCorrection([b.transpose() for b in [train_data_frame,test_data_frame]])
+        batch_corrected = computeMnnBatchCorrection([b.transpose() for b in 
+                                                     [train_data_frame,test_data_frame]])
         train_data_frame = batch_corrected[0].transpose()
         test_data_frame = batch_corrected[1].transpose()
-        del batch_corrected
-        gc.collect()
+        train_data_frame.to_csv(os.path.join(outdir, "train_data_bc.tsv"), sep="\t")
+        test_data_frame.to_csv(os.path.join(outdir, "test_data_bc.tsv"), sep="\t")
         
     # Apply the z-transformation
     if z_transformation:
@@ -163,51 +196,102 @@ def main(train_data,
     if test_classes_file is not None:
         test_data_frame, test_labels = update_labels(test_data_frame, test_labels_dict)
        
+    # Update labels so to ensure they go for 0-N sequentially
+    labels_index_map = dict()
+    index_label_map = dict()
+    for i,label in enumerate(sorted(set(train_labels))):
+        labels_index_map[label] = i
+        index_label_map[i] = label
+    print("Mapping of labels:")
+    print(index_label_map)
+    train_labels = [labels_index_map[x] for x in train_labels]
+    
+    # Split train and test dasasets
+    print("Splitting training set into training and test sets (equally balancing clusters)")
+    train_counts_x, train_counts_y, train_labels_x, train_labels_y = split_dataset(train_data_frame, 
+                                                                                   train_labels, 
+                                                                                   0.7, 
+                                                                                   min_class_size)
+    
+    print("Training set {}".format(train_counts_x.shape[0]))
+    print("Test set {}".format(train_counts_y.shape[0]))
+    
     # Get the numpy counts
-    train_counts = train_data_frame.astype(np.float32).values
-    test_counts = test_data_frame.astype(np.float32).values
+    train_counts = train_counts_x.astype(np.float32).values
+    test_counts = train_counts_y.astype(np.float32).values
+    predict_counts = test_data_frame.astype(np.float32).values
   
     # Log the counts
     if use_log_scale and not batch_correction and not normalization == "Scran":
         print("Transforming datasets to log space (log2 + 1)...")
         train_counts = np.log2(train_counts + 1)
         test_counts = np.log2(test_counts + 1)
+        predict_counts = np.log2(predict_counts + 1)
         
     # Train the classifier and predict
-    # TODO optimize parameters of the classifier (kernel="rbf" or "sigmoid")
+    class_weight = "balanced" if stratified_sampler else None
     if classifier in "SVC":
-        classifier = OneVsRestClassifier(SVC(probability=True, 
-                                             random_state=0,
-                                             tol=0.001,
-                                             max_iter=epochs,
-                                             decision_function_shape="ovr", 
-                                             kernel=svc_kernel), n_jobs=-1)
+        model = OneVsRestClassifier(SVC(probability=True, 
+                                        random_state=None,
+                                        tol=0.001,
+                                        max_iter=epochs,
+                                        class_weight=class_weight,
+                                        decision_function_shape="ovr", 
+                                        kernel=svc_kernel), n_jobs=-1)
+    elif classifier in "NN":
+        model = MLPClassifier(hidden_layer_sizes=(2000, 1000), 
+                              activation='relu', 
+                              solver='adam', 
+                              alpha=0.0001, 
+                              batch_size=batch_size, 
+                              learning_rate_init=learning_rate, 
+                              max_iter=epochs, 
+                              shuffle=True, 
+                              random_state=None, 
+                              tol=0.0001, 
+                              momentum=0.9)
     else:
-        classifier = OneVsRestClassifier(LogisticRegression(penalty='l2', 
-                                                            dual=False, 
-                                                            tol=0.0001, 
-                                                            C=1.0, 
-                                                            fit_intercept=True, 
-                                                            intercept_scaling=1, 
-                                                            class_weight=None, 
-                                                            random_state=0, 
-                                                            solver='liblinear', 
-                                                            max_iter=epochs, 
-                                                            multi_class='ovr', 
-                                                            warm_start=False), n_jobs=-1)
-    classifier = classifier.fit(train_counts, train_labels)
-    predicted_class = classifier.predict(test_counts) 
-    predicted_prob = classifier.predict_proba(test_counts)
+        model = OneVsRestClassifier(LogisticRegression(penalty='l2', 
+                                                       dual=False, 
+                                                       tol=0.0001, 
+                                                       C=1.0, 
+                                                       fit_intercept=True, 
+                                                       intercept_scaling=1, 
+                                                       class_weight=class_weight, 
+                                                       random_state=None, 
+                                                       solver='lbfgs', 
+                                                       max_iter=epochs, 
+                                                       multi_class='multinomial', 
+                                                       warm_start=False), n_jobs=-1)
+    # Training and validation
+    print("Training the model...")
+    model = model.fit(train_counts, train_labels_x)
+    predicted_class = model.predict(test_counts)
+    
+    print("Model trained!")
+    print("Training set score: %f" % model.score(train_counts, train_labels_x))
+    print("Test set score: %f" % model.score(test_counts, train_labels_y))
+    print("Classification report\n{}".
+          format(metrics.classification_report(train_labels_y, predicted_class)))
+    print("Confusion matrix:\n{}".format(metrics.confusion_matrix(train_labels_y, predicted_class)))
+    
+    # Predict
+    print("Predicting on test data..")
+    predicted_class = model.predict(predict_counts)  
+    predicted_prob = model.predict_proba(predict_counts)
+    # Map labels back to their original value
+    predicted_class = [index_label_map[x] for x in predicted_class]
     
     # Save the model
-    pickle.dump(classifier, open(os.path.join(outdir, "model.sav"), 'wb'))
+    pickle.dump(model, open(os.path.join(outdir, "model.sav"), 'wb'))
     
-    # Print the weights for each gene
-    pd.DataFrame(data=classifier.coef_,
-                 index=sorted(set(train_labels)),
-                 columns=intersect_genes).to_csv(os.path.join(outdir,
-                                                              "genes_contributions.tsv"), 
-                                                              sep='\t')
+    if classifier not in "NN":
+        # Print the weights for each gene
+        pd.DataFrame(data=model.coef_,
+                     index=sorted(set([index_label_map[x] for x in train_labels_x])),
+                     columns=intersect_genes).to_csv(os.path.join(outdir,
+                                                                  "genes_contributions.tsv"), 
+                                                                  sep='\t')
     
     # Compute accuracy
     if test_classes_file is not None:
@@ -217,7 +301,7 @@ def main(train_data,
     
     with open(os.path.join(outdir, "predicted_classes.tsv"), "w") as filehandler:
         for spot, pred, probs in zip(test_data_frame.index, predicted_class, predicted_prob):
-            filehandler.write("{0}\t{1}\t{2}\n".format(spot, np.asscalar(pred),
+            filehandler.write("{0}\t{1}\t{2}\n".format(spot, pred,
                                                        "\t".join(['{:.6f}'.format(x) for x in probs.tolist()]))) 
        
 if __name__ == '__main__':
@@ -237,7 +321,7 @@ if __name__ == '__main__':
                         help="Perform batch-correction (Scran::Mnncorrect()) between train and test sets")
     parser.add_argument("--z-transformation", action="store_true", default=False,
                         help="Apply the z-score transformation to each spot (Sij - Mean(i) / std(i))")
-    parser.add_argument("--normalization", default="DESeq2", metavar="[STR]", 
+    parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, 
                         choices=["RAW", "DESeq2",  "REL", "Scran"],
                         help="Normalize the counts using:\n" \
@@ -260,10 +344,11 @@ if __name__ == '__main__':
                         "considered expressed (default: %(default)s)")
     parser.add_argument("--classifier", default="SVC", metavar="[STR]", 
                         type=str, 
-                        choices=["SVC", "LR"],
+                        choices=["SVM", "LR", "NN"],
                         help="The classifier to use:\n" \
-                        "SVC = Support Vector Machine\n" \
+                        "SVM = Support Vector Machine\n" \
                         "LR = Logistic Regression\n" \
+                        "NN = 3 layers Neural Network\n" \
                         "(default: %(default)s)")
     parser.add_argument("--svc-kernel", default="linear", metavar="[STR]", 
                         type=str, 
@@ -274,10 +359,20 @@ if __name__ == '__main__':
                         "rbf = a rbf kernel\n" \
                         "sigmoid = a sigmoid kernel\n" \
                         "(default: %(default)s)")
+    parser.add_argument("--batch-size", type=int, default=1000, metavar="[INT]",
+                        help="The batch size for the Neural Network classifier (default: %(default)s)")
+    parser.add_argument("--learning-rate", type=float, default=0.001, metavar="[FLOAT]",
+                        help="The learning rate for the Neural Network classifier (default: %(default)s)")
+    parser.add_argument("--stratified-sampler", action="store_true", default=False,
+                        help="Draw samples with equal probabilities when training")
+    parser.add_argument("--min-class-size", type=int, default=30, metavar="[INT]",
+                        help="The minimum number of elements a class must has in the training set (default: %(default)s)")
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
          args.test_classes, args.use_log_scale, args.normalization, 
          args.outdir, args.batch_correction, args.z_transformation, 
          args.epochs, args.num_exp_genes, args.num_exp_spots, 
-         args.min_gene_expression, args.classifier, args.svc_kernel)
+         args.min_gene_expression, args.classifier, args.svc_kernel,
+         args.batch_size, args.learning_rate, args.stratified_sampler, 
+         args.min_class_size)
 

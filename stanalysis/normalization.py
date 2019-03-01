@@ -63,30 +63,22 @@ def computeMnnBatchCorrection(counts):
     """
     pandas2ri.activate()
     as_matrix = r["as.matrix"]
-    meta = list()
-    r_counts = list()
-    for x in counts:
-        meta.append((x.index,x.columns))
-        r_counts.append(as_matrix(pandas2ri.py2ri(x)))
-        del x
-        gc.collect()
+    meta = [(x.index,x.columns) for x in counts]
+    r_counts = [as_matrix(pandas2ri.py2ri(x)) for x in counts]
     RimportLibrary("scran")
     r_call = """
-        function(counts){
-           norm_counts = do.call(mnnCorrect, c(counts, k=20, cos.norm.out=FALSE));
+        function(counts) {
+           norm_counts = do.call(fastMNN, c(counts));
            return(lapply(norm_counts$corrected, as.data.frame))
         }
     """
     r_func = r(r_call)
-    r_norm_counts = r_func(r_counts)
     norm_counts = list()
-    for i,x in enumerate(r_norm_counts):
+    for i,x in enumerate(r_func(r_counts)):
         norm_c = pandas2ri.ri2py(x)
         norm_c.index = meta[i][0]
         norm_c.columns = meta[i][1]
         norm_counts.append(norm_c)
-        del x
-        gc.collect()
     pandas2ri.deactivate()
     return norm_counts
 

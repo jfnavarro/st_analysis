@@ -62,7 +62,7 @@ def computeWeightsClasses(dataset):
     # Distribution of labels
     label_count = defaultdict(int)
     for _,label in dataset:
-        label_count[label] += 1         
+        label_count[label.item()] += 1         
     # Weight for each sample
     weights = [1.0 / x for x in label_count.values()]
     return torch.DoubleTensor(weights)
@@ -93,34 +93,6 @@ def split_dataset(dataset, labels, split_num=0.8, min_size=50):
     # Return the splitted datasets and their labels
     return dataset.iloc[train_indexes,:], dataset.iloc[test_indexes,:], train_labels, test_labels
 
-def train(model, trn_loader, optimizer, loss, use_cuda, verbose=False):
-    model.train()
-    training_loss = 0
-    training_f1 = 0
-    for data, target in trn_loader:
-        if use_cuda:
-            data, target = data.cuda(), target.cuda()
-        data, target = Variable(data), Variable(target)
-        # Zero the gradients
-        optimizer.zero_grad()
-        # Forward pass
-        output = model(data)
-        tloss = loss(output, target)
-        training_loss += tloss.item()
-        # Backward pass
-        tloss.backward()
-         # Compute prediction's score
-        with torch.no_grad():
-            _, pred = torch.max(output, 1)
-            training_f1 += f1_score(target.data.cpu().numpy(),
-                                    pred.data.cpu().numpy(), 
-                                    average='weighted')
-        # Update parameters
-        optimizer.step()
-    if verbose:
-        print("Training set avg. loss: {:.4f}".format(training_loss / len(trn_loader.dataset)))
-        print("Training set avg. micro-f1: {:.4f}".format(training_f1 / len(trn_loader.dataset)))
-
 def test(model, tst_loader, loss, use_cuda, verbose=False):
     model.eval()
     test_loss = 0
@@ -129,7 +101,7 @@ def test(model, tst_loader, loss, use_cuda, verbose=False):
         if use_cuda:
             data, target = data.cuda(), target.cuda()
         with torch.no_grad():
-            data, target = Variable(data), Variable(target)
+            #data, target = Variable(data), Variable(target)
             output = model(data)
             test_loss += loss(output, target).item()
             _, pred = torch.max(output, 1)
@@ -266,12 +238,12 @@ def main(train_data,
     # Perform batch correction (Batches are training and prediction set)
     if batch_correction:
         print("Performing batch correction...")
-        gc.collect()
-        batch_corrected = computeMnnBatchCorrection([b.transpose() for b in [train_data_frame,test_data_frame]])
+        batch_corrected = computeMnnBatchCorrection([b.transpose() for b in 
+                                                     [train_data_frame,test_data_frame]])
         train_data_frame = batch_corrected[0].transpose()
         test_data_frame = batch_corrected[1].transpose()
-        del batch_corrected
-        gc.collect()
+        train_data_frame.to_csv(os.path.join(outdir, "train_data_bc.tsv"), sep="\t")
+        test_data_frame.to_csv(os.path.join(outdir, "test_data_bc.tsv"), sep="\t")
         
     # Apply the z-transformation
     if z_transformation:
@@ -299,9 +271,6 @@ def main(train_data,
     train_counts_x, train_counts_y, train_labels_x, train_labels_y = split_dataset(train_data_frame, 
                                                                                    train_labels, 0.7, min_class_size)
     
-    del train_data_frame
-    gc.collect()
-    
     print("Training set {}".format(train_counts_x.shape[0]))
     print("Test set {}".format(train_counts_y.shape[0]))
     
@@ -309,9 +278,6 @@ def main(train_data,
     train_counts = train_counts_x.astype(np.float32).values
     test_counts = train_counts_y.astype(np.float32).values
     predict_counts = test_data_frame.astype(np.float32).values
-    del train_counts_x
-    del train_counts_y
-    gc.collect()
     
     # Log the counts
     if use_log_scale and not batch_correction and not normalization == "Scran":
@@ -341,12 +307,8 @@ def main(train_data,
         torch.cuda.manual_seed(SEED)
 
     # Create Tensor Flow train dataset
-    print("Creating tensors...")
     X_train = torch.tensor(train_counts)
     X_test = torch.tensor(test_counts)
-    del train_counts
-    del test_counts
-    gc.collect()
     
     y_train = torch.from_numpy(np.asarray(train_labels_x, dtype=np.longlong))
     y_test = torch.from_numpy(np.asarray(train_labels_y, dtype=np.longlong))
@@ -361,17 +323,14 @@ def main(train_data,
     if test_batch_size >= (n_ele_test / 2):
         print("The test batch size is almost as big as the test set...")
     if stratified_sampler:
-        print("Using a stratified sampler for training and test set")
+        print("Using a stratified sampler for training set...")
         weights_train = computeWeightsClasses(trn_set)
         trn_sampler = utils.sampler.WeightedRandomSampler(weights_train, len(weights_train)) 
-        weights_test = computeWeightsClasses(tst_set)
-        tst_sampler = utils.sampler.WeightedRandomSampler(weights_test, len(weights_test)) 
     else:
-        trn_sampler = None                                 
-        tst_sampler = None
+        trn_sampler = None    
     trn_loader = utils.DataLoader(trn_set, sampler=trn_sampler, 
                                   batch_size=train_batch_size, **kwargs)
-    tst_loader = utils.DataLoader(tst_set, sampler=tst_sampler, 
+    tst_loader = utils.DataLoader(tst_set, sampler=None, 
                                   batch_size=test_batch_size, **kwargs)
 
     # Init model
@@ -404,17 +363,44 @@ def main(train_data,
     best_f1 = 0.0
     history = list()
     best_model = dict()
-    print("Training model...")
+    print("Training the model...")
     for epoch in range(epochs):
         if verbose:
             print('Epoch: {}'.format(epoch))
-        train(model, trn_loader, optimizer, loss, use_cuda, verbose)
+        # Train the model
+        model.train()
+        training_loss = 0
+        training_f1 = 0
+        for data, target in trn_loader:
+            if use_cuda:
+                data, target = data.cuda(), target.cuda()
+            data, target = Variable(data), Variable(target)
+            # Zero the gradients
+            optimizer.zero_grad()
+            # Forward pass
+            output = model(data)
+            tloss = loss(output, target)
+            training_loss += tloss.item()
+            # Backward pass
+            tloss.backward()
+             # Compute prediction's score
+            with torch.no_grad():
+                _, pred = torch.max(output, 1)
+                training_f1 += f1_score(target.data.cpu().numpy(),
+                                        pred.data.cpu().numpy(), 
+                                        average='micro')
+            # Update parameters
+            optimizer.step()
+        if verbose:
+            print("Training set avg. loss: {:.4f}".format(training_loss / len(trn_loader.dataset)))
+            print("Training set avg. micro-f1: {:.4f}".format(training_f1 / len(trn_loader.dataset)))
+        # Testing
         preds = test(model, tst_loader, loss, use_cuda, verbose)
         conf_mat = confusion_matrix(train_labels_y, preds)
         precision, recall, f1, _ = precision_recall_fscore_support(train_labels_y, preds, average='weighted')
         if verbose:
-            print("Confusion matrix:\n", conf_mat)
-            print("Precison {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))  
+            print("Testing confusion matrix:\n", conf_mat)
+            print("Teting precison {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))  
         history.append((conf_mat, precision, recall, f1))
         if f1 > best_f1: 
             best_f1 = f1
@@ -477,7 +463,7 @@ if __name__ == '__main__':
                         help="The input batch size for testing (default: %(default)s)")
     parser.add_argument("--epochs", type=int, default=50, metavar="[INT]",
                         help="The number of epochs to train (default: %(default)s)")
-    parser.add_argument("--learning-rate", type=float, default=0.01, metavar="[FLOAT]",
+    parser.add_argument("--learning-rate", type=float, default=0.001, metavar="[FLOAT]",
                         help="The learning rate (default: %(default)s)")
     parser.add_argument("--use-cuda", action="store_true", default=False,
                         help="Whether to use CUDA (GPU computation)")
