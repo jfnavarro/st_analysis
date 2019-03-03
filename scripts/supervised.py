@@ -42,11 +42,9 @@ from sklearn.neural_network import MLPClassifier
 
 from cProfile import label
 
-def split_dataset(dataset, labels, split_num=0.8, min_size=50):
+def filter_classes(dataset, labels, min_size=50):
     train_indexes = list()
-    test_indexes = list()
     train_labels = list()
-    test_labels = list()
     label_indexes = dict()
     # Store indexes for each cluster
     for i,label in enumerate(labels):
@@ -54,19 +52,13 @@ def split_dataset(dataset, labels, split_num=0.8, min_size=50):
             label_indexes[label].append(i)
         except KeyError:
             label_indexes[label] = [i]
-    # Split randomly indexes for each cluster into training and testing sets  
+    # Keep only clusters bigger than min_size
     for label,indexes in label_indexes.items():
         if len(indexes) >= min_size:
-            indexes = np.asarray(indexes)
-            np.random.shuffle(indexes)
-            cut = int(split_num * len(indexes))
-            training, test = indexes[:cut], indexes[cut:]
-            train_indexes += training.tolist()
-            test_indexes += test.tolist()
-            train_labels += [label] * len(training)
-            test_labels += [label] * len(test)
-    # Return the splitted datasets and their labels
-    return dataset.iloc[train_indexes,:], dataset.iloc[test_indexes,:], train_labels, test_labels
+            train_indexes += indexes
+            train_labels += [label] * len(indexes)
+    # Return the reduced dataset/labels
+    return dataset.iloc[train_indexes,:], train_labels
 
 def update_labels(counts, labels_dict):
     # make sure the spots in the training set data frame
@@ -206,26 +198,19 @@ def main(train_data,
     print(index_label_map)
     train_labels = [labels_index_map[x] for x in train_labels]
     
-    # Split train and test dasasets
-    print("Splitting training set into training and test sets (equally balancing clusters)")
-    train_counts_x, train_counts_y, train_labels_x, train_labels_y = split_dataset(train_data_frame, 
-                                                                                   train_labels, 
-                                                                                   0.7, 
-                                                                                   min_class_size)
-    
+    # Discard "noisy" classes
+    print("Removing classes with less than {} elements".format(min_class_size))
+    train_counts_x, train_labels_x = filter_classes(train_data_frame, train_labels, min_class_size)
     print("Training set {}".format(train_counts_x.shape[0]))
-    print("Test set {}".format(train_counts_y.shape[0]))
     
     # Get the numpy counts
     train_counts = train_counts_x.astype(np.float32).values
-    test_counts = train_counts_y.astype(np.float32).values
     predict_counts = test_data_frame.astype(np.float32).values
   
     # Log the counts
     if use_log_scale and not batch_correction and not normalization == "Scran":
         print("Transforming datasets to log space (log2 + 1)...")
         train_counts = np.log2(train_counts + 1)
-        test_counts = np.log2(test_counts + 1)
         predict_counts = np.log2(predict_counts + 1)
         
     # Train the classifier and predict
@@ -266,14 +251,7 @@ def main(train_data,
     # Training and validation
     print("Training the model...")
     model = model.fit(train_counts, train_labels_x)
-    predicted_class = model.predict(test_counts)
-    
     print("Model trained!")
-    print("Training set score: %f" % model.score(train_counts, train_labels_x))
-    print("Test set score: %f" % model.score(test_counts, train_labels_y))
-    print("Classification report\n{}".
-          format(metrics.classification_report(train_labels_y, predicted_class)))
-    print("Confusion matrix:\n{}".format(metrics.confusion_matrix(train_labels_y, predicted_class)))
     
     # Predict
     print("Predicting on test data..")
