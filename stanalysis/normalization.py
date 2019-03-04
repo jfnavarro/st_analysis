@@ -68,7 +68,7 @@ def computeMnnBatchCorrection(counts):
     RimportLibrary("scran")
     r_call = """
         function(counts) {
-           norm_counts = do.call(fastMNN, c(counts));
+           norm_counts = do.call(mnnCorrect, c(counts, cos.norm.out=FALSE));
            return(lapply(norm_counts$corrected, as.data.frame))
         }
     """
@@ -85,7 +85,7 @@ def computeMnnBatchCorrection(counts):
 def computeSumFactors(counts, scran_clusters=True):
     """ Compute normalization factors
     using the deconvolution method
-    described in Merioni et al.
+    described in Marioni et al.
     Returns the computed size factors as a vector.
     :param counts: a matrix of counts (genes as rows)
     :return returns the normalization factors a vector

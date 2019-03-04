@@ -100,7 +100,8 @@ def main(train_data,
          batch_size, 
          learning_rate, 
          stratified_sampler, 
-         min_class_size):
+         min_class_size,
+         hidden_layers_size):
 
     if not os.path.isfile(train_data):
         sys.stderr.write("Error, the training data input is not valid\n")
@@ -224,7 +225,9 @@ def main(train_data,
                                         decision_function_shape="ovr", 
                                         kernel=svc_kernel), n_jobs=-1)
     elif classifier in "NN":
-        model = MLPClassifier(hidden_layer_sizes=(2000, 1000), 
+        print("Neural Network with the following hidden layers {}".format(
+            " ".join([str(x) for x in hidden_layers_size])))
+        model = MLPClassifier(hidden_layer_sizes=hidden_layers_size, 
                               activation='relu', 
                               solver='adam', 
                               alpha=0.0001, 
@@ -251,7 +254,9 @@ def main(train_data,
     # Training and validation
     print("Training the model...")
     model = model.fit(train_counts, train_labels_x)
-    print("Model trained!")
+    # Save the model
+    pickle.dump(model, open(os.path.join(outdir, "model.sav"), 'wb'))
+    print("Model trained and saved!")
     
     # Predict
     print("Predicting on test data..")
@@ -259,9 +264,6 @@ def main(train_data,
     predicted_prob = model.predict_proba(predict_counts)
     # Map labels back to their original value
     predicted_class = [index_label_map[x] for x in predicted_class]
-    
-    # Save the model
-    pickle.dump(model, open(os.path.join(outdir, "model.sav"), 'wb'))
     
     if classifier not in "NN":
         # Print the weights for each gene
@@ -280,7 +282,7 @@ def main(train_data,
     with open(os.path.join(outdir, "predicted_classes.tsv"), "w") as filehandler:
         for spot, pred, probs in zip(test_data_frame.index, predicted_class, predicted_prob):
             filehandler.write("{0}\t{1}\t{2}\n".format(spot, pred,
-                                                       "\t".join(['{:.6f}'.format(x) for x in probs.tolist()]))) 
+                                                       "\t".join(['{:.4f}'.format(x) for x in probs.tolist()]))) 
        
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
@@ -339,6 +341,9 @@ if __name__ == '__main__':
                         "(default: %(default)s)")
     parser.add_argument("--batch-size", type=int, default=1000, metavar="[INT]",
                         help="The batch size for the Neural Network classifier (default: %(default)s)")
+    parser.add_argument("--hidden-layers-size", type=int, nargs="+", metavar="[INT]", default=[1000, 500],
+                        help="The sizes of the hidden layers for the Neural Network\n " \
+                        "The number of hidden layers will correspond to the number of sizes given (default: %(default)s)")
     parser.add_argument("--learning-rate", type=float, default=0.001, metavar="[FLOAT]",
                         help="The learning rate for the Neural Network classifier (default: %(default)s)")
     parser.add_argument("--stratified-sampler", action="store_true", default=False,
@@ -352,5 +357,5 @@ if __name__ == '__main__':
          args.epochs, args.num_exp_genes, args.num_exp_spots, 
          args.min_gene_expression, args.classifier, args.svc_kernel,
          args.batch_size, args.learning_rate, args.stratified_sampler, 
-         args.min_class_size)
+         args.min_class_size, args.hidden_layers_size)
 
