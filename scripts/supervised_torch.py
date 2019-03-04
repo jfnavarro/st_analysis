@@ -64,7 +64,7 @@ def computeWeightsClasses(dataset):
     for _,label in dataset:
         label_count[label.item()] += 1         
     # Weight for each sample
-    weights = [1.0 / x for x in label_count.values()]
+    weights = np.asarray([1.0 / x for x in label_count.values()])
     return torch.DoubleTensor(weights)
     
 def split_dataset(dataset, labels, split_num=0.8, min_size=50):
@@ -93,13 +93,43 @@ def split_dataset(dataset, labels, split_num=0.8, min_size=50):
     # Return the splitted datasets and their labels
     return dataset.iloc[train_indexes,:], dataset.iloc[test_indexes,:], train_labels, test_labels
 
-def test(model, tst_loader, loss, use_cuda, verbose=False):
+def train(model, trn_loader, optimizer, loss, device, verbose):
+    model.train()
+    training_loss = 0
+    training_f1 = 0
+    for data, target in trn_loader:
+        data.to(device)
+        target.to(device)
+        data = Variable(data)
+        target = Variable(target)
+        # Zero the gradients
+        optimizer.zero_grad()
+        # Forward pass
+        output = model(data)
+        tloss = loss(output, target)
+        training_loss += tloss.item()
+        # Backward pass
+        tloss.backward()
+         # Compute prediction's score
+        with torch.no_grad():
+            _, pred = torch.max(output, 1)
+            training_f1 += f1_score(target.data.cpu().numpy(),
+                                    pred.data.cpu().numpy(), 
+                                    average='micro')
+        # Update parameters
+        optimizer.step()
+        
+    if verbose:
+        print("Training set avg. loss: {:.4f}".format(training_loss / len(trn_loader.dataset)))
+        print("Training set avg. micro-f1: {:.4f}".format(training_f1 / len(trn_loader.dataset)))
+        
+def test(model, tst_loader, loss, device, verbose=False):
     model.eval()
     test_loss = 0
     preds = list()
     for data, target in tst_loader:
-        if use_cuda:
-            data, target = data.cuda(), target.cuda()
+        data.to(device)
+        target.to(device)
         with torch.no_grad():
             #data, target = Variable(data), Variable(target)
             output = model(data)
@@ -110,13 +140,10 @@ def test(model, tst_loader, loss, use_cuda, verbose=False):
         print("Test set avg. loss: {:.4f}".format(test_loss / len(tst_loader.dataset)))
     return preds
 
-def predict(model, X_pre, use_cuda):
+def predict(model, data, device):
     model.eval()
-    data = X_pre
-    if use_cuda:
-        data = data.cuda()
+    data.to(device)
     with torch.no_grad():
-        data = Variable(data)
         output = model(data)
         _, pred = torch.max(output, 1)
     return output, pred
@@ -293,7 +320,7 @@ def main(train_data,
     n_class = max(set(train_labels)) + 1
     
     print("CUDA Available: ", torch.cuda.is_available())
-    device = torch.device("cuda" if use_cuda else "cpu")
+    device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
     
     # workers = multiprocessing.cpu_count() - 1
     # In Windows we can only use few workers
@@ -334,7 +361,7 @@ def main(train_data,
                                   batch_size=test_batch_size, **kwargs)
 
     # Init model
-    H1 = 2000
+    H1 = 1000
     H2 = 500
     print("Creating NN model...")
     print("Input size {}".format(n_feature))
@@ -367,40 +394,16 @@ def main(train_data,
     for epoch in range(epochs):
         if verbose:
             print('Epoch: {}'.format(epoch))
-        # Train the model
-        model.train()
-        training_loss = 0
-        training_f1 = 0
-        for data, target in trn_loader:
-            if use_cuda:
-                data, target = data.cuda(), target.cuda()
-            data, target = Variable(data), Variable(target)
-            # Zero the gradients
-            optimizer.zero_grad()
-            # Forward pass
-            output = model(data)
-            tloss = loss(output, target)
-            training_loss += tloss.item()
-            # Backward pass
-            tloss.backward()
-             # Compute prediction's score
-            with torch.no_grad():
-                _, pred = torch.max(output, 1)
-                training_f1 += f1_score(target.data.cpu().numpy(),
-                                        pred.data.cpu().numpy(), 
-                                        average='micro')
-            # Update parameters
-            optimizer.step()
-        if verbose:
-            print("Training set avg. loss: {:.4f}".format(training_loss / len(trn_loader.dataset)))
-            print("Training set avg. micro-f1: {:.4f}".format(training_f1 / len(trn_loader.dataset)))
+        # Training
+        train(model, trn_loader, optimizer, loss, device, verbose)
         # Testing
-        preds = test(model, tst_loader, loss, use_cuda, verbose)
+        preds = test(model, tst_loader, loss, device, verbose)
         conf_mat = confusion_matrix(train_labels_y, preds)
-        precision, recall, f1, _ = precision_recall_fscore_support(train_labels_y, preds, average='weighted')
+        precision, recall, f1, _ = precision_recall_fscore_support(train_labels_y, 
+                                                                   preds, average='micro')
         if verbose:
             print("Testing confusion matrix:\n", conf_mat)
-            print("Teting precison {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))  
+            print("Testing precision {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))  
         history.append((conf_mat, precision, recall, f1))
         if f1 > best_f1: 
             best_f1 = f1
@@ -411,7 +414,7 @@ def main(train_data,
     print("Best epoch {}".format(best_epoch_idx))
     conf_mat, precision, recall, f1 = history[best_epoch_idx]
     print("Confusion matrix:\n", conf_mat)
-    print("Precison {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))    
+    print("Precision {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))    
 
     # Predict
     print("Predicting on test data..")
@@ -419,7 +422,7 @@ def main(train_data,
     torch.save(model, os.path.join(outdir, "model.pt"))
     X_pre = torch.tensor(predict_counts)
     y_pre = test_labels if test_classes_file is not None else None
-    out, preds = predict(model, X_pre, use_cuda)
+    out, preds = predict(model, X_pre, device)
     # Map labels back to their original value
     preds = [index_label_map[np.asscalar(x)] for x in preds.cpu().numpy()]
     if y_pre is not None:
