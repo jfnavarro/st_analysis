@@ -469,7 +469,7 @@ if __name__ == '__main__':
                         help="Whether to use CUDA (GPU computation)")
     parser.add_argument("--stratified-sampler", action="store_true", default=False,
                         help="Draw samples with equal probabilities when training")
-    parser.add_argument("--min-class-size", type=int, default=30, metavar="[INT]",
+    parser.add_argument("--min-class-size", type=int, default=20, metavar="[INT]",
                         help="The minimum number of elements a class must has in the training set (default: %(default)s)")
     parser.add_argument("--verbose", action="store_true", default=False,
                         help="Whether to show extra messages")

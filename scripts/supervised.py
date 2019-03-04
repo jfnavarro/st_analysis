@@ -348,7 +348,7 @@ if __name__ == '__main__':
                         help="The learning rate for the Neural Network classifier (default: %(default)s)")
     parser.add_argument("--stratified-sampler", action="store_true", default=False,
                         help="Draw samples with equal probabilities when training")
-    parser.add_argument("--min-class-size", type=int, default=30, metavar="[INT]",
+    parser.add_argument("--min-class-size", type=int, default=20, metavar="[INT]",
                         help="The minimum number of elements a class must has in the training set (default: %(default)s)")
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
