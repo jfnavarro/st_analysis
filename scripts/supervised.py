@@ -31,6 +31,7 @@ import os
 import numpy as np
 import pandas as pd
 import pickle
+import gc
 
 from stanalysis.preprocessing import *
 
@@ -175,8 +176,6 @@ def main(train_data,
                                                      [train_data_frame,test_data_frame]])
         train_data_frame = batch_corrected[0].transpose()
         test_data_frame = batch_corrected[1].transpose()
-        train_data_frame.to_csv(os.path.join(outdir, "train_data_bc.tsv"), sep="\t")
-        test_data_frame.to_csv(os.path.join(outdir, "test_data_bc.tsv"), sep="\t")
         
     # Log the counts
     if log_scale and not batch_correction and not normalization == "Scran":
@@ -186,7 +185,7 @@ def main(train_data,
         
     # Apply the z-transformation
     if standard_transformation:
-        print("Applying z-score transformation...")
+        print("Applying standard transformation...")
         train_data_frame = ztransformation(train_data_frame)
         test_data_frame = ztransformation(test_data_frame)
 
@@ -207,12 +206,13 @@ def main(train_data,
     
     # Discard "noisy" classes
     print("Removing classes with less than {} elements".format(min_class_size))
-    train_counts_x, train_labels_x = filter_classes(train_data_frame, train_labels, min_class_size)
-    print("Training set {}".format(train_counts_x.shape[0]))
+    train_data_frame, train_labels = filter_classes(train_data_frame, train_labels, min_class_size)
+    print("Training set {}".format(train_data_frame.shape[0]))
     
     # Get the numpy counts
-    train_counts = train_counts_x.astype(np.float32).values
-    predict_counts = test_data_frame.astype(np.float32).values
+    train_counts = train_data_frame.astype(np.float32).values
+    del train_data_frame
+    gc.collect()
         
     # Train the classifier and predict
     class_weight = "balanced" if stratified_sampler else None
@@ -255,13 +255,18 @@ def main(train_data,
                                                        warm_start=False), n_jobs=-1)
     # Training and validation
     print("Training the model...")
-    model = model.fit(train_counts, train_labels_x)
+    model = model.fit(train_counts, train_labels)
     # Save the model
     pickle.dump(model, open(os.path.join(outdir, "model.sav"), 'wb'))
     print("Model trained and saved!")
     
     # Predict
     print("Predicting on test data..")
+    predict_counts = test_data_frame.astype(np.float32).values
+    test_index = test_data_frame.index
+    del test_data_frame
+    gc.collect()
+    
     predicted_class = model.predict(predict_counts)  
     predicted_prob = model.predict_proba(predict_counts)
     # Map labels back to their original value
@@ -270,7 +275,7 @@ def main(train_data,
     if classifier not in "NN":
         # Print the weights for each gene
         pd.DataFrame(data=model.coef_,
-                     index=sorted(set([index_label_map[x] for x in train_labels_x])),
+                     index=sorted(set([index_label_map[x] for x in train_labels])),
                      columns=intersect_genes).to_csv(os.path.join(outdir,
                                                                   "genes_contributions.tsv"), 
                                                                   sep='\t')
@@ -282,7 +287,7 @@ def main(train_data,
         print("Confusion matrix:\n{}".format(metrics.confusion_matrix(test_labels, predicted_class)))
     
     with open(os.path.join(outdir, "predicted_classes.tsv"), "w") as filehandler:
-        for spot, pred, probs in zip(test_data_frame.index, predicted_class, predicted_prob):
+        for spot, pred, probs in zip(test_index, predicted_class, predicted_prob):
             filehandler.write("{0}\t{1}\t{2}\n".format(spot, pred,
                                                        "\t".join(['{:.4f}'.format(x) for x in probs.tolist()]))) 
        

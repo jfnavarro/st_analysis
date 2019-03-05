@@ -33,6 +33,8 @@ import time
 import argparse
 import numpy as np
 import pandas as pd
+import gc
+
 from collections import defaultdict
 
 from stanalysis.preprocessing import *
@@ -269,8 +271,6 @@ def main(train_data,
                                                      [train_data_frame,test_data_frame]])
         train_data_frame = batch_corrected[0].transpose()
         test_data_frame = batch_corrected[1].transpose()
-        train_data_frame.to_csv(os.path.join(outdir, "train_data_bc.tsv"), sep="\t")
-        test_data_frame.to_csv(os.path.join(outdir, "test_data_bc.tsv"), sep="\t")
         
     # Log the counts
     if log_scale and not batch_correction and not normalization == "Scran":
@@ -280,7 +280,7 @@ def main(train_data,
         
     # Apply the z-transformation
     if standard_transformation:
-        print("Applying z-score transformation...")
+        print("Applying standard transformation...")
         train_data_frame = ztransformation(train_data_frame)
         test_data_frame = ztransformation(test_data_frame)
 
@@ -310,8 +310,11 @@ def main(train_data,
     # PyTorch needs floats
     train_counts = train_counts_x.astype(np.float32).values
     test_counts = train_counts_y.astype(np.float32).values
-    predict_counts = test_data_frame.astype(np.float32).values
-        
+    del train_counts_x
+    del train_counts_y
+    del train_data_frame
+    gc.collect()
+    
     # Input and output sizes
     n_feature = train_counts.shape[1]
     n_ele_train = train_counts.shape[0]
@@ -335,9 +338,13 @@ def main(train_data,
     # Create Tensor Flow train dataset
     X_train = torch.tensor(train_counts)
     X_test = torch.tensor(test_counts)
-    
     y_train = torch.from_numpy(np.asarray(train_labels_x, dtype=np.longlong))
     y_test = torch.from_numpy(np.asarray(train_labels_y, dtype=np.longlong))
+    del train_counts
+    del test_counts
+    del train_labels_x
+    del train_labels_y
+    gc.collect()
     
     # Create tensor datasets (train + test)
     trn_set = utils.TensorDataset(X_train, y_train)
@@ -397,8 +404,8 @@ def main(train_data,
         train(model, trn_loader, optimizer, loss, device, verbose)
         # Testing
         preds = test(model, tst_loader, loss, device, verbose)
-        conf_mat = confusion_matrix(train_labels_y, preds)
-        precision, recall, f1, _ = precision_recall_fscore_support(train_labels_y, 
+        conf_mat = confusion_matrix(y_test.cpu().numpy(), preds)
+        precision, recall, f1, _ = precision_recall_fscore_support(y_test.cpu().numpy(), 
                                                                    preds, average='micro')
         if verbose:
             print("Testing confusion matrix:\n", conf_mat)
@@ -414,11 +421,17 @@ def main(train_data,
     conf_mat, precision, recall, f1 = history[best_epoch_idx]
     print("Confusion matrix:\n", conf_mat)
     print("Precision {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))    
-
-    # Predict
-    print("Predicting on test data..")
+    # Load and save best model
     model.load_state_dict(best_model)
     torch.save(model, os.path.join(outdir, "model.pt"))
+    
+    # Predict
+    print("Predicting on test data..")
+    predict_counts = test_data_frame.astype(np.float32).values
+    test_index = test_data_frame.index
+    del test_data_frame
+    gc.collect()
+    
     X_pre = torch.tensor(predict_counts)
     y_pre = test_labels if test_classes_file is not None else None
     out, preds = predict(model, X_pre, device)
@@ -429,7 +442,7 @@ def main(train_data,
               format(classification_report(y_pre, preds)))
         print("Confusion matrix:\n{}".format(confusion_matrix(y_pre, preds)))
     with open(os.path.join(outdir, "predicted_classes.tsv"), "w") as filehandler:
-        for spot, pred, probs in zip(test_data_frame.index, preds, out.cpu().numpy()):
+        for spot, pred, probs in zip(test_index, preds, out.cpu().numpy()):
             filehandler.write("{0}\t{1}\t{2}\n".format(spot, pred,
                                                        "\t".join(['{:.6f}'.format(x) for x in probs]))) 
         
