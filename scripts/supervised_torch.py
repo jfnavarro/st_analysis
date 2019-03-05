@@ -67,7 +67,7 @@ def computeWeightsClasses(dataset):
         label_count[label.item()] += 1         
     # Weight for each sample
     weights = np.asarray([1.0 / x for x in label_count.values()])
-    return torch.DoubleTensor(weights)
+    return weights
     
 def split_dataset(dataset, labels, split_num=0.8, min_size=50):
     train_indexes = list()
@@ -95,13 +95,12 @@ def split_dataset(dataset, labels, split_num=0.8, min_size=50):
     # Return the splitted datasets and their labels
     return dataset.iloc[train_indexes,:], dataset.iloc[test_indexes,:], train_labels, test_labels
 
-def train(model, trn_loader, optimizer, loss, device, verbose):
+def train(model, trn_loader, optimizer, loss, device):
     model.train()
     training_loss = 0
-    training_f1 = 0
     for data, target in trn_loader:
-        data.to(device)
-        target.to(device)
+        data = data.to(device)
+        target = target.to(device)
         data = Variable(data)
         target = Variable(target)
         # Zero the gradients
@@ -109,42 +108,33 @@ def train(model, trn_loader, optimizer, loss, device, verbose):
         # Forward pass
         output = model(data)
         tloss = loss(output, target)
-        training_loss += tloss.item()
         # Backward pass
         tloss.backward()
-         # Compute prediction's score
-        with torch.no_grad():
-            _, pred = torch.max(output, 1)
-            training_f1 += f1_score(target.data.cpu().numpy(),
-                                    pred.data.cpu().numpy(), 
-                                    average='micro')
         # Update parameters
         optimizer.step()
+        # Compute prediction's score
+        training_loss += tloss.item()
+    avg_loss = training_loss / float(len(trn_loader.dataset))
+    return avg_loss
         
-    if verbose:
-        print("Training set avg. loss: {:.4f}".format(training_loss / len(trn_loader.dataset)))
-        print("Training set avg. micro-f1: {:.4f}".format(training_f1 / len(trn_loader.dataset)))
-        
-def test(model, tst_loader, loss, device, verbose=False):
+def test(model, tst_loader, loss, device):
     model.eval()
     test_loss = 0
     preds = list()
     for data, target in tst_loader:
-        data.to(device)
-        target.to(device)
+        data = data.to(device)
+        target = target.to(device)
         with torch.no_grad():
-            #data, target = Variable(data), Variable(target)
             output = model(data)
             test_loss += loss(output, target).item()
             _, pred = torch.max(output, 1)
             preds += pred.cpu().numpy().tolist()
-    if verbose:
-        print("Test set avg. loss: {:.4f}".format(test_loss / len(tst_loader.dataset)))
-    return preds
+    avg_loss = test_loss / float(len(tst_loader.dataset))  
+    return preds, avg_loss
 
 def predict(model, data, device):
     model.eval()
-    data.to(device)
+    data = data.to(device)
     with torch.no_grad():
         output = model(data)
         _, pred = torch.max(output, 1)
@@ -360,6 +350,7 @@ def main(train_data,
     if stratified_sampler:
         print("Using a stratified sampler for training set...")
         weights_train = computeWeightsClasses(trn_set)
+        weights_train = torch.from_numpy(weights_train).float().to(device)
         trn_sampler = utils.sampler.WeightedRandomSampler(weights_train, len(weights_train)) 
     else:
         trn_sampler = None    
@@ -385,17 +376,18 @@ def main(train_data,
         torch.nn.ReLU(),
         torch.nn.Linear(H2, n_class),
     )
-    model.to(device) 
+    model = model.to(device) 
     
-    # Creating loss
-    loss = torch.nn.CrossEntropyLoss().cuda() if use_cuda else torch.nn.CrossEntropyLoss()
+    # Creating loss (reduction='none')
+    loss = torch.nn.CrossEntropyLoss()
     
     # Creating optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     
     # Train the model
     best_epoch_idx = -1
-    best_f1 = 0.0
+    best_score = 10e6
+    counter = 0
     history = list()
     best_model = dict()
     print("Training the model...")
@@ -403,20 +395,31 @@ def main(train_data,
         if verbose:
             print('Epoch: {}'.format(epoch))
         # Training
-        train(model, trn_loader, optimizer, loss, device, verbose)
+        avg_train_loss = train(model, trn_loader, optimizer, loss, device)
         # Testing
-        preds = test(model, tst_loader, loss, device, verbose)
+        preds, avg_test_loss = test(model, tst_loader, loss, device)
+        # Compute accuracy scores
         conf_mat = confusion_matrix(y_test.cpu().numpy(), preds)
         precision, recall, f1, _ = precision_recall_fscore_support(y_test.cpu().numpy(), 
                                                                    preds, average='micro')
         if verbose:
-            print("Testing confusion matrix:\n", conf_mat)
-            print("Testing precision {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))  
+            print("Train set avg. loss: {:.4f}".format(avg_train_loss))
+            print("Test set avg. loss: {:.4f}".format(avg_test_loss))
+            print("Test set confusion matrix:\n", conf_mat)
+            print("Test set precision {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))  
+            
         history.append((conf_mat, precision, recall, f1))
-        if f1 > best_f1: 
-            best_f1 = f1
+        if avg_test_loss < best_score:
+            counter = 0
+            best_score = avg_test_loss
             best_epoch_idx = epoch
             best_model = model.state_dict()
+        else:
+            counter += 1
+        
+        if counter >= 20:
+            print("Early stopping")
+            break
 
     print("Model trained!")
     print("Best epoch {}".format(best_epoch_idx))
