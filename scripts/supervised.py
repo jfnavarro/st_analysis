@@ -229,7 +229,7 @@ def main(train_data,
         print("Neural Network with the following hidden layers {}".format(
             " ".join([str(x) for x in hidden_layers_size])))
         model = MLPClassifier(hidden_layer_sizes=hidden_layers_size, 
-                              activation='tanh', 
+                              activation='relu', 
                               solver='adam', 
                               alpha=0.0001, 
                               batch_size=batch_size, 
