@@ -221,7 +221,8 @@ def main(train_data,
     print("Output folder {}".format(outdir))
     
     print("Loading training dataset...")
-    train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0).astype(np.float32)
+    train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0, 
+                                     engine='c', low_memory=True)
     # Remove noisy genes
     train_data_frame = remove_noise(train_data_frame, 1.0, num_exp_spots, min_gene_expression)
     train_genes = list(train_data_frame.columns.values)
@@ -231,7 +232,8 @@ def main(train_data,
     train_data_frame, train_labels = update_labels(train_data_frame, train_labels_dict)
     
     print("Loading prediction dataset...")
-    test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0).astype(np.float32)
+    test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0,
+                                    engine='c', low_memory=True)
     # Remove noisy genes
     test_data_frame = remove_noise(test_data_frame, 1.0, num_exp_spots, min_gene_expression)
     test_genes = list(test_data_frame.columns.values)
