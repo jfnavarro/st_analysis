@@ -174,11 +174,11 @@ def main(train_data,
          test_data, 
          train_classes_file, 
          test_classes_file, 
-         use_log_scale, 
+         log_scale, 
          normalization, 
          outdir, 
          batch_correction,
-         z_transformation,
+         standard_transformation,
          train_batch_size,
          test_batch_size, 
          epochs, 
@@ -207,7 +207,7 @@ def main(train_data,
         sys.stderr.write("Error, the test labels input is not valid\n")
         sys.exit(1)
        
-    if normalization == "Scran" and use_log_scale:
+    if normalization == "Scran" and log_scale:
         sys.stderr.write("Warning, Scran normalization converts to log space already\n")
          
     if not torch.cuda.is_available() and use_cuda:
@@ -272,8 +272,14 @@ def main(train_data,
         train_data_frame.to_csv(os.path.join(outdir, "train_data_bc.tsv"), sep="\t")
         test_data_frame.to_csv(os.path.join(outdir, "test_data_bc.tsv"), sep="\t")
         
+    # Log the counts
+    if log_scale and not batch_correction and not normalization == "Scran":
+        print("Transforming datasets to log space...")
+        train_data_frame = np.log1p(train_data_frame)
+        test_data_frame = np.log1p(test_data_frame)
+        
     # Apply the z-transformation
-    if z_transformation:
+    if standard_transformation:
         print("Applying z-score transformation...")
         train_data_frame = ztransformation(train_data_frame)
         test_data_frame = ztransformation(test_data_frame)
@@ -305,13 +311,6 @@ def main(train_data,
     train_counts = train_counts_x.astype(np.float32).values
     test_counts = train_counts_y.astype(np.float32).values
     predict_counts = test_data_frame.astype(np.float32).values
-    
-    # Log the counts
-    if use_log_scale and not batch_correction and not normalization == "Scran":
-        print("Transforming datasets to log space (log2 + 1)...")
-        train_counts = np.log2(train_counts + 1)
-        test_counts = np.log2(test_counts + 1)
-        predict_counts = np.log2(predict_counts + 1)
         
     # Input and output sizes
     n_feature = train_counts.shape[1]
@@ -371,10 +370,10 @@ def main(train_data,
     model = torch.nn.Sequential(
         torch.nn.Linear(n_feature, H1),
         torch.nn.BatchNorm1d(num_features=H1),
-        torch.nn.ReLU(),
+        torch.nn.SELU(),
         torch.nn.Linear(H1, H2),
         torch.nn.BatchNorm1d(num_features=H2),
-        torch.nn.ReLU(),
+        torch.nn.SELU(),
         torch.nn.Linear(H2, n_class),
     )
     model.to(device) 
@@ -444,13 +443,13 @@ if __name__ == '__main__':
     parser.add_argument("--train-classes", required=True, type=str,
                         help="Path to the training classes file (SPOT LABEL)")
     parser.add_argument("--test-classes", required=False, type=str,
-                        help="Path to the test classes file (SPOT LABEL) (OPTIONAL)")
-    parser.add_argument("--use-log-scale", action="store_true", default=False,
-                        help="Use log2 + 1 for the training and test (if no batch correction is performed)")
+                        help="Path to the test classes file (SPOT LABEL)")
+    parser.add_argument("--log-scale", action="store_true", default=False,
+                        help="Convert the training and test sets to log space (if no batch correction is performed)")
     parser.add_argument("--batch-correction", action="store_true", default=False,
                         help="Perform batch-correction (Scran::Mnncorrect()) between train and test sets")
-    parser.add_argument("--z-transformation", action="store_true", default=False,
-                        help="Apply the z-score transformation to each spot (Sij - Mean(i) / std(i))")
+    parser.add_argument("--standard-transformation", action="store_true", default=False,
+                        help="Apply the z-score transformation to each gene")
     parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, 
                         choices=["RAW", "DESeq2",  "REL", "Scran"],
@@ -488,7 +487,7 @@ if __name__ == '__main__':
                         "considered expressed (default: %(default)s)")
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
-         args.test_classes, args.use_log_scale, args.normalization, 
-         args.outdir, args.batch_correction, args.z_transformation, args.train_batch_size,
+         args.test_classes, args.log_scale, args.normalization, 
+         args.outdir, args.batch_correction, args.standard_transformation, args.train_batch_size,
          args.test_batch_size, args.epochs, args.learning_rate, args.stratified_sampler, args.min_class_size, 
          args.use_cuda, args.num_exp_genes, args.num_exp_spots, args.min_gene_expression, args.verbose)

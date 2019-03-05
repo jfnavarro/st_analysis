@@ -86,11 +86,11 @@ def main(train_data,
          test_data,
          train_classes_file, 
          test_classes_file, 
-         use_log_scale, 
+         log_scale, 
          normalization, 
          outdir, 
          batch_correction, 
-         z_transformation, 
+         standard_transformation, 
          epochs, 
          num_exp_genes, 
          num_exp_spots, 
@@ -119,7 +119,7 @@ def main(train_data,
         sys.stderr.write("Error, the test labels input is not valid\n")
         sys.exit(1)
        
-    if normalization == "Scran" and use_log_scale:
+    if normalization == "Scran" and log_scale:
         sys.stderr.write("Warning, Scran normalization converts to log space already\n")
                  
     if not outdir or not os.path.isdir(outdir):
@@ -178,8 +178,14 @@ def main(train_data,
         train_data_frame.to_csv(os.path.join(outdir, "train_data_bc.tsv"), sep="\t")
         test_data_frame.to_csv(os.path.join(outdir, "test_data_bc.tsv"), sep="\t")
         
+    # Log the counts
+    if log_scale and not batch_correction and not normalization == "Scran":
+        print("Transforming datasets to log space...")
+        train_data_frame = np.log1p(train_data_frame)
+        test_data_frame = np.log1p(test_data_frame)
+        
     # Apply the z-transformation
-    if z_transformation:
+    if standard_transformation:
         print("Applying z-score transformation...")
         train_data_frame = ztransformation(train_data_frame)
         test_data_frame = ztransformation(test_data_frame)
@@ -207,16 +213,11 @@ def main(train_data,
     # Get the numpy counts
     train_counts = train_counts_x.astype(np.float32).values
     predict_counts = test_data_frame.astype(np.float32).values
-  
-    # Log the counts
-    if use_log_scale and not batch_correction and not normalization == "Scran":
-        print("Transforming datasets to log space (log2 + 1)...")
-        train_counts = np.log2(train_counts + 1)
-        predict_counts = np.log2(predict_counts + 1)
         
     # Train the classifier and predict
     class_weight = "balanced" if stratified_sampler else None
     if classifier in "SVC":
+        print("One vs rest SVM")
         model = OneVsRestClassifier(SVC(probability=True, 
                                         random_state=None,
                                         tol=0.001,
@@ -228,7 +229,7 @@ def main(train_data,
         print("Neural Network with the following hidden layers {}".format(
             " ".join([str(x) for x in hidden_layers_size])))
         model = MLPClassifier(hidden_layer_sizes=hidden_layers_size, 
-                              activation='relu', 
+                              activation='tanh', 
                               solver='adam', 
                               alpha=0.0001, 
                               batch_size=batch_size, 
@@ -239,6 +240,7 @@ def main(train_data,
                               tol=0.0001, 
                               momentum=0.9)
     else:
+        print("One vs rest Logistic Regression")
         model = OneVsRestClassifier(LogisticRegression(penalty='l2', 
                                                        dual=False, 
                                                        tol=0.0001, 
@@ -294,13 +296,13 @@ if __name__ == '__main__':
     parser.add_argument("--train-classes", required=True, type=str,
                         help="Path to the training classes file (SPOT LABEL)")
     parser.add_argument("--test-classes", required=False, type=str,
-                        help="Path to the test classes file (SPOT LABEL) (OPTIONAL)")
-    parser.add_argument("--use-log-scale", action="store_true", default=False,
-                        help="Use log2 + 1 for the training and test (if no batch correction is performed)")
+                        help="Path to the test classes file (SPOT LABEL)")
+    parser.add_argument("--log-scale", action="store_true", default=False,
+                        help="Convert the training and test sets to log space (if no batch correction is performed)")
     parser.add_argument("--batch-correction", action="store_true", default=False,
                         help="Perform batch-correction (Scran::Mnncorrect()) between train and test sets")
-    parser.add_argument("--z-transformation", action="store_true", default=False,
-                        help="Apply the z-score transformation to each spot (Sij - Mean(i) / std(i))")
+    parser.add_argument("--standard-transformation", action="store_true", default=False,
+                        help="Apply the z-score transformation to each feature (gene)")
     parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, 
                         choices=["RAW", "DESeq2",  "REL", "Scran"],
@@ -352,8 +354,8 @@ if __name__ == '__main__':
                         help="The minimum number of elements a class must has in the training set (default: %(default)s)")
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
-         args.test_classes, args.use_log_scale, args.normalization, 
-         args.outdir, args.batch_correction, args.z_transformation, 
+         args.test_classes, args.log_scale, args.normalization, 
+         args.outdir, args.batch_correction, args.standard_transformation, 
          args.epochs, args.num_exp_genes, args.num_exp_spots, 
          args.min_gene_expression, args.classifier, args.svc_kernel,
          args.batch_size, args.learning_rate, args.stratified_sampler, 

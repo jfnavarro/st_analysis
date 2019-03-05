@@ -8,16 +8,21 @@ import pandas as pd
 import math
 import os
 from stanalysis.normalization import *
+from sklearn.preprocessing import StandardScaler
 
 def ztransformation(counts):
     """ Applies a zimple z-score transformation
     which consists of substracting to each count the 
-    the mean of its row (spot) and then divide it by
-    the std of its row
+    the mean of its column (spot) and then divide it by
+    the standard deviation
     """
-    means = counts.mean(axis=1)
-    stds = counts.std(axis=1)
-    return counts.subtract(means, axis=0).div(stds, axis=0)
+    scaler = StandardScaler()
+    rows = counts.index
+    cols = counts.columns
+    scaled_counts = scaler.fit_transform(counts.values)
+    return pd.DataFrame(data=scaled_counts,
+                        index=rows,
+                        columns=cols)
     
 def aggregate_datatasets(counts_table_files, add_index=True):
     """ This functions takes a list of data frames with ST data
