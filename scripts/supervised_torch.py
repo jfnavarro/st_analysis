@@ -326,19 +326,20 @@ def main(train_data,
     if test_classes_file is not None:
         test_data_frame, test_labels = update_labels(test_data_frame, test_labels_dict)
     
-    # Split train and test dasasets
-    print("Splitting training set into training and test sets (equally balancing clusters)")
-    train_counts_x, train_counts_y, train_labels_x, train_labels_y = split_dataset(train_data_frame, 
-                                                                                   train_labels, 0.7, min_class_size)
     # Update labels so to ensure they go for 0-N sequentially
     labels_index_map = dict()
     index_label_map = dict()
-    for i,label in enumerate(sorted(set(train_labels_x))):
+    for i,label in enumerate(sorted(set(train_labels))):
         labels_index_map[label] = i
         index_label_map[i] = label
     print("Mapping of labels:")
     print(index_label_map)
-    train_labels_x = [labels_index_map[x] for x in train_labels_x]
+    train_labels = [labels_index_map[x] for x in train_labels]
+    
+    # Split train and test dasasets
+    print("Splitting training set into training and test sets (equally balancing clusters)")
+    train_counts_x, train_counts_y, train_labels_x, train_labels_y = split_dataset(train_data_frame, 
+                                                                                   train_labels, 0.7, min_class_size)
     
     print("Training set {}".format(train_counts_x.shape[0]))
     print("Test set {}".format(train_counts_y.shape[0]))
