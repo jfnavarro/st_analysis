@@ -119,6 +119,7 @@ def train(model, trn_loader, optimizer, loss, device):
         # Forward pass
         output = model(data)
         tloss = loss(output, target)
+        training_loss += tloss.item()
         # Zero the gradients
         optimizer.zero_grad()
         # Backward pass
@@ -126,7 +127,6 @@ def train(model, trn_loader, optimizer, loss, device):
         # Update parameters
         optimizer.step()
         # Compute prediction's score
-        training_loss += tloss.item()
         pred = torch.argmax(output.data, 1)
         training_f1 += f1_score(target.data.cpu().numpy(),
                                 pred.data.cpu().numpy(),
@@ -155,7 +155,7 @@ def predict(model, data, device):
     data = data.to(device)
     with torch.no_grad():
         output = model(data)
-        _, pred = torch.max(output, 1)
+        pred = torch.argmax(output.data, 1)
     return output, pred
 
 def update_labels(counts, labels_dict):
@@ -430,6 +430,12 @@ def main(train_data,
     )
     model = model.to(device) 
     
+    def init_weights(m):
+        if type(m) == nn.Linear:
+            torch.nn.init.xavier_uniform(m.weight)
+            m.bias.data.fill_(0.01)
+    model.apply(init_weights)
+        
     # Creating loss (reduction='none')
     # Compute weights
     weights_classes = computeWeightsClasses(trn_set)
