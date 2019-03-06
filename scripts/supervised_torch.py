@@ -58,6 +58,7 @@ import gc
 __spec__ = None
 import multiprocessing
 
+
 def computeWeightsClasses(dataset):
     # Distribution of labels
     label_count = defaultdict(int)
@@ -66,6 +67,19 @@ def computeWeightsClasses(dataset):
     # Weight for each sample
     weights = np.asarray([1.0 / x for x in label_count.values()])
     return weights
+
+def computeWeights(dataset, nclasses):
+    count = [0] * nclasses                                                      
+    for item in dataset:                                                         
+        count[item[1]] += 1                                                     
+    weight_per_class = [0.] * nclasses                                      
+    N = float(sum(count))                                                   
+    for i in range(nclasses):                                                   
+        weight_per_class[i] = N/float(count[i])                                 
+    weight = [0] * len(dataset)                                              
+    for idx, val in enumerate(dataset):                                          
+        weight[idx] = weight_per_class[val[1]]                                  
+    return np.asarray(weight)  
     
 def split_dataset(dataset, labels, split_num=0.8, min_size=50):
     train_indexes = list()
@@ -367,7 +381,7 @@ def main(train_data,
     # Create tensor datasets (train + test)
     trn_set = utils.TensorDataset(X_train, y_train)
     tst_set = utils.TensorDataset(X_test, y_test)
-    
+        
     # Create loaders with balanced labels
     if train_batch_size >= (n_ele_train / 2):
         print("The training batch size is almost as big as the training set...")
@@ -375,12 +389,12 @@ def main(train_data,
         print("The test batch size is almost as big as the test set...")
     if stratified_sampler:
         print("Using a stratified sampler for training set...")
-        weights_train = computeWeightsClasses(trn_set)
+        weights_train = computeWeights(trn_set, n_class)
         weights_train = torch.from_numpy(weights_train).float().to(device)
         trn_sampler = utils.sampler.WeightedRandomSampler(weights_train, len(weights_train)) 
     else:
         trn_sampler = None    
-    trn_loader = utils.DataLoader(trn_set, sampler=trn_sampler, shuffle=True,
+    trn_loader = utils.DataLoader(trn_set, sampler=trn_sampler, shuffle=not stratified_sampler,
                                   batch_size=train_batch_size, **kwargs)
     tst_loader = utils.DataLoader(tst_set, sampler=None, shuffle=False,
                                   batch_size=test_batch_size, **kwargs)
@@ -405,10 +419,14 @@ def main(train_data,
     model = model.to(device) 
     
     # Creating loss (reduction='none')
-    loss = torch.nn.CrossEntropyLoss().cuda() if use_cuda else torch.nn.CrossEntropyLoss()
+    # Compute weights
+    weights_classes = computeWeightsClasses(trn_set)
+    weights_classes = torch.from_numpy(weights_classes).float().to(device)
+    loss = torch.nn.CrossEntropyLoss(weight=weights_classes).cuda() \
+           if use_cuda else torch.nn.CrossEntropyLoss(weight=weights_classes)
     
     # Creating optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
     
     # Train the model
     best_epoch_idx = -1
