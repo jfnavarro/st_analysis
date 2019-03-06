@@ -341,6 +341,18 @@ def main(train_data,
     train_counts_x, train_counts_y, train_labels_x, train_labels_y = split_dataset(train_data_frame, 
                                                                                    train_labels, 0.7, min_class_size)
     
+    # Update the maps of indexes to labels again since some labels may have been removed
+    #TODO this is ugly, a better approach should be implemented
+    labels_index_map_filtered = dict()
+    index_label_map_filtered = dict()
+    for i,label in enumerate(sorted(set(train_labels_x))):
+        labels_index_map_filtered[label] = i
+        index_label_map_filtered[i] = index_label_map[label]
+    print("Mapping of labels (filtered):")
+    print(index_label_map_filtered)
+    train_labels_x = [labels_index_map_filtered[x] for x in train_labels_x]
+    train_labels_y = [labels_index_map_filtered[x] for x in train_labels_y] 
+    
     print("Training set {}".format(train_counts_x.shape[0]))
     print("Test set {}".format(train_counts_y.shape[0]))
     
@@ -491,7 +503,7 @@ def main(train_data,
     y_pre = test_labels if test_classes_file is not None else None
     out, preds = predict(model, X_pre, device)
     # Map labels back to their original value
-    preds = [index_label_map[np.asscalar(x)] for x in preds.cpu().numpy()]
+    preds = [index_label_map_filtered[np.asscalar(x)] for x in preds.cpu().numpy()]
     if y_pre is not None:
         print("Classification report\n{}".
               format(classification_report(y_pre, preds)))
