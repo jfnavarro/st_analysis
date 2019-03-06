@@ -58,8 +58,6 @@ import gc
 __spec__ = None
 import multiprocessing
 
-SEED = 666
-
 def computeWeightsClasses(dataset):
     # Distribution of labels
     label_count = defaultdict(int)
@@ -98,36 +96,42 @@ def split_dataset(dataset, labels, split_num=0.8, min_size=50):
 def train(model, trn_loader, optimizer, loss, device):
     model.train()
     training_loss = 0
+    training_f1 = 0
     for data, target in trn_loader:
         data = data.to(device)
         target = target.to(device)
         data = Variable(data)
         target = Variable(target)
-        # Zero the gradients
-        optimizer.zero_grad()
         # Forward pass
         output = model(data)
         tloss = loss(output, target)
+        # Zero the gradients
+        optimizer.zero_grad()
         # Backward pass
         tloss.backward()
         # Update parameters
         optimizer.step()
         # Compute prediction's score
         training_loss += tloss.item()
+        pred = torch.argmax(output.data, 1)
+        training_f1 += f1_score(target.data.cpu().numpy(),
+                                pred.data.cpu().numpy(),
+                                average='weighted')
     avg_loss = training_loss / float(len(trn_loader.dataset))
-    return avg_loss
+    avg_f1 = training_f1 / float(len(trn_loader.dataset))
+    return avg_loss, avg_f1
         
 def test(model, tst_loader, loss, device):
     model.eval()
     test_loss = 0
     preds = list()
     for data, target in tst_loader:
-        data = data.to(device)
-        target = target.to(device)
         with torch.no_grad():
+            data = data.to(device)
+            target = target.to(device)
             output = model(data)
             test_loss += loss(output, target).item()
-            _, pred = torch.max(output, 1)
+            pred = torch.argmax(output.data, 1)
             preds += pred.cpu().numpy().tolist()
     avg_loss = test_loss / float(len(tst_loader.dataset))  
     return preds, avg_loss
@@ -321,11 +325,6 @@ def main(train_data,
     workers = 4
     print("Workers {}".format(workers))
     kwargs = {'num_workers': workers, 'pin_memory': True}
-    
-    # Set the SEED
-    torch.manual_seed(SEED)
-    if use_cuda:
-        torch.cuda.manual_seed(SEED)
 
     # Create Tensor Flow train dataset
     X_train = torch.tensor(train_counts)
@@ -354,13 +353,13 @@ def main(train_data,
         trn_sampler = utils.sampler.WeightedRandomSampler(weights_train, len(weights_train)) 
     else:
         trn_sampler = None    
-    trn_loader = utils.DataLoader(trn_set, sampler=trn_sampler, 
+    trn_loader = utils.DataLoader(trn_set, sampler=trn_sampler, shuffle=True,
                                   batch_size=train_batch_size, **kwargs)
-    tst_loader = utils.DataLoader(tst_set, sampler=None, 
+    tst_loader = utils.DataLoader(tst_set, sampler=None, shuffle=False,
                                   batch_size=test_batch_size, **kwargs)
 
     # Init model
-    H1 = 1000
+    H1 = 2000
     H2 = 500
     print("Creating NN model...")
     print("Input size {}".format(n_feature))
@@ -379,14 +378,15 @@ def main(train_data,
     model = model.to(device) 
     
     # Creating loss (reduction='none')
-    loss = torch.nn.CrossEntropyLoss()
+    loss = torch.nn.CrossEntropyLoss().cuda() if use_cuda else torch.nn.CrossEntropyLoss()
     
     # Creating optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     
     # Train the model
     best_epoch_idx = -1
-    best_score = 10e6
+    best_loss = 10e6
+    best_f1 = 0
     counter = 0
     history = list()
     best_model = dict()
@@ -395,25 +395,30 @@ def main(train_data,
         if verbose:
             print('Epoch: {}'.format(epoch))
         # Training
-        avg_train_loss = train(model, trn_loader, optimizer, loss, device)
+        avg_train_loss, avg_training_f1 = train(model, trn_loader, optimizer, loss, device)
         # Testing
         preds, avg_test_loss = test(model, tst_loader, loss, device)
         # Compute accuracy scores
         conf_mat = confusion_matrix(y_test.cpu().numpy(), preds)
         precision, recall, f1, _ = precision_recall_fscore_support(y_test.cpu().numpy(), 
-                                                                   preds, average='micro')
+                                                                   preds, average='weighted')
+        history.append((conf_mat, precision, recall, f1))
+        
         if verbose:
+            print("Train set avg. f1: {:.4f}".format(avg_training_f1))
             print("Train set avg. loss: {:.4f}".format(avg_train_loss))
             print("Test set avg. loss: {:.4f}".format(avg_test_loss))
             print("Test set confusion matrix:\n", conf_mat)
             print("Test set precision {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))  
-            
-        history.append((conf_mat, precision, recall, f1))
-        if avg_test_loss < best_score:
-            counter = 0
-            best_score = avg_test_loss
+           
+        if f1 > best_f1:
+            best_f1 = f1 
             best_epoch_idx = epoch
             best_model = model.state_dict()
+            
+        if avg_test_loss < best_loss:
+            counter = 0
+            best_loss = avg_test_loss
         else:
             counter += 1
         
