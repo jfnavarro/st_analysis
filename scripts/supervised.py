@@ -58,6 +58,7 @@ def filter_classes(dataset, labels, min_size=50):
         if len(indexes) >= min_size:
             train_indexes += indexes
             train_labels += [label] * len(indexes)
+    assert(len(train_labels) >= 0.1 * dataset.shape[0])
     # Return the reduced dataset/labels
     return dataset.iloc[train_indexes,:], train_labels
 
@@ -121,8 +122,35 @@ def main(train_data,
         sys.exit(1)
        
     if normalization == "Scran" and log_scale:
-        sys.stderr.write("Warning, Scran normalization converts to log space already\n")
-                 
+        sys.stderr.write("Warning, when performing Scran normalization log-scale will be ignored\n")
+     
+    if batch_correction and log_scale:
+        sys.stderr.write("Warning, when performing batch correction log-scale will be ignored\n")
+                  
+    if min_class_size < 0:
+        sys.stderr.write("Error, invalid minimum class size\n")
+        sys.exit(1)
+
+    if learning_rate < 0:
+        sys.stderr.write("Error, learning rate\n")
+        sys.exit(1)
+        
+    if batch_size < 10:
+        sys.stderr.write("Error, batch size is too small\n")
+        sys.exit(1)
+        
+    if epochs < 10:
+        sys.stderr.write("Error, number of epoch is too small\n")
+        sys.exit(1)
+    
+    if num_exp_genes < 0.0 or num_exp_genes > 1.0:
+        sys.stderr.write("Error, invalid number of expressed genes\n")
+        sys.exit(1)
+        
+    if num_exp_spots < 0.0 or num_exp_spots > 1.0:
+        sys.stderr.write("Error, invalid number of expressed genes\n")
+        sys.exit(1)
+                  
     if not outdir or not os.path.isdir(outdir):
         outdir = os.getcwd()   
     print("Output folder {}".format(outdir))

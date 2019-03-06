@@ -210,7 +210,34 @@ def main(train_data,
         sys.exit(1)
        
     if normalization == "Scran" and log_scale:
-        sys.stderr.write("Warning, Scran normalization converts to log space already\n")
+        sys.stderr.write("Warning, when performing Scran normalization log-scale will be ignored\n")
+     
+    if batch_correction and log_scale:
+        sys.stderr.write("Warning, when performing batch correction log-scale will be ignored\n")
+                  
+    if min_class_size < 0:
+        sys.stderr.write("Error, invalid minimum class size\n")
+        sys.exit(1)
+
+    if learning_rate < 0:
+        sys.stderr.write("Error, learning rate\n")
+        sys.exit(1)
+        
+    if train_batch_size < 10 or test_batch_size < 10:
+        sys.stderr.write("Error, batch size is too small\n")
+        sys.exit(1)
+        
+    if epochs < 10:
+        sys.stderr.write("Error, number of epoch is too small\n")
+        sys.exit(1)
+    
+    if num_exp_genes < 0.0 or num_exp_genes > 1.0:
+        sys.stderr.write("Error, invalid number of expressed genes\n")
+        sys.exit(1)
+        
+    if num_exp_spots < 0.0 or num_exp_spots > 1.0:
+        sys.stderr.write("Error, invalid number of expressed genes\n")
+        sys.exit(1)
          
     if not torch.cuda.is_available() and use_cuda:
         sys.stderr.write("Error, CUDA is not available in this computer\n")
@@ -460,11 +487,11 @@ if __name__ == '__main__':
     parser.add_argument("--test-classes", required=False, type=str,
                         help="Path to the test classes file (SPOT LABEL)")
     parser.add_argument("--log-scale", action="store_true", default=False,
-                        help="Convert the training and test sets to log space (if no batch correction is performed)")
+                        help="Convert the training and test sets to log space (not applied when using batch correction)")
     parser.add_argument("--batch-correction", action="store_true", default=False,
                         help="Perform batch-correction (Scran::Mnncorrect()) between train and test sets")
     parser.add_argument("--standard-transformation", action="store_true", default=False,
-                        help="Apply the z-score transformation to each gene")
+                        help="Apply the standard transformation to each gene on the train and test sets")
     parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, 
                         choices=["RAW", "DESeq2",  "REL", "Scran"],
