@@ -325,21 +325,20 @@ def main(train_data,
     train_data_frame, train_labels = update_labels(train_data_frame, train_labels_dict)
     if test_classes_file is not None:
         test_data_frame, test_labels = update_labels(test_data_frame, test_labels_dict)
-            
-    # Update labels so to ensure they go for 0-N sequentially
-    labels_index_map = dict()
-    index_label_map = dict()
-    for i,label in enumerate(sorted(set(train_labels))):
-        labels_index_map[label] = i
-        index_label_map[i] = label
-    print("Mapping of labels:")
-    print(index_label_map)
-    train_labels = [labels_index_map[x] for x in train_labels]
     
     # Split train and test dasasets
     print("Splitting training set into training and test sets (equally balancing clusters)")
     train_counts_x, train_counts_y, train_labels_x, train_labels_y = split_dataset(train_data_frame, 
                                                                                    train_labels, 0.7, min_class_size)
+    # Update labels so to ensure they go for 0-N sequentially
+    labels_index_map = dict()
+    index_label_map = dict()
+    for i,label in enumerate(sorted(set(train_labels_x))):
+        labels_index_map[label] = i
+        index_label_map[i] = label
+    print("Mapping of labels:")
+    print(index_label_map)
+    train_labels_x = [labels_index_map[x] for x in train_labels_x]
     
     print("Training set {}".format(train_counts_x.shape[0]))
     print("Test set {}".format(train_counts_y.shape[0]))
@@ -356,7 +355,7 @@ def main(train_data,
     n_feature = train_counts.shape[1]
     n_ele_train = train_counts.shape[0]
     n_ele_test = test_counts.shape[0]
-    n_class = max(set(train_labels)) + 1
+    n_class = max(set(train_labels_x)) + 1
     
     print("CUDA Available: ", torch.cuda.is_available())
     device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
