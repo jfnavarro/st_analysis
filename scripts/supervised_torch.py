@@ -130,7 +130,7 @@ def train(model, trn_loader, optimizer, loss, device):
         pred = torch.argmax(output.data, 1)
         training_f1 += f1_score(target.data.cpu().numpy(),
                                 pred.data.cpu().numpy(),
-                                average='weighted')
+                                average='micro')
     avg_loss = training_loss / float(len(trn_loader.dataset))
     avg_f1 = training_f1 / float(len(trn_loader.dataset))
     return avg_loss, avg_f1
@@ -339,7 +339,7 @@ def main(train_data,
     # Split train and test dasasets
     print("Splitting training set into training and test sets (equally balancing clusters)")
     train_counts_x, train_counts_y, train_labels_x, train_labels_y = split_dataset(train_data_frame, 
-                                                                                   train_labels, 0.7, min_class_size)
+                                                                                   train_labels, 0.8, min_class_size)
     
     # Update the maps of indexes to labels again since some labels may have been removed
     #TODO this is ugly, a better approach should be implemented
@@ -395,10 +395,6 @@ def main(train_data,
     tst_set = utils.TensorDataset(X_test, y_test)
         
     # Create loaders with balanced labels
-    if train_batch_size >= (n_ele_train / 2):
-        print("The training batch size is almost as big as the training set...")
-    if test_batch_size >= (n_ele_test / 2):
-        print("The test batch size is almost as big as the test set...")
     if stratified_sampler:
         print("Using a stratified sampler for training set...")
         weights_train = computeWeights(trn_set, n_class)
@@ -412,9 +408,12 @@ def main(train_data,
                                   batch_size=test_batch_size, **kwargs)
 
     # Init model
-    H1 = 2000
+    H1 = 1000
     H2 = 500
-    print("Creating NN model...")
+    print("Creating Neural Network...")
+    print("Training batch size {}".format(train_batch_size))
+    print("Test batch size {}".format(test_batch_size))
+    print("Learning rate {}".format(learning_rate))
     print("Input size {}".format(n_feature))
     print("Hidden layer 1 size {}".format(H1))
     print("Hidden layer 2 size {}".format(H2))
@@ -429,17 +428,11 @@ def main(train_data,
         torch.nn.Linear(H2, n_class),
     )
     model = model.to(device) 
-    
-    def init_weights(m):
-        if type(m) == nn.Linear:
-            torch.nn.init.xavier_uniform(m.weight)
-            m.bias.data.fill_(0.01)
-    model.apply(init_weights)
         
-    # Creating loss (reduction='none')
     # Compute weights
     weights_classes = computeWeightsClasses(trn_set)
     weights_classes = torch.from_numpy(weights_classes).float().to(device)
+    # Creating loss
     loss = torch.nn.CrossEntropyLoss(weight=weights_classes).cuda() \
            if use_cuda else torch.nn.CrossEntropyLoss(weight=weights_classes)
     
@@ -462,16 +455,14 @@ def main(train_data,
         # Testing
         preds, avg_test_loss = test(model, tst_loader, loss, device)
         # Compute accuracy scores
-        conf_mat = confusion_matrix(y_test.cpu().numpy(), preds)
         precision, recall, f1, _ = precision_recall_fscore_support(y_test.cpu().numpy(), 
-                                                                   preds, average='weighted')
-        history.append((conf_mat, precision, recall, f1))
+                                                                   preds, average='micro')
+        history.append((precision, recall, f1))
         
         if verbose:
             print("Train set avg. f1: {:.4f}".format(avg_training_f1))
             print("Train set avg. loss: {:.4f}".format(avg_train_loss))
             print("Test set avg. loss: {:.4f}".format(avg_test_loss))
-            print("Test set confusion matrix:\n", conf_mat)
             print("Test set precision {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))  
            
         if f1 > best_f1:
@@ -485,14 +476,13 @@ def main(train_data,
         else:
             counter += 1
         
-        if counter >= 20:
-            print("Early stopping")
+        if counter >= 25:
+            print("Early stopping at epoch {}".format(epoch))
             break
 
     print("Model trained!")
     print("Best epoch {}".format(best_epoch_idx))
-    conf_mat, precision, recall, f1 = history[best_epoch_idx]
-    print("Confusion matrix:\n", conf_mat)
+    precision, recall, f1 = history[best_epoch_idx]
     print("Precision {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))    
     # Load and save best model
     model.load_state_dict(best_model)
@@ -541,7 +531,7 @@ if __name__ == '__main__':
                         choices=["RAW", "DESeq2",  "REL", "Scran"],
                         help="Normalize the counts using:\n" \
                         "RAW = absolute counts\n" \
-                        "DESeq2 = DESeq2::estimateSizeFactors(counts)\n" \
+                        "DESeq2 = DESeq2::estimateSizeFactors()\n" \
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")

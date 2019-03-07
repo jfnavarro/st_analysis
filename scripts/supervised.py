@@ -302,14 +302,6 @@ def main(train_data,
     # Map labels back to their original value
     predicted_class = [index_label_map[x] for x in predicted_class]
     
-    if classifier not in "NN":
-        # Print the weights for each gene
-        pd.DataFrame(data=model.coef_,
-                     index=sorted(set([index_label_map[x] for x in train_labels])),
-                     columns=intersect_genes).to_csv(os.path.join(outdir,
-                                                                  "genes_contributions.tsv"), 
-                                                                  sep='\t')
-    
     # Compute accuracy
     if test_classes_file is not None:
         print("Classification report\n{}".
@@ -320,6 +312,17 @@ def main(train_data,
         for spot, pred, probs in zip(test_index, predicted_class, predicted_prob):
             filehandler.write("{0}\t{1}\t{2}\n".format(spot, pred,
                                                        "\t".join(['{:.4f}'.format(x) for x in probs.tolist()]))) 
+            
+    if hasattr(model, coef_) and classifier not in "NN":
+        try:
+            # Print the weights for each gene
+            pd.DataFrame(data=model.coef_,
+                         index=sorted(set([index_label_map[x] for x in train_labels])),
+                         columns=intersect_genes).to_csv(os.path.join(outdir,
+                                                                      "genes_contributions.tsv"), 
+                                                                      sep='\t')
+        except AttributeError:
+            sys.stderr.write("There was an error retrieving the gene weights\n")
        
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
