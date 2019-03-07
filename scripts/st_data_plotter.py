@@ -23,6 +23,7 @@ import pandas as pd
 import numpy as np
 import os
 import sys
+from matplotlib.pyplot import plotting
 
 def normalize(counts, normalization):
     return normalize_data(counts,
@@ -73,23 +74,26 @@ def compute_plotting_data(counts, names, cutoff_lower,
     for i, name in enumerate(names):
         r = re.compile("^{}_".format(i))
         spots = list(filter(r.match, counts.index))
-        # Compute the expressions for each spot
-        # as the sum of the counts above threshold
-        slice = counts.reindex(spots)
-        x,y = zip(*map(lambda s: (float(s.split("x")[0].split("_")[1]),
-                                  float(s.split("x")[1])), spots))
-        # Get the the gene values for each spot
-        rel_sum = np.log2(slice.values + 1) if use_log_scale else slice.values
-        if not rel_sum.any():
-            sys.stdout.write("Warning, the gene given is not expressed in {}\n".format(name))
-        vmin = vmin_global if use_global_scale else rel_sum.min() 
-        vmax = vmax_global if use_global_scale else rel_sum.max()
-        plotting_data.append((x,y,rel_sum,vmin,vmax,name))
+        if len(spots) > 0:
+            # Compute the expressions for each spot
+            # as the sum of the counts above threshold
+            slice = counts.reindex(spots)
+            x,y = zip(*map(lambda s: (float(s.split("x")[0].split("_")[1]),
+                                      float(s.split("x")[1])), spots))
+            # Get the the gene values for each spot
+            rel_sum = np.log2(slice.values + 1) if use_log_scale else slice.values
+            if not rel_sum.any():
+                sys.stdout.write("Warning, the gene given is not expressed in {}\n".format(name))
+            vmin = vmin_global if use_global_scale else rel_sum.min() 
+            vmax = vmax_global if use_global_scale else rel_sum.max()
+            plotting_data.append((x,y,rel_sum,vmin,vmax,name))
     return plotting_data
     
 def plot_data(plotting_data, n_col, n_row, dot_size, color_scale,
               xlim=[1,33], ylim=[1,35], invert=True, colorbar=False):
-    fig, ax = plt.subplots(n_row, n_col, figsize=(4*n_col,4*n_row)) 
+    n_col = min(n_col, len(plotting_data))
+    n_row = max(int(len(plotting_data) / n_col), 1)
+    fig, ax = plt.subplots(n_row, n_col, figsize=(4*n_col, 4*n_row,)) 
     fig.subplots_adjust(left = 0.1, 
                         right = 0.9,
                         bottom = 0.1,
