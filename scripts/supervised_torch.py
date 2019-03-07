@@ -408,8 +408,8 @@ def main(train_data,
                                   batch_size=test_batch_size, **kwargs)
 
     # Init model
-    H1 = 1000
-    H2 = 500
+    H1 = 2000
+    H2 = 1000
     print("Creating Neural Network...")
     print("Training batch size {}".format(train_batch_size))
     print("Test batch size {}".format(test_batch_size))

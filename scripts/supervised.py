@@ -103,7 +103,8 @@ def main(train_data,
          learning_rate, 
          stratified_sampler, 
          min_class_size,
-         hidden_layers_size):
+         hidden_layers_size,
+         model_file):
 
     if not os.path.isfile(train_data):
         sys.stderr.write("Error, the training data input is not valid\n")
@@ -119,6 +120,10 @@ def main(train_data,
     
     if test_classes_file is not None and not os.path.isfile(test_classes_file):
         sys.stderr.write("Error, the test labels input is not valid\n")
+        sys.exit(1)
+        
+    if model_file is not None and not os.path.isfile(model_file):
+        sys.stderr.write("Error, invalid model file\n")
         sys.exit(1)
        
     if normalization == "Scran" and log_scale:
@@ -244,52 +249,56 @@ def main(train_data,
     del train_data_frame
     gc.collect()
         
-    # Train the classifier and predict
-    class_weight = "balanced" if stratified_sampler else None
-    if classifier in "SVC":
-        print("One vs rest SVM")
-        model = OneVsRestClassifier(SVC(probability=True, 
-                                        random_state=None,
-                                        tol=0.001,
-                                        max_iter=epochs,
-                                        class_weight=class_weight,
-                                        decision_function_shape="ovr", 
-                                        kernel=svc_kernel), n_jobs=-1)
-    elif classifier in "NN":
-        print("Neural Network with the following hidden layers {}".format(
-            " ".join([str(x) for x in hidden_layers_size])))
-        model = MLPClassifier(hidden_layer_sizes=hidden_layers_size, 
-                              activation='relu', 
-                              solver='adam', 
-                              alpha=0.0001, 
-                              batch_size=batch_size, 
-                              learning_rate_init=learning_rate, 
-                              max_iter=epochs, 
-                              shuffle=True, 
-                              random_state=None, 
-                              tol=0.0001, 
-                              momentum=0.9)
+    if model_file is None:
+        # Train the classifier and predict
+        class_weight = "balanced" if stratified_sampler else None
+        if classifier in "SVC":
+            print("One vs rest SVM")
+            model = OneVsRestClassifier(SVC(probability=True, 
+                                            random_state=None,
+                                            tol=0.001,
+                                            max_iter=epochs,
+                                            class_weight=class_weight,
+                                            decision_function_shape="ovr", 
+                                            kernel=svc_kernel), n_jobs=-1)
+        elif classifier in "NN":
+            print("Neural Network with the following hidden layers {}".format(
+                " ".join([str(x) for x in hidden_layers_size])))
+            model = MLPClassifier(hidden_layer_sizes=hidden_layers_size, 
+                                  activation='relu', 
+                                  solver='adam', 
+                                  alpha=0.0001, 
+                                  batch_size=batch_size, 
+                                  learning_rate_init=learning_rate, 
+                                  max_iter=epochs, 
+                                  shuffle=True, 
+                                  random_state=None, 
+                                  tol=0.0001, 
+                                  momentum=0.9)
+        else:
+            print("One vs rest Logistic Regression")
+            model = OneVsRestClassifier(LogisticRegression(penalty='l2', 
+                                                           dual=False, 
+                                                           tol=0.0001, 
+                                                           C=1.0, 
+                                                           fit_intercept=True, 
+                                                           intercept_scaling=1, 
+                                                           class_weight=class_weight, 
+                                                           random_state=None, 
+                                                           solver='lbfgs', 
+                                                           max_iter=epochs, 
+                                                           multi_class='multinomial', 
+                                                           warm_start=False), n_jobs=-1)
+        # Training and validation
+        print("Training the model...")
+        model = model.fit(train_counts, train_labels)
+        # Save the model
+        pickle.dump(model, open(os.path.join(outdir, "model.sav"), 'wb'))
+        print("Model trained and saved!")
     else:
-        print("One vs rest Logistic Regression")
-        model = OneVsRestClassifier(LogisticRegression(penalty='l2', 
-                                                       dual=False, 
-                                                       tol=0.0001, 
-                                                       C=1.0, 
-                                                       fit_intercept=True, 
-                                                       intercept_scaling=1, 
-                                                       class_weight=class_weight, 
-                                                       random_state=None, 
-                                                       solver='lbfgs', 
-                                                       max_iter=epochs, 
-                                                       multi_class='multinomial', 
-                                                       warm_start=False), n_jobs=-1)
-    # Training and validation
-    print("Training the model...")
-    model = model.fit(train_counts, train_labels)
-    # Save the model
-    pickle.dump(model, open(os.path.join(outdir, "model.sav"), 'wb'))
-    print("Model trained and saved!")
-    
+        print("Loading model {}".format(model_file))
+        model = pickle.load(open(model_file, 'rb'))
+        
     # Predict
     print("Predicting on test data..")
     predict_counts = test_data_frame.astype(np.float32).values
@@ -335,6 +344,8 @@ if __name__ == '__main__':
                         help="Path to the training classes file (SPOT LABEL)")
     parser.add_argument("--test-classes", required=False, type=str,
                         help="Path to the test classes file (SPOT LABEL)")
+    parser.add_argument("--model-file", required=False, type=str, default=None,
+                        help="Path to saved model file to avoid recomputing the model and only predict")
     parser.add_argument("--log-scale", action="store_true", default=False,
                         help="Convert the training and test sets to log space (if no batch correction is performed)")
     parser.add_argument("--batch-correction", action="store_true", default=False,
@@ -397,5 +408,5 @@ if __name__ == '__main__':
          args.epochs, args.num_exp_genes, args.num_exp_spots, 
          args.min_gene_expression, args.classifier, args.svc_kernel,
          args.batch_size, args.learning_rate, args.stratified_sampler, 
-         args.min_class_size, args.hidden_layers_size)
+         args.min_class_size, args.hidden_layers_size, args.model_file)
 
