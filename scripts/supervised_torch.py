@@ -185,7 +185,8 @@ def main(train_data,
          train_classes_file, 
          test_classes_file, 
          log_scale, 
-         normalization, 
+         normalization,
+         stratified_loss,
          outdir, 
          batch_correction,
          standard_transformation,
@@ -199,7 +200,10 @@ def main(train_data,
          num_exp_genes, 
          num_exp_spots,
          min_gene_expression,
-         verbose):
+         verbose,
+         hidden_layer_one, 
+         hidden_layer_two, 
+         train_test_ratio):
 
     if not os.path.isfile(train_data):
         sys.stderr.write("Error, the training data input is not valid\n")
@@ -231,6 +235,10 @@ def main(train_data,
         sys.stderr.write("Error, learning rate\n")
         sys.exit(1)
         
+    if hidden_layer_one <= 0 or hidden_layer_two <= 0:
+        sys.stderr.write("Error, invalid hidden layers\n")
+        sys.exit(1)
+        
     if train_batch_size < 10 or test_batch_size < 10:
         sys.stderr.write("Error, batch size is too small\n")
         sys.exit(1)
@@ -245,6 +253,10 @@ def main(train_data,
         
     if num_exp_spots < 0.0 or num_exp_spots > 1.0:
         sys.stderr.write("Error, invalid number of expressed genes\n")
+        sys.exit(1)
+
+    if train_test_ratio < 0.3 or train_test_ratio > 1.0:
+        sys.stderr.write("Error, invalid train test ratio genes\n")
         sys.exit(1)
          
     if not torch.cuda.is_available() and use_cuda:
@@ -337,9 +349,12 @@ def main(train_data,
     train_labels = [labels_index_map[x] for x in train_labels]
     
     # Split train and test dasasets
-    print("Splitting training set into training and test sets (equally balancing clusters)")
+    print("Splitting training set into training and test sets (equally balancing clusters)\n"\
+          "with a ratio of {} and discarding classes with less than {} elements".format(train_test_ratio, min_class_size))
     train_counts_x, train_counts_y, train_labels_x, train_labels_y = split_dataset(train_data_frame, 
-                                                                                   train_labels, 0.8, min_class_size)
+                                                                                   train_labels, 
+                                                                                   train_test_ratio, 
+                                                                                   min_class_size)
     
     # Update the maps of indexes to labels again since some labels may have been removed
     #TODO this is ugly, a better approach should be implemented
@@ -408,8 +423,8 @@ def main(train_data,
                                   batch_size=test_batch_size, **kwargs)
 
     # Init model
-    H1 = 2000
-    H2 = 1000
+    H1 = hidden_layer_one
+    H2 = hidden_layer_two
     print("Creating Neural Network...")
     print("Training batch size {}".format(train_batch_size))
     print("Test batch size {}".format(test_batch_size))
@@ -429,9 +444,14 @@ def main(train_data,
     )
     model = model.to(device) 
         
-    # Compute weights
-    weights_classes = computeWeightsClasses(trn_set)
-    weights_classes = torch.from_numpy(weights_classes).float().to(device)
+    if stratified_loss:
+        print("Using a stratified loss...")
+        # Compute weights
+        weights_classes = computeWeightsClasses(trn_set)
+        weights_classes = torch.from_numpy(weights_classes).float().to(device)
+    else:
+        weights_classes = None  
+
     # Creating loss
     loss = torch.nn.CrossEntropyLoss(weight=weights_classes).cuda() \
            if use_cuda else torch.nn.CrossEntropyLoss(weight=weights_classes)
@@ -541,12 +561,20 @@ if __name__ == '__main__':
                         help="The input batch size for testing (default: %(default)s)")
     parser.add_argument("--epochs", type=int, default=50, metavar="[INT]",
                         help="The number of epochs to train (default: %(default)s)")
+    parser.add_argument("--hidden-layer-one", type=int, default=2000, metavar="[INT]",
+                        help="The number of neurons in the first hidden layer (default: %(default)s)")
+    parser.add_argument("--hidden-layer-two", type=int, default=1000, metavar="[INT]",
+                        help="The number of neurons in the second hidden layer (default: %(default)s)")
+    parser.add_argument("--train-test-ratio", type=float, default=0.8, metavar="[FLOAT]",
+                        help="The percentage of the training set that will be used to test the model during training (default: %(default)s)")
     parser.add_argument("--learning-rate", type=float, default=0.001, metavar="[FLOAT]",
                         help="The learning rate (default: %(default)s)")
     parser.add_argument("--use-cuda", action="store_true", default=False,
                         help="Whether to use CUDA (GPU computation)")
     parser.add_argument("--stratified-sampler", action="store_true", default=False,
                         help="Draw samples with equal probabilities when training")
+    parser.add_argument("--stratified-loss", action="store_true", default=False,
+                        help="Penalizes more small classes in the loss")
     parser.add_argument("--min-class-size", type=int, default=20, metavar="[INT]",
                         help="The minimum number of elements a class must has in the training set (default: %(default)s)")
     parser.add_argument("--verbose", action="store_true", default=False,
@@ -563,7 +591,8 @@ if __name__ == '__main__':
                         "considered expressed (default: %(default)s)")
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
-         args.test_classes, args.log_scale, args.normalization, 
+         args.test_classes, args.log_scale, args.normalization, args.stratified_loss,
          args.outdir, args.batch_correction, args.standard_transformation, args.train_batch_size,
          args.test_batch_size, args.epochs, args.learning_rate, args.stratified_sampler, args.min_class_size, 
-         args.use_cuda, args.num_exp_genes, args.num_exp_spots, args.min_gene_expression, args.verbose)
+         args.use_cuda, args.num_exp_genes, args.num_exp_spots, args.min_gene_expression, args.verbose,
+         args.hidden_layer_one, args.hidden_layer_two, args.train_test_ratio)
