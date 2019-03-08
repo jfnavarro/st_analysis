@@ -414,7 +414,8 @@ def main(train_data,
         print("Using a stratified sampler for training set...")
         weights_train = computeWeights(trn_set, n_class)
         weights_train = torch.from_numpy(weights_train).float().to(device)
-        trn_sampler = utils.sampler.WeightedRandomSampler(weights_train, len(weights_train)) 
+        trn_sampler = utils.sampler.WeightedRandomSampler(weights_train, 
+                                                          len(weights_train), replacement=False) 
     else:
         trn_sampler = None    
     trn_loader = utils.DataLoader(trn_set, sampler=trn_sampler, shuffle=not stratified_sampler,
