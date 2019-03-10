@@ -415,10 +415,12 @@ def main(train_data,
         weights_train = computeWeights(trn_set, n_class)
         weights_train = torch.from_numpy(weights_train).float().to(device)
         trn_sampler = utils.sampler.WeightedRandomSampler(weights_train, 
-                                                          len(weights_train), replacement=False) 
+                                                          len(weights_train), 
+                                                          replacement=False) 
     else:
         trn_sampler = None    
-    trn_loader = utils.DataLoader(trn_set, sampler=trn_sampler, shuffle=not stratified_sampler,
+    trn_loader = utils.DataLoader(trn_set, sampler=trn_sampler, 
+                                  shuffle=not stratified_sampler,
                                   batch_size=train_batch_size, **kwargs)
     tst_loader = utils.DataLoader(tst_set, sampler=None, shuffle=False,
                                   batch_size=test_batch_size, **kwargs)
@@ -437,10 +439,10 @@ def main(train_data,
     model = torch.nn.Sequential(
         torch.nn.Linear(n_feature, H1),
         torch.nn.BatchNorm1d(num_features=H1),
-        torch.nn.ReLU(),
+        torch.nn.Tanh(),
         torch.nn.Linear(H1, H2),
         torch.nn.BatchNorm1d(num_features=H2),
-        torch.nn.ReLU(),
+        torch.nn.Tanh(),
         torch.nn.Linear(H2, n_class),
     )
     model = model.to(device) 
@@ -461,7 +463,7 @@ def main(train_data,
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
     
     # Train the model
-    best_epoch_idx = -1
+    best_epoch_idx = 0
     best_loss = 10e6
     best_f1 = 0
     counter = 0
@@ -481,8 +483,8 @@ def main(train_data,
         history.append((precision, recall, f1))
         
         if verbose:
-            print("Train set avg. f1: {:.4f}".format(avg_training_f1))
-            print("Train set avg. loss: {:.4f}".format(avg_train_loss))
+            print("Training set avg. f1: {:.4f}".format(avg_training_f1))
+            print("Training set avg. loss: {:.4f}".format(avg_train_loss))
             print("Test set avg. loss: {:.4f}".format(avg_test_loss))
             print("Test set precision {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))  
            
@@ -567,7 +569,8 @@ if __name__ == '__main__':
     parser.add_argument("--hidden-layer-two", type=int, default=1000, metavar="[INT]",
                         help="The number of neurons in the second hidden layer (default: %(default)s)")
     parser.add_argument("--train-test-ratio", type=float, default=0.8, metavar="[FLOAT]",
-                        help="The percentage of the training set that will be used to test the model during training (default: %(default)s)")
+                        help="The percentage of the training set that will be used to test"\
+                        " the model during training (default: %(default)s)")
     parser.add_argument("--learning-rate", type=float, default=0.001, metavar="[FLOAT]",
                         help="The learning rate (default: %(default)s)")
     parser.add_argument("--use-cuda", action="store_true", default=False,
@@ -577,7 +580,8 @@ if __name__ == '__main__':
     parser.add_argument("--stratified-loss", action="store_true", default=False,
                         help="Penalizes more small classes in the loss")
     parser.add_argument("--min-class-size", type=int, default=20, metavar="[INT]",
-                        help="The minimum number of elements a class must has in the training set (default: %(default)s)")
+                        help="The minimum number of elements a class must has in the" \
+                        " training set (default: %(default)s)")
     parser.add_argument("--verbose", action="store_true", default=False,
                         help="Whether to show extra messages")
     parser.add_argument("--outdir", help="Path to output directory")

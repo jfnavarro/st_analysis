@@ -98,7 +98,7 @@ def main(train_data,
          num_exp_spots, 
          min_gene_expression, 
          classifier, 
-         svc_kernel,
+         svm_kernel,
          batch_size, 
          learning_rate, 
          stratified_sampler, 
@@ -260,12 +260,12 @@ def main(train_data,
                                             max_iter=epochs,
                                             class_weight=class_weight,
                                             decision_function_shape="ovr", 
-                                            kernel=svc_kernel), n_jobs=-1)
+                                            kernel=svm_kernel), n_jobs=-1)
         elif classifier in "NN":
             print("Neural Network with the following hidden layers {}".format(
                 " ".join([str(x) for x in hidden_layers_size])))
             model = MLPClassifier(hidden_layer_sizes=hidden_layers_size, 
-                                  activation='relu', 
+                                  activation='tanh', 
                                   solver='adam', 
                                   alpha=0.0001, 
                                   batch_size=batch_size, 
@@ -322,16 +322,15 @@ def main(train_data,
             filehandler.write("{0}\t{1}\t{2}\n".format(spot, pred,
                                                        "\t".join(['{:.4f}'.format(x) for x in probs.tolist()]))) 
             
-    if hasattr(model, coef_) and classifier not in "NN":
-        try:
-            # Print the weights for each gene
-            pd.DataFrame(data=model.coef_,
-                         index=sorted(set([index_label_map[x] for x in train_labels])),
-                         columns=intersect_genes).to_csv(os.path.join(outdir,
-                                                                      "genes_contributions.tsv"), 
-                                                                      sep='\t')
-        except AttributeError:
-            sys.stderr.write("There was an error retrieving the gene weights\n")
+    try:
+        # Print the weights for each gene
+        pd.DataFrame(data=model.coef_,
+                     index=sorted(set([index_label_map[x] for x in train_labels])),
+                     columns=intersect_genes).to_csv(os.path.join(outdir,
+                                                                  "genes_contributions.tsv"), 
+                                                                  sep='\t')
+    except (AttributeError, NameError):
+        sys.stderr.write("There was an error retrieving the gene weights\n")
        
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
@@ -379,12 +378,12 @@ if __name__ == '__main__':
                         help="The classifier to use:\n" \
                         "SVM = Support Vector Machine\n" \
                         "LR = Logistic Regression\n" \
-                        "NN = 3 layers Neural Network\n" \
+                        "NN = Neural Network\n" \
                         "(default: %(default)s)")
-    parser.add_argument("--svc-kernel", default="linear", metavar="[STR]", 
+    parser.add_argument("--svm-kernel", default="linear", metavar="[STR]", 
                         type=str, 
                         choices=["linear", "poly", "rbf", "sigmoid"],
-                        help="What kernel to use with the SVC classifier:\n" \
+                        help="What kernel to use with the SVM classifier:\n" \
                         "linear = a linear kernel\n" \
                         "poly = a polynomial kernel\n" \
                         "rbf = a rbf kernel\n" \
@@ -406,7 +405,7 @@ if __name__ == '__main__':
          args.test_classes, args.log_scale, args.normalization, 
          args.outdir, args.batch_correction, args.standard_transformation, 
          args.epochs, args.num_exp_genes, args.num_exp_spots, 
-         args.min_gene_expression, args.classifier, args.svc_kernel,
+         args.min_gene_expression, args.classifier, args.svm_kernel,
          args.batch_size, args.learning_rate, args.stratified_sampler, 
          args.min_class_size, args.hidden_layers_size, args.model_file)
 
