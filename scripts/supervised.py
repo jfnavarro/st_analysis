@@ -228,16 +228,6 @@ def main(train_data,
     train_data_frame, train_labels = update_labels(train_data_frame, train_labels_dict)
     if test_classes_file is not None:
         test_data_frame, test_labels = update_labels(test_data_frame, test_labels_dict)
-       
-    # Update labels so to ensure they go for 0-N sequentially
-    labels_index_map = dict()
-    index_label_map = dict()
-    for i,label in enumerate(sorted(set(train_labels))):
-        labels_index_map[label] = i
-        index_label_map[i] = label
-    print("Mapping of labels:")
-    print(index_label_map)
-    train_labels = [labels_index_map[x] for x in train_labels]
     
     # Discard "noisy" classes
     print("Removing classes with less than {} elements".format(min_class_size))
@@ -308,8 +298,6 @@ def main(train_data,
     
     predicted_class = model.predict(predict_counts)  
     predicted_prob = model.predict_proba(predict_counts)
-    # Map labels back to their original value
-    predicted_class = [index_label_map[x] for x in predicted_class]
     
     # Compute accuracy
     if test_classes_file is not None:
