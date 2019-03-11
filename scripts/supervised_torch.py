@@ -58,6 +58,9 @@ import gc
 __spec__ = None
 import multiprocessing
 
+SEARCH_BATCH = [(100,100), (200,200), (500,500), (1000, 1000), (2000, 1000), (3000, 1000), (4000,1000)]
+SEARCH_LR = [0.1,0.01,0.05,0.001,0.005,0.0001,0.0005,0.00001]
+SEARCH_HL = [(3000,500), (2000,500), (1000,500), (3000, 1000), (2000, 1000), (2000, 300), (1000,300), (500,300)]
 
 def computeWeightsClasses(dataset):
     # Distribution of labels
@@ -107,7 +110,41 @@ def split_dataset(dataset, labels, split_num=0.8, min_size=50):
     # Return the splitted datasets and their labels
     return dataset.iloc[train_indexes,:], dataset.iloc[test_indexes,:], train_labels, test_labels
 
-def train(model, trn_loader, optimizer, loss, device):
+def create_model(n_feature, n_class, hidden_layer_one, hidden_layer_two, af):
+    # Init model
+    H1 = hidden_layer_one
+    H2 = hidden_layer_two
+    model = torch.nn.Sequential(
+        torch.nn.Linear(n_feature, H1),
+        torch.nn.BatchNorm1d(num_features=H1),
+        torch.nn.Tanh() if af == "tanh" else torch.nn.SELU(),
+        torch.nn.Linear(H1, H2),
+        torch.nn.BatchNorm1d(num_features=H2),
+        torch.nn.Tanh() if af == "tanh" else torch.nn.SELU(),
+        torch.nn.Linear(H2, n_class),
+    )
+    return model   
+   
+def create_loaders(trn_set, tst_set, 
+                   train_batch_size, test_batch_size, 
+                   train_sampler, test_sampler, 
+                   shuffle_train, shuffle_test, 
+                   kwargs): 
+    # Create loaders
+    trn_loader = utils.DataLoader(trn_set, 
+                                  sampler=train_sampler, 
+                                  shuffle=shuffle_train,
+                                  batch_size=train_batch_size, 
+                                  **kwargs)
+    tst_loader = utils.DataLoader(tst_set, 
+                                  sampler=test_sampler, 
+                                  shuffle=shuffle_test,
+                                  batch_size=test_batch_size, 
+                                  **kwargs)
+    
+    return trn_loader, tst_loader
+    
+def train(model, trn_loader, optimizer, loss_func, device):
     model.train()
     training_loss = 0
     training_f1 = 0
@@ -118,7 +155,7 @@ def train(model, trn_loader, optimizer, loss, device):
         target = Variable(target)
         # Forward pass
         output = model(data)
-        tloss = loss(output, target)
+        tloss = loss_func(output, target)
         training_loss += tloss.item()
         # Zero the gradients
         optimizer.zero_grad()
@@ -135,7 +172,7 @@ def train(model, trn_loader, optimizer, loss, device):
     avg_f1 = training_f1 / float(len(trn_loader.dataset))
     return avg_loss, avg_f1
         
-def test(model, tst_loader, loss, device):
+def test(model, tst_loader, loss_func, device):
     model.eval()
     test_loss = 0
     preds = list()
@@ -144,7 +181,7 @@ def test(model, tst_loader, loss, device):
             data = data.to(device)
             target = target.to(device)
             output = model(data)
-            test_loss += loss(output, target).item()
+            test_loss += loss_func(output, target).item()
             pred = torch.argmax(output.data, 1)
             preds += pred.cpu().numpy().tolist()
     avg_loss = test_loss / float(len(tst_loader.dataset))  
@@ -203,7 +240,8 @@ def main(train_data,
          verbose,
          hidden_layer_one, 
          hidden_layer_two, 
-         train_test_ratio):
+         train_test_ratio,
+         grid_search):
 
     if not os.path.isfile(train_data):
         sys.stderr.write("Error, the training data input is not valid\n")
@@ -388,11 +426,12 @@ def main(train_data,
     print("CUDA Available: ", torch.cuda.is_available())
     device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
     
-    # workers = multiprocessing.cpu_count() - 1
-    # In Windows we can only use few workers
-    workers = 4
-    print("Workers {}".format(workers))
-    kwargs = {'num_workers': workers, 'pin_memory': True}
+    if not use_cuda:
+        workers = 4
+        print("Workers {}".format(workers))
+        kwargs = {'num_workers': workers, 'pin_memory': False}
+    else:
+        kwargs = {'num_workers': 1, 'pin_memory': True}
 
     # Create Tensor Flow train dataset
     X_train = torch.tensor(train_counts)
@@ -409,44 +448,6 @@ def main(train_data,
     trn_set = utils.TensorDataset(X_train, y_train)
     tst_set = utils.TensorDataset(X_test, y_test)
         
-    # Create loaders with balanced labels
-    if stratified_sampler:
-        print("Using a stratified sampler for training set...")
-        weights_train = computeWeights(trn_set, n_class)
-        weights_train = torch.from_numpy(weights_train).float().to(device)
-        trn_sampler = utils.sampler.WeightedRandomSampler(weights_train, 
-                                                          len(weights_train), 
-                                                          replacement=False) 
-    else:
-        trn_sampler = None    
-    trn_loader = utils.DataLoader(trn_set, sampler=trn_sampler, 
-                                  shuffle=not stratified_sampler,
-                                  batch_size=train_batch_size, **kwargs)
-    tst_loader = utils.DataLoader(tst_set, sampler=None, shuffle=False,
-                                  batch_size=test_batch_size, **kwargs)
-
-    # Init model
-    H1 = hidden_layer_one
-    H2 = hidden_layer_two
-    print("Creating Neural Network...")
-    print("Training batch size {}".format(train_batch_size))
-    print("Test batch size {}".format(test_batch_size))
-    print("Learning rate {}".format(learning_rate))
-    print("Input size {}".format(n_feature))
-    print("Hidden layer 1 size {}".format(H1))
-    print("Hidden layer 2 size {}".format(H2))
-    print("Output size {}".format(n_class))
-    model = torch.nn.Sequential(
-        torch.nn.Linear(n_feature, H1),
-        torch.nn.BatchNorm1d(num_features=H1),
-        torch.nn.Tanh(),
-        torch.nn.Linear(H1, H2),
-        torch.nn.BatchNorm1d(num_features=H2),
-        torch.nn.Tanh(),
-        torch.nn.Linear(H2, n_class),
-    )
-    model = model.to(device) 
-        
     if stratified_loss:
         print("Using a stratified loss...")
         # Compute weights
@@ -456,61 +457,107 @@ def main(train_data,
         weights_classes = None  
 
     # Creating loss
-    loss = torch.nn.CrossEntropyLoss(weight=weights_classes).cuda() \
-           if use_cuda else torch.nn.CrossEntropyLoss(weight=weights_classes)
+    loss_func = torch.nn.CrossEntropyLoss(weight=weights_classes).cuda() \
+                if use_cuda else torch.nn.CrossEntropyLoss(weight=weights_classes)
     
-    # Creating optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
+    # Create Samplers
+    if stratified_sampler:
+        print("Using a stratified sampler for training set...")
+        weights_train = computeWeights(trn_set, n_class)
+        weights_train = torch.from_numpy(weights_train).float().to(device)
+        trn_sampler = utils.sampler.WeightedRandomSampler(weights_train, 
+                                                          len(weights_train), 
+                                                          replacement=False) 
+    else:
+        trn_sampler = None   
+    tst_sampler = None
     
-    # Train the model
-    best_epoch_idx = 0
-    best_loss = 10e6
-    best_f1 = 0
-    counter = 0
-    history = list()
+    learning_rates = [learning_rate] if not grid_search else SEARCH_LR
+    batch_sizes = [(train_batch_size, test_batch_size)] if not grid_search else SEARCH_BATCH
+    hidden_sizes = [(2000, 1000)] if not grid_search else SEARCH_HL
     best_model = dict()
-    print("Training the model...")
-    for epoch in range(epochs):
-        if verbose:
-            print('Epoch: {}'.format(epoch))
-        # Training
-        avg_train_loss, avg_training_f1 = train(model, trn_loader, optimizer, loss, device)
-        # Testing
-        preds, avg_test_loss = test(model, tst_loader, loss, device)
-        # Compute accuracy scores
-        precision, recall, f1, _ = precision_recall_fscore_support(y_test.cpu().numpy(), 
-                                                                   preds, average='micro')
-        history.append((precision, recall, f1))
-        
-        if verbose:
-            print("Training set avg. f1: {:.4f}".format(avg_training_f1))
-            print("Training set avg. loss: {:.4f}".format(avg_train_loss))
-            print("Test set avg. loss: {:.4f}".format(avg_test_loss))
-            print("Test set precision {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))  
-           
-        if f1 > best_f1:
-            best_f1 = f1 
-            best_epoch_idx = epoch
-            best_model = model.state_dict()
-            
-        if avg_test_loss < best_loss:
-            counter = 0
-            best_loss = avg_test_loss
-        else:
-            counter += 1
-        
-        if counter >= 25:
-            print("Early stopping at epoch {}".format(epoch))
-            break
+    best_f1 = 0
+    best_lr = 0
+    best_bs = (0,0)
+    best_h = (0,0)
+    for lr in learning_rates:
+        for (trn_bs, tst_bs) in batch_sizes:
+            for (h1, h2) in hidden_sizes:
+                # Create model
+                model = create_model(n_feature, n_class, h1, h2, af="tanh")
+                model = model.to(device)
+                # Create optimizer
+                optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
+                # Create loaders
+                trn_loader, tst_loader = create_loaders(trn_set, tst_set, 
+                                                        trn_bs, tst_bs,
+                                                        trn_sampler, tst_sampler, 
+                                                        not stratified_sampler, False,
+                                                        kwargs)
+                # Train the model
+                best_local_loss = 10e6
+                best_local_f1 = 0
+                best_epoch_idx = 0
+                counter = 0
+                history = list()
+                best_model_local = dict()
+                if grid_search:
+                    print("Training the NN with:\n learning rate {}\n train batch size {}\n "\
+                          "test batch size {}\n hidden layer one {}\n hidden layer two {}\n".format(lr,trn_bs,tst_bs,h1,h2))
+                for epoch in range(epochs):
+                    if verbose:
+                        print('Epoch: {}'.format(epoch))
+                    # Training
+                    avg_train_loss, avg_training_f1 = train(model, trn_loader, optimizer, loss_func, device)
+                    # Testing
+                    preds, avg_test_loss = test(model, tst_loader, loss_func, device)
+                    # Compute accuracy scores
+                    precision, recall, f1, _ = precision_recall_fscore_support(y_test.cpu().numpy(), 
+                                                                               preds, average='micro')
+                    history.append((precision, recall, f1, avg_test_loss))
+                    
+                    if verbose:
+                        print("Training set avg. f1: {:.4f}".format(avg_training_f1))
+                        print("Training set avg. loss: {:.4f}".format(avg_train_loss))
+                        print("Test set avg. loss: {:.4f}".format(avg_test_loss))
+                        print("Test set precision {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))  
+                       
+                    if f1 > best_local_f1:
+                        best_local_f1 = f1 
+                        best_epoch_idx = epoch
+                        best_model_local = model.state_dict()
+                        
+                    if avg_test_loss < best_local_loss:
+                        counter = 0
+                        best_local_loss = avg_test_loss
+                    else:
+                        counter += 1
+                    
+                    if counter >= 25:
+                        if verbose: 
+                            print("Early stopping at epoch {}".format(epoch))
+                        break
+                # Check the results with the globals
+                precision, recall, f1, avg_test_loss = history[best_epoch_idx]
+                if f1 > best_f1:
+                    best_f1 = f1
+                    best_model = best_model_local
+                    best_lr = lr
+                    best_bs = (trn_bs, tst_bs)
+                    best_h = (h1,h2)
 
     print("Model trained!")
-    print("Best epoch {}".format(best_epoch_idx))
-    precision, recall, f1 = history[best_epoch_idx]
-    print("Precision {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))    
+    print("Learning rate {}".format(best_lr))
+    print("Train batch size {}".format(best_bs[0]))
+    print("Test batch size {}".format(best_bs[1]))
+    print("Hidden layer one {}".format(best_h1[0]))
+    print("Hidden layer two {}".format(best_h2[1]))
+    print("F1 score {}".format(best_f1))
+    
     # Load and save best model
     model.load_state_dict(best_model)
     torch.save(model, os.path.join(outdir, "model.pt"))
-    
+        
     # Predict
     print("Predicting on test data..")
     predict_counts = test_data_frame.astype(np.float32).values
@@ -584,6 +631,8 @@ if __name__ == '__main__':
                         " training set (default: %(default)s)")
     parser.add_argument("--verbose", action="store_true", default=False,
                         help="Whether to show extra messages")
+    parser.add_argument("--grid-search", action="store_true", default=False,
+                        help="Perform a grid search to find the most optimal parameters")
     parser.add_argument("--outdir", help="Path to output directory")
     parser.add_argument("--num-exp-genes", default=0.01, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
@@ -600,4 +649,4 @@ if __name__ == '__main__':
          args.outdir, args.batch_correction, args.standard_transformation, args.train_batch_size,
          args.test_batch_size, args.epochs, args.learning_rate, args.stratified_sampler, args.min_class_size, 
          args.use_cuda, args.num_exp_genes, args.num_exp_spots, args.min_gene_expression, args.verbose,
-         args.hidden_layer_one, args.hidden_layer_two, args.train_test_ratio)
+         args.hidden_layer_one, args.hidden_layer_two, args.train_test_ratio, args.grid_search)

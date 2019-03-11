@@ -39,7 +39,8 @@ setup(
     'Pillow',
     'jinja2',
     'tzlocal',
-    'plotly'
+    'plotly',
+    'tqdm'
   ],
   #test_suite = 'tests',
   scripts = glob.glob('scripts/*.py'),
