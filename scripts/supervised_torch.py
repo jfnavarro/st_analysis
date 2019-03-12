@@ -46,8 +46,7 @@ import torch.utils.data as utils
 import torchvision
 
 from sklearn.metrics import confusion_matrix
-from sklearn.metrics import f1_score
-from sklearn.metrics import precision_recall_fscore_support
+from sklearn.metrics import accuracy_score
 from sklearn.metrics import classification_report
 from sklearn.utils import shuffle
 from sklearn.model_selection import StratifiedShuffleSplit
@@ -125,8 +124,8 @@ def create_model(n_feature, n_class, hidden_layer_one, hidden_layer_two, af):
     )
     return model   
    
-def create_loaders(trn_set, tst_set, 
-                   train_batch_size, test_batch_size, 
+def create_loaders(trn_set, vali_set, 
+                   train_batch_size, validation_batch_size, 
                    train_sampler, test_sampler, 
                    shuffle_train, shuffle_test, 
                    kwargs): 
@@ -136,23 +135,21 @@ def create_loaders(trn_set, tst_set,
                                   shuffle=shuffle_train,
                                   batch_size=train_batch_size, 
                                   **kwargs)
-    tst_loader = utils.DataLoader(tst_set, 
+    vali_loader = utils.DataLoader(vali_set, 
                                   sampler=test_sampler, 
                                   shuffle=shuffle_test,
-                                  batch_size=test_batch_size, 
+                                  batch_size=validation_batch_size, 
                                   **kwargs)
     
-    return trn_loader, tst_loader
+    return trn_loader, vali_loader
     
 def train(model, trn_loader, optimizer, loss_func, device):
     model.train()
     training_loss = 0
-    training_f1 = 0
+    training_acc = 0
     for data, target in trn_loader:
-        data = data.to(device)
-        target = target.to(device)
-        data = Variable(data)
-        target = Variable(target)
+        data = Variable(data.to(device))
+        target = Variable(target.to(device))
         # Forward pass
         output = model(data)
         tloss = loss_func(output, target)
@@ -165,26 +162,25 @@ def train(model, trn_loader, optimizer, loss_func, device):
         optimizer.step()
         # Compute prediction's score
         pred = torch.argmax(output.data, 1)
-        training_f1 += f1_score(target.data.cpu().numpy(),
-                                pred.data.cpu().numpy(),
-                                average='micro')
+        training_acc += accuracy_score(target.data.cpu().numpy(),
+                                       pred.data.cpu().numpy())
     avg_loss = training_loss / float(len(trn_loader.dataset))
-    avg_f1 = training_f1 / float(len(trn_loader.dataset))
-    return avg_loss, avg_f1
+    avg_acc = training_acc / float(len(trn_loader.dataset))
+    return avg_loss, avg_acc
         
-def test(model, tst_loader, loss_func, device):
+def test(model, vali_loader, loss_func, device):
     model.eval()
     test_loss = 0
     preds = list()
-    for data, target in tst_loader:
+    for data, target in vali_loader:
         with torch.no_grad():
-            data = data.to(device)
-            target = target.to(device)
+            data = Variable(data.to(device))
+            target = Variable(target.to(device))
             output = model(data)
             test_loss += loss_func(output, target).item()
             pred = torch.argmax(output.data, 1)
             preds += pred.cpu().numpy().tolist()
-    avg_loss = test_loss / float(len(tst_loader.dataset))  
+    avg_loss = test_loss / float(len(vali_loader.dataset))  
     return preds, avg_loss
 
 def predict(model, data, device):
@@ -228,7 +224,7 @@ def main(train_data,
          batch_correction,
          standard_transformation,
          train_batch_size,
-         test_batch_size, 
+         validation_batch_size, 
          epochs, 
          learning_rate,
          stratified_sampler,
@@ -240,7 +236,7 @@ def main(train_data,
          verbose,
          hidden_layer_one, 
          hidden_layer_two, 
-         train_test_ratio,
+         train_validation_ratio,
          grid_search):
 
     if not os.path.isfile(train_data):
@@ -270,18 +266,18 @@ def main(train_data,
         sys.exit(1)
 
     if learning_rate < 0:
-        sys.stderr.write("Error, learning rate\n")
+        sys.stderr.write("Error, invalid learning rate\n")
         sys.exit(1)
         
     if hidden_layer_one <= 0 or hidden_layer_two <= 0:
         sys.stderr.write("Error, invalid hidden layers\n")
         sys.exit(1)
         
-    if train_batch_size < 10 or test_batch_size < 10:
+    if train_batch_size < 5 or validation_batch_size < 5:
         sys.stderr.write("Error, batch size is too small\n")
         sys.exit(1)
         
-    if epochs < 10:
+    if epochs < 5:
         sys.stderr.write("Error, number of epoch is too small\n")
         sys.exit(1)
     
@@ -293,7 +289,7 @@ def main(train_data,
         sys.stderr.write("Error, invalid number of expressed genes\n")
         sys.exit(1)
 
-    if train_test_ratio < 0.3 or train_test_ratio > 1.0:
+    if train_validation_ratio < 0.2 or train_validation_ratio > 1.0:
         sys.stderr.write("Error, invalid train test ratio genes\n")
         sys.exit(1)
          
@@ -316,7 +312,7 @@ def main(train_data,
     train_labels_dict = load_labels(train_classes_file)
     train_data_frame, train_labels = update_labels(train_data_frame, train_labels_dict)
     
-    print("Loading prediction dataset...")
+    print("Loading testing dataset...")
     test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0,
                                     engine='c', low_memory=True)
     # Remove noisy genes
@@ -331,8 +327,8 @@ def main(train_data,
     # Keep only the record in the training set that intersects with the prediction set
     print("Genes in training set {}".format(train_data_frame.shape[1]))
     print("Spots in training set {}".format(train_data_frame.shape[0]))
-    print("Genes in prediction set {}".format(test_data_frame.shape[1]))
-    print("Spots in prediction set {}".format(test_data_frame.shape[0]))
+    print("Genes in testing set {}".format(test_data_frame.shape[1]))
+    print("Spots in testing set {}".format(test_data_frame.shape[0]))
     intersect_genes = np.intersect1d(train_genes, test_genes)
     if len(intersect_genes) == 0:
         sys.stderr.write("Error, there are no genes intersecting the train and test datasets\n")
@@ -358,6 +354,10 @@ def main(train_data,
                                                      [train_data_frame,test_data_frame]])
         train_data_frame = batch_corrected[0].transpose()
         test_data_frame = batch_corrected[1].transpose()
+        train_data_frame.to_csv("train_bc_final.tsv", sep="\t")
+        test_data_frame.to_csv("test_bc_final.tsv", sep="\t")
+        del batch_corrected
+        gc.collect()
         
     # Log the counts
     if log_scale and not batch_correction and not normalization == "Scran":
@@ -387,11 +387,11 @@ def main(train_data,
     train_labels = [labels_index_map[x] for x in train_labels]
     
     # Split train and test dasasets
-    print("Splitting training set into training and test sets (equally balancing clusters)\n"\
-          "with a ratio of {} and discarding classes with less than {} elements".format(train_test_ratio, min_class_size))
+    print("Splitting training set into training and validation sets (equally balancing clusters)\n"\
+          "with a ratio of {} and discarding classes with less than {} elements".format(train_validation_ratio, min_class_size))
     train_counts_x, train_counts_y, train_labels_x, train_labels_y = split_dataset(train_data_frame, 
                                                                                    train_labels, 
-                                                                                   train_test_ratio, 
+                                                                                   train_validation_ratio, 
                                                                                    min_class_size)
     
     # Update the maps of indexes to labels again since some labels may have been removed
@@ -407,11 +407,11 @@ def main(train_data,
     train_labels_y = [labels_index_map_filtered[x] for x in train_labels_y] 
     
     print("Training set {}".format(train_counts_x.shape[0]))
-    print("Test set {}".format(train_counts_y.shape[0]))
+    print("Validation set {}".format(train_counts_y.shape[0]))
     
     # PyTorch needs floats
     train_counts = train_counts_x.astype(np.float32).values
-    test_counts = train_counts_y.astype(np.float32).values
+    vali_counts = train_counts_y.astype(np.float32).values
     del train_counts_x
     del train_counts_y
     del train_data_frame
@@ -420,7 +420,7 @@ def main(train_data,
     # Input and output sizes
     n_feature = train_counts.shape[1]
     n_ele_train = train_counts.shape[0]
-    n_ele_test = test_counts.shape[0]
+    n_ele_test = vali_counts.shape[0]
     n_class = max(set(train_labels_x)) + 1
     
     print("CUDA Available: ", torch.cuda.is_available())
@@ -435,18 +435,16 @@ def main(train_data,
 
     # Create Tensor Flow train dataset
     X_train = torch.tensor(train_counts)
-    X_test = torch.tensor(test_counts)
+    X_vali = torch.tensor(vali_counts)
     y_train = torch.from_numpy(np.asarray(train_labels_x, dtype=np.longlong))
-    y_test = torch.from_numpy(np.asarray(train_labels_y, dtype=np.longlong))
+    y_vali = torch.from_numpy(np.asarray(train_labels_y, dtype=np.longlong))
     del train_counts
-    del test_counts
-    del train_labels_x
-    del train_labels_y
+    del vali_counts
     gc.collect()
     
     # Create tensor datasets (train + test)
     trn_set = utils.TensorDataset(X_train, y_train)
-    tst_set = utils.TensorDataset(X_test, y_test)
+    vali_set = utils.TensorDataset(X_vali, y_vali)
         
     if stratified_loss:
         print("Using a stratified loss...")
@@ -457,8 +455,7 @@ def main(train_data,
         weights_classes = None  
 
     # Creating loss
-    loss_func = torch.nn.CrossEntropyLoss(weight=weights_classes).cuda() \
-                if use_cuda else torch.nn.CrossEntropyLoss(weight=weights_classes)
+    loss_func = torch.nn.CrossEntropyLoss(weight=weights_classes, reduction="sum")
     
     # Create Samplers
     if stratified_sampler:
@@ -468,20 +465,25 @@ def main(train_data,
         trn_sampler = utils.sampler.WeightedRandomSampler(weights_train, 
                                                           len(weights_train), 
                                                           replacement=False) 
+        weights_vali = computeWeights(vali_set, n_class)
+        weights_vali = torch.from_numpy(weights_vali).float().to(device)
+        vali_sampler = utils.sampler.WeightedRandomSampler(weights_vali, 
+                                                           len(weights_vali), 
+                                                           replacement=False) 
     else:
         trn_sampler = None   
-    tst_sampler = None
+        vali_sampler = None
     
     learning_rates = [learning_rate] if not grid_search else SEARCH_LR
-    batch_sizes = [(train_batch_size, test_batch_size)] if not grid_search else SEARCH_BATCH
+    batch_sizes = [(train_batch_size, validation_batch_size)] if not grid_search else SEARCH_BATCH
     hidden_sizes = [(2000, 1000)] if not grid_search else SEARCH_HL
     best_model = dict()
-    best_f1 = 0
+    best_acc = 0
     best_lr = 0
     best_bs = (0,0)
     best_h = (0,0)
     for lr in learning_rates:
-        for (trn_bs, tst_bs) in batch_sizes:
+        for (trn_bs, vali_bs) in batch_sizes:
             for (h1, h2) in hidden_sizes:
                 # Create model
                 model = create_model(n_feature, n_class, h1, h2, af="tanh")
@@ -489,72 +491,83 @@ def main(train_data,
                 # Create optimizer
                 optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
                 # Create loaders
-                trn_loader, tst_loader = create_loaders(trn_set, tst_set, 
-                                                        trn_bs, tst_bs,
-                                                        trn_sampler, tst_sampler, 
-                                                        not stratified_sampler, False,
-                                                        kwargs)
+                trn_loader, vali_loader = create_loaders(trn_set, vali_set, 
+                                                         trn_bs, vali_bs,
+                                                         trn_sampler, vali_sampler, 
+                                                         not stratified_sampler, 
+                                                         not stratified_sampler,
+                                                         kwargs)
                 # Train the model
                 best_local_loss = 10e6
-                best_local_f1 = 0
+                best_local_acc = 0
                 best_epoch_idx = 0
                 counter = 0
                 history = list()
                 best_model_local = dict()
                 if grid_search:
-                    print("Training the NN with:\n learning rate {}\n train batch size {}\n "\
-                          "test batch size {}\n hidden layer one {}\n hidden layer two {}\n".format(lr,trn_bs,tst_bs,h1,h2))
+                    print("Training model with:\n learning rate {}\n train batch size {}\n "\
+                          "test batch size {}\n hidden layer one {}\n hidden layer two {}\n".format(lr,trn_bs,vali_bs,h1,h2))
                 for epoch in range(epochs):
                     if verbose:
                         print('Epoch: {}'.format(epoch))
+                        
                     # Training
-                    avg_train_loss, avg_training_f1 = train(model, trn_loader, optimizer, loss_func, device)
-                    # Testing
-                    preds, avg_test_loss = test(model, tst_loader, loss_func, device)
-                    # Compute accuracy scores
-                    precision, recall, f1, _ = precision_recall_fscore_support(y_test.cpu().numpy(), 
-                                                                               preds, average='micro')
-                    history.append((precision, recall, f1, avg_test_loss))
-                    
+                    avg_train_loss, avg_training_acc = train(model, trn_loader, optimizer, loss_func, device)
+                    history.append((avg_training_acc, avg_train_loss))
+
                     if verbose:
-                        print("Training set avg. f1: {:.4f}".format(avg_training_f1))
-                        print("Training set avg. loss: {:.4f}".format(avg_train_loss))
-                        print("Test set avg. loss: {:.4f}".format(avg_test_loss))
-                        print("Test set precision {:.4f}\nRecall {:.4f}\nf1 {:.4f}\n".format(precision,recall,f1))  
+                        print("Training set accuracy {}".format(avg_training_acc))
+                        print("Training set loss (avg) {}".format(avg_train_loss))
+                        print("Testing set accuracy {}".format(avg_testing_acc))
+                        print("Testing set loss (avg) {}".format(avg_test_loss))
                        
-                    if f1 > best_local_f1:
-                        best_local_f1 = f1 
+                    # Check if the accuracy got better
+                    if avg_training_acc > best_local_acc:
+                        best_local_acc = avg_training_acc 
                         best_epoch_idx = epoch
                         best_model_local = model.state_dict()
                         
-                    if avg_test_loss < best_local_loss:
+                    # Check if the loss is not improving
+                    if avg_train_loss < best_local_loss:
                         counter = 0
-                        best_local_loss = avg_test_loss
+                        best_local_loss = avg_train_loss
                     else:
                         counter += 1
                     
-                    if counter >= 25:
+                    # Early out
+                    if counter >= 20:
                         if verbose: 
                             print("Early stopping at epoch {}".format(epoch))
                         break
-                # Check the results with the globals
-                precision, recall, f1, avg_test_loss = history[best_epoch_idx]
-                if f1 > best_f1:
-                    best_f1 = f1
+                       
+                # Test the model on the validation set
+                model.load_state_dict(best_model_local)   
+                preds, avg_test_loss = test(model, vali_loader, loss_func, device)
+
+                # Compute accuracy score
+                avg_testing_acc = accuracy_score(y_vali.cpu().numpy(), preds)
+                      
+                # Check the results to keep the best model
+                avg_train_acc, avg_train_loss = history[best_epoch_idx]
+                print("Best training accuracy {} and loss (avg.) {}".format(avg_train_acc, avg_train_loss))
+                print("Best testing accuracy {} and loss (avg.) {}".format(avg_testing_acc, avg_test_loss))
+                if avg_testing_acc > best_acc:
+                    best_acc = avg_testing_acc
                     best_model = best_model_local
                     best_lr = lr
-                    best_bs = (trn_bs, tst_bs)
+                    best_bs = (trn_bs, vali_bs)
                     best_h = (h1,h2)
 
     print("Model trained!")
     print("Learning rate {}".format(best_lr))
     print("Train batch size {}".format(best_bs[0]))
-    print("Test batch size {}".format(best_bs[1]))
-    print("Hidden layer one {}".format(best_h1[0]))
-    print("Hidden layer two {}".format(best_h2[1]))
-    print("F1 score {}".format(best_f1))
+    print("Validation batch size {}".format(best_bs[1]))
+    print("Hidden layer one {}".format(best_h[0]))
+    print("Hidden layer two {}".format(best_h[1]))
+    print("Accuracy score {}".format(best_acc))
     
     # Load and save best model
+    model = create_model(n_feature, n_class, best_h[0], best_h[1], af="tanh")
     model.load_state_dict(best_model)
     torch.save(model, os.path.join(outdir, "model.pt"))
         
@@ -583,9 +596,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--train-data", required=True, type=str,
-                        help="Path to the input training data file (matrix of counts, spots as rows)")
+                        help="Path to the input training dataset (matrix of counts, spots as rows)")
     parser.add_argument("--test-data", required=True, type=str,
-                        help="Path to the test training data file (matrix of counts, spots as rows)")
+                        help="Path to the test dataset (to be predicted) (matrix of counts, spots as rows)")
     parser.add_argument("--train-classes", required=True, type=str,
                         help="Path to the training classes file (SPOT LABEL)")
     parser.add_argument("--test-classes", required=False, type=str,
@@ -607,16 +620,16 @@ if __name__ == '__main__':
                         "(default: %(default)s)")
     parser.add_argument("--train-batch-size", type=int, default=1000, metavar="[INT]",
                         help="The input batch size for training (default: %(default)s)")
-    parser.add_argument("--test-batch-size", type=int, default=1000, metavar="[INT]",
-                        help="The input batch size for testing (default: %(default)s)")
+    parser.add_argument("--validation-batch-size", type=int, default=1000, metavar="[INT]",
+                        help="The input batch size for validation (default: %(default)s)")
     parser.add_argument("--epochs", type=int, default=50, metavar="[INT]",
                         help="The number of epochs to train (default: %(default)s)")
     parser.add_argument("--hidden-layer-one", type=int, default=2000, metavar="[INT]",
                         help="The number of neurons in the first hidden layer (default: %(default)s)")
     parser.add_argument("--hidden-layer-two", type=int, default=1000, metavar="[INT]",
                         help="The number of neurons in the second hidden layer (default: %(default)s)")
-    parser.add_argument("--train-test-ratio", type=float, default=0.8, metavar="[FLOAT]",
-                        help="The percentage of the training set that will be used to test"\
+    parser.add_argument("--train-validation-ratio", type=float, default=0.8, metavar="[FLOAT]",
+                        help="The percentage of the training set that will be used to validate"\
                         " the model during training (default: %(default)s)")
     parser.add_argument("--learning-rate", type=float, default=0.001, metavar="[FLOAT]",
                         help="The learning rate (default: %(default)s)")
@@ -645,8 +658,11 @@ if __name__ == '__main__':
                         "considered expressed (default: %(default)s)")
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
-         args.test_classes, args.log_scale, args.normalization, args.stratified_loss,
-         args.outdir, args.batch_correction, args.standard_transformation, args.train_batch_size,
-         args.test_batch_size, args.epochs, args.learning_rate, args.stratified_sampler, args.min_class_size, 
-         args.use_cuda, args.num_exp_genes, args.num_exp_spots, args.min_gene_expression, args.verbose,
-         args.hidden_layer_one, args.hidden_layer_two, args.train_test_ratio, args.grid_search)
+         args.test_classes, args.log_scale, args.normalization, 
+         args.stratified_loss, args.outdir, args.batch_correction, 
+         args.standard_transformation, args.train_batch_size, args.validation_batch_size, 
+         args.epochs, args.learning_rate, args.stratified_sampler, 
+         args.min_class_size, args.use_cuda, args.num_exp_genes, 
+         args.num_exp_spots, args.min_gene_expression, args.verbose,
+         args.hidden_layer_one, args.hidden_layer_two, args.train_validation_ratio, 
+         args.grid_search)

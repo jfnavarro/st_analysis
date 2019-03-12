@@ -211,6 +211,10 @@ def main(train_data,
                                                      [train_data_frame,test_data_frame]])
         train_data_frame = batch_corrected[0].transpose()
         test_data_frame = batch_corrected[1].transpose()
+        train_data_frame.to_csv("train_bc_final.tsv", sep="\t")
+        test_data_frame.to_csv("test_bc_final.tsv", sep="\t")
+        del batch_corrected
+        gc.collect()
         
     # Log the counts
     if log_scale and not batch_correction and not normalization == "Scran":
