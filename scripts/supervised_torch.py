@@ -147,6 +147,7 @@ def train(model, trn_loader, optimizer, loss_func, device):
     model.train()
     training_loss = 0
     training_acc = 0
+    counter = 0
     for data, target in trn_loader:
         data = Variable(data.to(device))
         target = Variable(target.to(device))
@@ -164,13 +165,15 @@ def train(model, trn_loader, optimizer, loss_func, device):
         pred = torch.argmax(output.data, 1)
         training_acc += accuracy_score(target.data.cpu().numpy(),
                                        pred.data.cpu().numpy())
-    avg_loss = training_loss / float(len(trn_loader.dataset))
-    avg_acc = training_acc / float(len(trn_loader.dataset))
+        counter += 1
+    avg_loss = training_loss / float(counter)
+    avg_acc = training_acc / float(counter)
     return avg_loss, avg_acc
         
 def test(model, vali_loader, loss_func, device):
     model.eval()
     test_loss = 0
+    counter = 0
     preds = list()
     for data, target in vali_loader:
         with torch.no_grad():
@@ -180,7 +183,8 @@ def test(model, vali_loader, loss_func, device):
             test_loss += loss_func(output, target).item()
             pred = torch.argmax(output.data, 1)
             preds += pred.cpu().numpy().tolist()
-    avg_loss = test_loss / float(len(vali_loader.dataset))  
+            counter += 1
+    avg_loss = test_loss / float(counter)  
     return preds, avg_loss
 
 def predict(model, data, device):
@@ -495,7 +499,6 @@ def main(train_data,
                 # Train the model
                 best_local_loss = 10e6
                 best_local_acc = 0
-                best_epoch_idx = 0
                 counter = 0
                 history = list()
                 best_model_local = dict()
@@ -508,24 +511,19 @@ def main(train_data,
                         
                     # Training
                     avg_train_loss, avg_training_acc = train(model, trn_loader, optimizer, loss_func, device)
-                    history.append((avg_training_acc, avg_train_loss))
 
                     if verbose:
                         print("Training set accuracy {}".format(avg_training_acc))
                         print("Training set loss (avg) {}".format(avg_train_loss))
                         print("Testing set accuracy {}".format(avg_testing_acc))
                         print("Testing set loss (avg) {}".format(avg_test_loss))
-                       
-                    # Check if the accuracy got better
-                    if avg_training_acc > best_local_acc:
-                        best_local_acc = avg_training_acc 
-                        best_epoch_idx = epoch
-                        best_model_local = model.state_dict()
                         
                     # Check if the loss is not improving
                     if avg_train_loss < best_local_loss:
                         counter = 0
+                        best_local_acc = avg_training_acc
                         best_local_loss = avg_train_loss
+                        best_model_local = model.state_dict()
                     else:
                         counter += 1
                     
@@ -536,15 +534,14 @@ def main(train_data,
                         break
                        
                 # Test the model on the validation set
-                model.load_state_dict(best_model_local)   
+                model.load_state_dict(best_model_local) 
                 preds, avg_test_loss = test(model, vali_loader, loss_func, device)
 
                 # Compute accuracy score
                 avg_testing_acc = accuracy_score(y_vali.cpu().numpy(), preds)
                       
                 # Check the results to keep the best model
-                avg_train_acc, avg_train_loss = history[best_epoch_idx]
-                print("Best training accuracy {} and loss (avg.) {}".format(avg_train_acc, avg_train_loss))
+                print("Best training accuracy {} and loss (avg.) {}".format(best_local_acc, best_local_loss))
                 print("Best testing accuracy {} and loss (avg.) {}".format(avg_testing_acc, avg_test_loss))
                 if avg_testing_acc > best_acc:
                     best_acc = avg_testing_acc
