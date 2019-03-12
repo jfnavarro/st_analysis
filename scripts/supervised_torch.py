@@ -57,7 +57,7 @@ import gc
 __spec__ = None
 import multiprocessing
 
-SEARCH_BATCH = [(100,100), (200,200), (500,500), (1000, 1000), (2000, 1000), (3000, 1000), (4000,1000)]
+SEARCH_BATCH = [(100,100), (200,200), (500,500), (1000, 1000), (2000, 1000), (3000, 1000), (4000,1000), (4000,2000)]
 SEARCH_LR = [0.1,0.01,0.05,0.001,0.005,0.0001,0.0005,0.00001]
 SEARCH_HL = [(3000,500), (2000,500), (1000,500), (3000, 1000), (2000, 1000), (2000, 300), (1000,300), (500,300)]
 
@@ -465,14 +465,9 @@ def main(train_data,
         trn_sampler = utils.sampler.WeightedRandomSampler(weights_train, 
                                                           len(weights_train), 
                                                           replacement=False) 
-        weights_vali = computeWeights(vali_set, n_class)
-        weights_vali = torch.from_numpy(weights_vali).float().to(device)
-        vali_sampler = utils.sampler.WeightedRandomSampler(weights_vali, 
-                                                           len(weights_vali), 
-                                                           replacement=False) 
     else:
         trn_sampler = None   
-        vali_sampler = None
+    vali_sampler = None
     
     learning_rates = [learning_rate] if not grid_search else SEARCH_LR
     batch_sizes = [(train_batch_size, validation_batch_size)] if not grid_search else SEARCH_BATCH
@@ -495,7 +490,7 @@ def main(train_data,
                                                          trn_bs, vali_bs,
                                                          trn_sampler, vali_sampler, 
                                                          not stratified_sampler, 
-                                                         not stratified_sampler,
+                                                         False,
                                                          kwargs)
                 # Train the model
                 best_local_loss = 10e6
@@ -506,7 +501,7 @@ def main(train_data,
                 best_model_local = dict()
                 if grid_search:
                     print("Training model with:\n learning rate {}\n train batch size {}\n "\
-                          "test batch size {}\n hidden layer one {}\n hidden layer two {}\n".format(lr,trn_bs,vali_bs,h1,h2))
+                          "test batch size {}\n hidden layer one {}\n hidden layer two {}".format(lr,trn_bs,vali_bs,h1,h2))
                 for epoch in range(epochs):
                     if verbose:
                         print('Epoch: {}'.format(epoch))
