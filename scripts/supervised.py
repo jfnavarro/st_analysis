@@ -2,11 +2,10 @@
 """ 
 This script performs a supervised training and prediction for ST datasets
 
-The multi-label classification can be performed with either SVC or 
+The multi-class classification can be performed with either SVC, NN or 
 logistic regression
 
-The training set will be a matrix
-with counts (genes as columns and spots as rows)
+The training set will be a matrix with counts (genes as columns and spots as rows)
 and the test set will be a matrix of counts with the same format
 
 One file with class labels for the training set is needed
@@ -34,6 +33,7 @@ import pickle
 import gc
 
 from stanalysis.preprocessing import *
+from stanalysis.utils import *
 
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
@@ -42,47 +42,6 @@ from sklearn.multiclass import OneVsRestClassifier
 from sklearn.neural_network import MLPClassifier
 
 from cProfile import label
-
-def filter_classes(dataset, labels, min_size=50):
-    train_indexes = list()
-    train_labels = list()
-    label_indexes = dict()
-    # Store indexes for each cluster
-    for i,label in enumerate(labels):
-        try:
-            label_indexes[label].append(i)
-        except KeyError:
-            label_indexes[label] = [i]
-    # Keep only clusters bigger than min_size
-    for label,indexes in label_indexes.items():
-        if len(indexes) >= min_size:
-            train_indexes += indexes
-            train_labels += [label] * len(indexes)
-    assert(len(train_labels) >= 0.1 * dataset.shape[0])
-    # Return the reduced dataset/labels
-    return dataset.iloc[train_indexes,:], train_labels
-
-def update_labels(counts, labels_dict):
-    # make sure the spots in the training set data frame
-    # and the label training spots have the same order
-    # and are the same 
-    train_labels = list()
-    for spot in counts.index:
-        try:
-            train_labels.append(labels_dict[spot])
-        except KeyError:
-            counts.drop(spot, axis=0, inplace=True)
-    assert(len(train_labels) == counts.shape[0])
-    return counts, train_labels   
-    
-def load_labels(filename):
-    labels_dict = dict()
-    with open(filename) as filehandler:
-        for line in filehandler.readlines():
-            tokens = line.split()
-            assert(len(tokens) == 2)
-            labels_dict[tokens[0]] = int(tokens[1])
-    return labels_dict
 
 def main(train_data,
          test_data,
@@ -131,7 +90,11 @@ def main(train_data,
      
     if batch_correction and log_scale:
         sys.stderr.write("Warning, when performing batch correction log-scale will be ignored\n")
-                  
+         
+    if epochs < 1:
+        sys.stderr.write("Error, number of epoch is too small\n")
+        sys.exit(1)
+                 
     if min_class_size < 0:
         sys.stderr.write("Error, invalid minimum class size\n")
         sys.exit(1)
@@ -140,12 +103,8 @@ def main(train_data,
         sys.stderr.write("Error, learning rate\n")
         sys.exit(1)
         
-    if batch_size < 10:
+    if batch_size < 1:
         sys.stderr.write("Error, batch size is too small\n")
-        sys.exit(1)
-        
-    if epochs < 10:
-        sys.stderr.write("Error, number of epoch is too small\n")
         sys.exit(1)
     
     if num_exp_genes < 0.0 or num_exp_genes > 1.0:
@@ -211,8 +170,8 @@ def main(train_data,
                                                      [train_data_frame,test_data_frame]])
         train_data_frame = batch_corrected[0].transpose()
         test_data_frame = batch_corrected[1].transpose()
-        train_data_frame.to_csv("train_bc_final.tsv", sep="\t")
-        test_data_frame.to_csv("test_bc_final.tsv", sep="\t")
+        train_data_frame.to_csv(os.path.join(outdir, "train_bc_final.tsv"), sep="\t")
+        test_data_frame.to_csv(os.path.join(outdir, "test_bc_final.tsv"), sep="\t")
         del batch_corrected
         gc.collect()
         
@@ -314,16 +273,13 @@ def main(train_data,
             filehandler.write("{0}\t{1}\t{2}\n".format(spot, pred,
                                                        "\t".join(['{:.4f}'.format(x) for x in probs.tolist()]))) 
             
-    try:
-        # Print the weights for each gene
-        pd.DataFrame(data=model.coef_,
-                     index=sorted(set([index_label_map[x] for x in train_labels])),
-                     columns=intersect_genes).to_csv(os.path.join(outdir,
-                                                                  "genes_contributions.tsv"), 
-                                                                  sep='\t')
-    except (AttributeError, NameError):
-        sys.stderr.write("There was an error retrieving the gene weights\n")
-       
+    # Print the weights for each gene
+    pd.DataFrame(data=model.coef_,
+                 index=sorted(set([index_label_map[x] for x in train_labels])),
+                 columns=intersect_genes).to_csv(os.path.join(outdir,
+                                                              "genes_contributions.tsv"), 
+                                                              sep='\t')
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
@@ -390,7 +346,7 @@ if __name__ == '__main__':
                         help="The learning rate for the Neural Network classifier (default: %(default)s)")
     parser.add_argument("--stratified-sampler", action="store_true", default=False,
                         help="Draw samples with equal probabilities when training")
-    parser.add_argument("--min-class-size", type=int, default=20, metavar="[INT]",
+    parser.add_argument("--min-class-size", type=int, default=10, metavar="[INT]",
                         help="The minimum number of elements a class must has in the training set (default: %(default)s)")
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 

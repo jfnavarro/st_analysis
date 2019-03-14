@@ -3,7 +3,7 @@
 """ 
 This script performs a supervised training and prediction for ST datasets
 
-The multi-label classification is performed using a 2 layers
+The multi-class classification is performed using a 2 layers
 neural network with the option to use CUDA
 
 The training set will be a matrix
@@ -34,10 +34,12 @@ import argparse
 import numpy as np
 import pandas as pd
 import gc
+import platform
 
 from collections import defaultdict
 
 from stanalysis.preprocessing import *
+from stanalysis.utils import *
 
 import torch
 import torch.nn as nn
@@ -58,7 +60,7 @@ __spec__ = None
 import multiprocessing
 
 SEARCH_BATCH = [(100,100), (200,200), (500,500), (1000, 1000), (2000, 1000), (3000, 1000), (4000,1000), (4000,2000)]
-SEARCH_LR = [0.1,0.01,0.05,0.001,0.005,0.0001,0.0005,0.00001]
+SEARCH_LR = [0.1,0.01,0.001,0.0001,0.00001]
 SEARCH_HL = [(3000,500), (2000,500), (1000,500), (3000, 1000), (2000, 1000), (2000, 300), (1000,300), (500,300)]
 
 def computeWeightsClasses(dataset):
@@ -82,44 +84,28 @@ def computeWeights(dataset, nclasses):
     for idx, val in enumerate(dataset):                                          
         weight[idx] = weight_per_class[val[1]]                                  
     return np.asarray(weight)  
-    
-def split_dataset(dataset, labels, split_num=0.8, min_size=50):
-    train_indexes = list()
-    test_indexes = list()
-    train_labels = list()
-    test_labels = list()
-    label_indexes = dict()
-    # Store indexes for each cluster
-    for i,label in enumerate(labels):
-        try:
-            label_indexes[label].append(i)
-        except KeyError:
-            label_indexes[label] = [i]
-    # Split randomly indexes for each cluster into training and testing sets  
-    for label,indexes in label_indexes.items():
-        if len(indexes) >= min_size:
-            indexes = np.asarray(indexes)
-            np.random.shuffle(indexes)
-            cut = int(split_num * len(indexes))
-            training, test = indexes[:cut], indexes[cut:]
-            train_indexes += training.tolist()
-            test_indexes += test.tolist()
-            train_labels += [label] * len(training)
-            test_labels += [label] * len(test)
-    # Return the splitted datasets and their labels
-    return dataset.iloc[train_indexes,:], dataset.iloc[test_indexes,:], train_labels, test_labels
 
-def create_model(n_feature, n_class, hidden_layer_one, hidden_layer_two, af):
+def str_to_act_func(str):
+    if str in "TANH":
+        return torch.nn.Tanh()
+    elif str in "SELU":
+        return torch.nn.SELU()
+    else:
+        return torch.nn.ReLU()
+    
+def create_model(n_feature, n_class, 
+                 hidden_layer_one, hidden_layer_two, 
+                 activation_function):
     # Init model
     H1 = hidden_layer_one
     H2 = hidden_layer_two
     model = torch.nn.Sequential(
         torch.nn.Linear(n_feature, H1),
         torch.nn.BatchNorm1d(num_features=H1),
-        torch.nn.Tanh() if af == "tanh" else torch.nn.SELU(),
+        str_to_act_func(activation_function),
         torch.nn.Linear(H1, H2),
         torch.nn.BatchNorm1d(num_features=H2),
-        torch.nn.Tanh() if af == "tanh" else torch.nn.SELU(),
+        str_to_act_func(activation_function),
         torch.nn.Linear(H2, n_class),
     )
     return model   
@@ -140,7 +126,6 @@ def create_loaders(trn_set, vali_set,
                                   shuffle=shuffle_test,
                                   batch_size=validation_batch_size, 
                                   **kwargs)
-    
     return trn_loader, vali_loader
     
 def train(model, trn_loader, optimizer, loss_func, device):
@@ -189,33 +174,11 @@ def test(model, vali_loader, loss_func, device):
 
 def predict(model, data, device):
     model.eval()
-    data = data.to(device)
     with torch.no_grad():
+        data = Variable(data.to(device))
         output = model(data)
         pred = torch.argmax(output.data, 1)
     return output, pred
-
-def update_labels(counts, labels_dict):
-    # make sure the spots in the training set data frame
-    # and the label training spots have the same order
-    # and are the same 
-    train_labels = list()
-    for spot in counts.index:
-        try:
-            train_labels.append(labels_dict[spot])
-        except KeyError:
-            counts.drop(spot, axis=0, inplace=True)
-    assert(len(train_labels) == counts.shape[0])
-    return counts, train_labels   
-    
-def load_labels(filename):
-    labels_dict = dict()
-    with open(filename) as filehandler:
-        for line in filehandler.readlines():
-            tokens = line.split()
-            assert(len(tokens) == 2)
-            labels_dict[tokens[0]] = int(tokens[1])
-    return labels_dict
             
 def main(train_data, 
          test_data, 
@@ -241,7 +204,8 @@ def main(train_data,
          hidden_layer_one, 
          hidden_layer_two, 
          train_validation_ratio,
-         grid_search):
+         grid_search,
+         activation_function):
 
     if not os.path.isfile(train_data):
         sys.stderr.write("Error, the training data input is not valid\n")
@@ -277,11 +241,11 @@ def main(train_data,
         sys.stderr.write("Error, invalid hidden layers\n")
         sys.exit(1)
         
-    if train_batch_size < 5 or validation_batch_size < 5:
+    if train_batch_size < 1 or validation_batch_size < 1:
         sys.stderr.write("Error, batch size is too small\n")
         sys.exit(1)
         
-    if epochs < 5:
+    if epochs < 1:
         sys.stderr.write("Error, number of epoch is too small\n")
         sys.exit(1)
     
@@ -293,7 +257,7 @@ def main(train_data,
         sys.stderr.write("Error, invalid number of expressed genes\n")
         sys.exit(1)
 
-    if train_validation_ratio < 0.2 or train_validation_ratio > 1.0:
+    if train_validation_ratio < 0.1 or train_validation_ratio > 0.9:
         sys.stderr.write("Error, invalid train test ratio genes\n")
         sys.exit(1)
          
@@ -358,8 +322,8 @@ def main(train_data,
                                                      [train_data_frame,test_data_frame]])
         train_data_frame = batch_corrected[0].transpose()
         test_data_frame = batch_corrected[1].transpose()
-        train_data_frame.to_csv("train_bc_final.tsv", sep="\t")
-        test_data_frame.to_csv("test_bc_final.tsv", sep="\t")
+        train_data_frame.to_csv(os.path.join(outdir, "train_bc_final.tsv"), sep="\t")
+        test_data_frame.to_csv(os.path.join(outdir, "test_bc_final.tsv"), sep="\t")
         del batch_corrected
         gc.collect()
         
@@ -430,12 +394,9 @@ def main(train_data,
     print("CUDA Available: ", torch.cuda.is_available())
     device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
     
-    if not use_cuda:
-        workers = 4
-        print("Workers {}".format(workers))
-        kwargs = {'num_workers': workers, 'pin_memory': False}
-    else:
-        kwargs = {'num_workers': 1, 'pin_memory': True}
+    workers = 1 if platform.system() == "Windows" else multiprocessing.cpu_count() - 1
+    print("Workers {}".format(workers))
+    kwargs = {'num_workers': workers, 'pin_memory': use_cuda}
 
     # Create Tensor Flow train dataset
     X_train = torch.tensor(train_counts)
@@ -459,7 +420,7 @@ def main(train_data,
         weights_classes = None  
 
     # Creating loss
-    loss_func = torch.nn.CrossEntropyLoss(weight=weights_classes, reduction="sum")
+    loss_func = nn.CrossEntropyLoss(weight=weights_classes, reduction="mean")
     
     # Create Samplers
     if stratified_sampler:
@@ -481,11 +442,12 @@ def main(train_data,
     best_lr = 0
     best_bs = (0,0)
     best_h = (0,0)
+    TOL = 0.001
     for lr in learning_rates:
         for (trn_bs, vali_bs) in batch_sizes:
             for (h1, h2) in hidden_sizes:
                 # Create model
-                model = create_model(n_feature, n_class, h1, h2, af="tanh")
+                model = create_model(n_feature, n_class, h1, h2, activation_function)
                 model = model.to(device)
                 # Create optimizer
                 optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
@@ -500,7 +462,6 @@ def main(train_data,
                 best_local_loss = 10e6
                 best_local_acc = 0
                 counter = 0
-                history = list()
                 best_model_local = dict()
                 if grid_search:
                     print("Training model with:\n learning rate {}\n train batch size {}\n "\
@@ -519,7 +480,7 @@ def main(train_data,
                         print("Testing set loss (avg) {}".format(avg_test_loss))
                         
                     # Check if the loss is not improving
-                    if avg_train_loss < best_local_loss:
+                    if abs(avg_train_loss - best_local_loss) > TOL:
                         counter = 0
                         best_local_acc = avg_training_acc
                         best_local_loss = avg_train_loss
@@ -551,15 +512,18 @@ def main(train_data,
                     best_h = (h1,h2)
 
     print("Model trained!")
+    print("Activation function {}".format(activation_function))
+    print("Cross entropy loss")
+    print("ADAM optimizer with 0.0001 weight decay")
     print("Learning rate {}".format(best_lr))
     print("Train batch size {}".format(best_bs[0]))
     print("Validation batch size {}".format(best_bs[1]))
     print("Hidden layer one {}".format(best_h[0]))
     print("Hidden layer two {}".format(best_h[1]))
-    print("Accuracy score {}".format(best_acc))
+    print("Accuracy score on training set {}".format(best_acc))
     
     # Load and save best model
-    model = create_model(n_feature, n_class, best_h[0], best_h[1], af="tanh")
+    model = create_model(n_feature, n_class, best_h[0], best_h[1], activation_function)
     model.load_state_dict(best_model)
     torch.save(model, os.path.join(outdir, "model.pt"))
         
@@ -625,13 +589,21 @@ if __name__ == '__main__':
                         " the model during training (default: %(default)s)")
     parser.add_argument("--learning-rate", type=float, default=0.001, metavar="[FLOAT]",
                         help="The learning rate (default: %(default)s)")
+    parser.add_argument("--activation-function", default="RELU", metavar="[STR]", 
+                        type=str, 
+                        choices=["RELU", "TANH",  "SELU"],
+                        help="Activation function to be used in the hidden layers:\n" \
+                        "RELU = rectified linear unit \n" \
+                        "TANH = hyperbolic tangent\n" \
+                        "SELU = self normalizing linear unit\n" \
+                        "(default: %(default)s)")
     parser.add_argument("--use-cuda", action="store_true", default=False,
                         help="Whether to use CUDA (GPU computation)")
     parser.add_argument("--stratified-sampler", action="store_true", default=False,
                         help="Draw samples with equal probabilities when training")
     parser.add_argument("--stratified-loss", action="store_true", default=False,
                         help="Penalizes more small classes in the loss")
-    parser.add_argument("--min-class-size", type=int, default=20, metavar="[INT]",
+    parser.add_argument("--min-class-size", type=int, default=10, metavar="[INT]",
                         help="The minimum number of elements a class must has in the" \
                         " training set (default: %(default)s)")
     parser.add_argument("--verbose", action="store_true", default=False,
@@ -657,4 +629,4 @@ if __name__ == '__main__':
          args.min_class_size, args.use_cuda, args.num_exp_genes, 
          args.num_exp_spots, args.min_gene_expression, args.verbose,
          args.hidden_layer_one, args.hidden_layer_two, args.train_validation_ratio, 
-         args.grid_search)
+         args.grid_search, args.activation_function)

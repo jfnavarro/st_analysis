@@ -28,9 +28,8 @@ def aggregate_datatasets(counts_table_files, add_index=True):
     """ This functions takes a list of data frames with ST data
     (genes as columns and spots as rows) and merges them into
     one data frame using the genes as merging criteria. 
-    An index will append to each spot to be able to identify
-    them. Optionally, a histogram of the read/spots and gene/spots
-    distributions can be generated for each dataset.
+    An index will be appended to each spot to be able to identify
+    them (optional).
     :param counts_table_files: a list of file names of the datasets
     :param add_index: add the dataset index to the spot's
     :return: a Pandas data frame with the merged data frames
@@ -57,11 +56,12 @@ def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=
     """This functions remove noisy genes and spots 
     for a given data frame (Genes as columns and spots as rows).
     - The noisy spots are removed so to keep a percentage
-    of the total distribution of spots whose gene counts are not 0
-    The percentage is given as a parameter.
+    of the total distribution of spots whose gene counts >= min_expression
+    The percentage is given as a parameter (0.0-1.0).
     - The noisy genes are removed so every gene that is expressed
-    in less than 1% of the total spots. Expressed with a count >= 2. 
-    :param counts: a Pandas data frame with the counts
+    in less than a percentage of the total spots whose gene counts >= min_expression
+    The percentage is given as a parameter (0.0-1.0).
+    :param counts: a data frame with the counts
     :param num_exp_genes: a float from 0-1 representing the % of 
     the distribution of expressed genes a spot must have to be kept
     :param num_exp_spots: a float from 0-1 representing the % of 
@@ -69,14 +69,14 @@ def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=
     than the parameter min_expression in order to be kept
     :param min_expression: the minimum expression for a gene to be
     considered expressed
-    :return: a new Pandas data frame with noisy spots/genes removed
+    :return: a new data frame with noisy spots/genes removed
     """
     
     # How many spots do we keep based on the number of genes expressed?
     num_spots = len(counts.index)
     num_genes = len(counts.columns)
     
-    if num_exp_genes not in [0.0,1.0]:
+    if num_exp_genes > 0.0 and num_exp_genes < 1.0:
         gene_sums = (counts >= min_expression).sum(axis=1)
         min_genes_spot_exp = round(gene_sums.quantile(num_exp_genes))
         print("Number of expressed genes (count of at least {}) a spot must have to be kept " \
@@ -84,7 +84,7 @@ def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=
         counts = counts[gene_sums >= min_genes_spot_exp]
         print("Dropped {} spots".format(num_spots - len(counts.index)))
         
-    if num_exp_spots not in [0.0,1.0]:  
+    if num_exp_spots > 0.0 and num_exp_spots < 1.0:  
         # Spots are columns and genes are rows
         counts = counts.transpose()
         # Remove noisy genes
@@ -98,14 +98,14 @@ def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=
     return counts 
     
 def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
-    """ This function takes a Pandas data frame
+    """ This function takes a data frame
     with ST data (Genes as columns and spots as rows)
     and returns a new data frame where only the top
     genes are kept by using the variance or the total count.
-    :param counts: a Pandas data frame with the counts
+    :param counts: a data frame with the counts
     :param num_genes_keep: the % (1-100) of genes to keep
     :param criteria: the criteria used to select ("Variance or "TopRanked")
-    :return: a new Pandas data frame with only the top ranked genes. 
+    :return: a new data frame with only the top ranked genes. 
     """
     # Spots as columns and genes as rows
     counts = counts.transpose()
@@ -165,12 +165,6 @@ def compute_size_factors(counts, normalization, scran_clusters=True):
     counts = counts.transpose()
     if normalization in "DESeq2":
         size_factors = computeSizeFactors(counts)
-    elif normalization in "DESeq2Linear":
-        size_factors = computeSizeFactorsLinear(counts)
-    elif normalization in "DESeq2PseudoCount":
-        size_factors = computeSizeFactors(counts + 1)
-    elif normalization in "DESeq2SizeAdjusted":
-        size_factors = computeSizeFactorsSizeAdjusted(counts)
     elif normalization in "TMM":
         size_factors = computeTMMFactors(counts)
     elif normalization in "RLE":
@@ -191,11 +185,10 @@ def normalize_data(counts, normalization, center=False,
     with ST data (genes as columns and spots as rows) and 
     returns a data frame with the normalized counts using
     different methods.
-    :param counts: a Pandas data frame with the counts
+    :param counts: a data frame with the counts
     :param normalization: the normalization method to use
     :param center: if True the size factors will be centered by their mean
     :param adjusted_log: return adjusted logged normalized counts if True
-    (DESeq2, DESeq2Linear, DESeq2PseudoCount, DESeq2SizeAdjusted,RLE, REL, RAW, TMM, Scran)
     :param scran_clusters: performs clustering for cell pooling in Scran
     :return: a Pandas data frame with the normalized counts (genes as columns)
     """
