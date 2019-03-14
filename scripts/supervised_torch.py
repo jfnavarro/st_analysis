@@ -59,9 +59,9 @@ import gc
 __spec__ = None
 import multiprocessing
 
-SEARCH_BATCH = [(100,100), (200,200), (500,500), (1000, 1000), (2000, 1000), (3000, 1000), (4000,1000), (4000,2000)]
+SEARCH_BATCH = [(200,200), (500,500), (1000,1000), (2000,1000), (3000,1000)]
 SEARCH_LR = [0.1,0.01,0.001,0.0001,0.00001]
-SEARCH_HL = [(3000,500), (2000,500), (1000,500), (3000, 1000), (2000, 1000), (2000, 300), (1000,300), (500,300)]
+SEARCH_HL = [(3000,500), (2000,500), (1000,500), (3000,1000), (2000,1000), (2000,300), (1000,300)]
 
 def computeWeightsClasses(dataset):
     # Distribution of labels
@@ -394,7 +394,7 @@ def main(train_data,
     print("CUDA Available: ", torch.cuda.is_available())
     device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
     
-    workers = 1 if platform.system() == "Windows" else multiprocessing.cpu_count() - 1
+    workers = 0 if platform.system() == "Windows" else multiprocessing.cpu_count() - 1
     print("Workers {}".format(workers))
     kwargs = {'num_workers': workers, 'pin_memory': use_cuda}
 
