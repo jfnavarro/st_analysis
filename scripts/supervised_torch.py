@@ -60,8 +60,8 @@ __spec__ = None
 import multiprocessing
 
 SEARCH_BATCH = [(200,200), (500,500), (1000,1000), (2000,1000), (3000,1000)]
-SEARCH_LR = [0.1,0.01,0.001,0.0001,0.00001]
-SEARCH_HL = [(3000,500), (2000,500), (1000,500), (3000,1000), (2000,1000), (2000,300), (1000,300)]
+SEARCH_LR = [0.1, 0.01, 0.05, 0.001, 0.005]
+SEARCH_HL = [(3000,500), (2000,500), (1000,500), (3000,1000), (2000,1000), (3000, 300), (2000,300), (1000,300)]
 
 def computeWeightsClasses(dataset):
     # Distribution of labels
@@ -524,6 +524,7 @@ def main(train_data,
     
     # Load and save best model
     model = create_model(n_feature, n_class, best_h[0], best_h[1], activation_function)
+    model = model.to(device)
     model.load_state_dict(best_model)
     torch.save(model, os.path.join(outdir, "model.pt"))
         
@@ -586,9 +587,9 @@ if __name__ == '__main__':
                         help="The number of neurons in the second hidden layer (default: %(default)s)")
     parser.add_argument("--train-validation-ratio", type=float, default=0.8, metavar="[FLOAT]",
                         help="The percentage of the training set that will be used to validate"\
-                        " the model during training (default: %(default)s)")
+                        "the model during training (default: %(default)s)")
     parser.add_argument("--learning-rate", type=float, default=0.001, metavar="[FLOAT]",
-                        help="The learning rate (default: %(default)s)")
+                        help="The learning rate for the Adam optimizer (default: %(default)s)")
     parser.add_argument("--activation-function", default="RELU", metavar="[STR]", 
                         type=str, 
                         choices=["RELU", "TANH",  "SELU"],
@@ -605,7 +606,7 @@ if __name__ == '__main__':
                         help="Penalizes more small classes in the loss")
     parser.add_argument("--min-class-size", type=int, default=10, metavar="[INT]",
                         help="The minimum number of elements a class must has in the" \
-                        " training set (default: %(default)s)")
+                        "training set (default: %(default)s)")
     parser.add_argument("--verbose", action="store_true", default=False,
                         help="Whether to show extra messages")
     parser.add_argument("--grid-search", action="store_true", default=False,
