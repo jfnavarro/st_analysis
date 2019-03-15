@@ -272,6 +272,8 @@ def main(train_data,
     print("Loading training dataset...")
     train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0, 
                                      engine='c', low_memory=True)
+    # Remove noisy genes
+    train_data_frame = remove_noise(train_data_frame, 1.0, num_exp_spots, min_gene_expression)
     train_genes = list(train_data_frame.columns.values)
     
     # Load all the classes for the training set
@@ -281,6 +283,8 @@ def main(train_data,
     print("Loading testing dataset...")
     test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0,
                                     engine='c', low_memory=True)
+    # Remove noisy genes
+    test_data_frame = remove_noise(test_data_frame, 1.0, num_exp_spots, min_gene_expression)
     test_genes = list(test_data_frame.columns.values)
     
     # Load all the classes for the prediction set
@@ -300,15 +304,14 @@ def main(train_data,
             
     print("Intersected genes {}".format(len(intersect_genes)))
     train_data_frame = train_data_frame.loc[:,intersect_genes]
-    if batch_correction:
-        train_data_frame = train_data_frame.loc[:,intersect_genes]
+    test_data_frame = test_data_frame.loc[:,intersect_genes]
     
-    # Get the normalized counts (prior removing noisy spot/genes)
-    train_data_frame = remove_noise(train_data_frame, num_exp_genes, num_exp_spots, min_gene_expression)
+    # Get the normalized counts (prior removing noisy spot)
+    train_data_frame = remove_noise(train_data_frame, num_exp_genes, 1.0, min_gene_expression)
     train_data_frame = normalize_data(train_data_frame, normalization,
                                       adjusted_log=normalization == "Scran")
-    # Get the normalized counts (prior removing noisy spot/genes)
-    test_data_frame = remove_noise(test_data_frame, num_exp_genes, num_exp_spots, min_gene_expression)
+    
+    test_data_frame = remove_noise(test_data_frame, num_exp_genes, 1.0, min_gene_expression)
     test_data_frame = normalize_data(test_data_frame, normalization, 
                                      adjusted_log=normalization == "Scran")
     
@@ -613,11 +616,11 @@ if __name__ == '__main__':
                         help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
                         "must have to be kept from the distribution of all expressed genes (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--num-exp-spots", default=0.01, metavar="[FLOAT]", type=float,
-                        help="The percentage of number of expressed spots a gene\n" \
+                        help="The percentage of number of expressed spots (>= --min-gene-expression) a gene\n" \
                         "must have to be kept from the total number of spots (0.0 - 1.0) (default: %(default)s)")
-    parser.add_argument("--min-gene-expression", default=1, type=int, metavar="[INT]", choices=range(1, 50),
-                        help="The minimum count (number of reads) a gene must have in a spot to be\n"
-                        "considered expressed (default: %(default)s)")
+    parser.add_argument("--min-gene-expression", default=1, type=float, metavar="[FLOAT]",
+                        help="The minimum count a gene must have in a spot to be\n"
+                        "considered expressed when filtering (default: %(default)s)")
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
          args.test_classes, args.log_scale, args.normalization, 
