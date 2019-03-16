@@ -443,6 +443,7 @@ def main(train_data,
     best_bs = (0,0)
     best_h = (0,0)
     TOL = 0.001
+    PATIENCE = 10
     for lr in learning_rates:
         for (trn_bs, vali_bs) in batch_sizes:
             for (h1, h2) in hidden_sizes:
@@ -479,17 +480,19 @@ def main(train_data,
                         print("Testing set accuracy {}".format(avg_testing_acc))
                         print("Testing set loss (avg) {}".format(avg_test_loss))
                         
-                    # Check if the loss is not improving
-                    if abs(avg_train_loss - best_local_loss) > TOL:
-                        counter = 0
+                    # Check if the loss is better
+                    if avg_train_loss < best_local_loss:
                         best_local_acc = avg_training_acc
                         best_local_loss = avg_train_loss
                         best_model_local = model.state_dict()
-                    else:
-                        counter += 1
                     
+                    # Check if the model has converged (loss no changing)
+                    if np.isclose(avg_train_loss, best_local_loss, rtol=TOL, atol=TOL):
+                        counter += 1
+                    else:
+                        counter = 0
                     # Early out
-                    if counter >= 20:
+                    if counter >= PATIENCE:
                         if verbose: 
                             print("Early stopping at epoch {}".format(epoch))
                         break
