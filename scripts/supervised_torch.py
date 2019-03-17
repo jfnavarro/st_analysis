@@ -162,8 +162,8 @@ def test(model, vali_loader, loss_func, device):
     preds = list()
     for data, target in vali_loader:
         with torch.no_grad():
-            data = Variable(data.to(device))
-            target = Variable(target.to(device))
+            data = data.to(device)
+            target = target.to(device)
             output = model(data)
             test_loss += loss_func(output, target).item()
             pred = torch.argmax(output.data, 1)
@@ -175,7 +175,7 @@ def test(model, vali_loader, loss_func, device):
 def predict(model, data, device):
     model.eval()
     with torch.no_grad():
-        data = Variable(data.to(device))
+        data = data.to(device)
         output = model(data)
         pred = torch.argmax(output.data, 1)
     return output, pred
@@ -456,8 +456,7 @@ def main(train_data,
                 trn_loader, vali_loader = create_loaders(trn_set, vali_set, 
                                                          trn_bs, vali_bs,
                                                          trn_sampler, vali_sampler, 
-                                                         not stratified_sampler, 
-                                                         False,
+                                                         not stratified_sampler, False,
                                                          kwargs)
                 # Train the model
                 best_local_loss = 10e6
@@ -484,7 +483,7 @@ def main(train_data,
                     if avg_train_loss < best_local_loss:
                         best_local_acc = avg_training_acc
                         best_local_loss = avg_train_loss
-                        best_model_local = model.state_dict()
+                        best_model_local = model.state_dict().copy()
                     
                     # Check if the model has converged (loss no changing)
                     if np.isclose(avg_train_loss, best_local_loss, rtol=TOL, atol=TOL):
@@ -523,7 +522,6 @@ def main(train_data,
     print("Validation batch size {}".format(best_bs[1]))
     print("Hidden layer one {}".format(best_h[0]))
     print("Hidden layer two {}".format(best_h[1]))
-    print("Accuracy score on training set {}".format(best_acc))
     
     # Load and save best model
     model = create_model(n_feature, n_class, best_h[0], best_h[1], activation_function)
