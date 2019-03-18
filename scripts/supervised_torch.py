@@ -482,7 +482,7 @@ def main(train_data,
                     counter = 0
                     best_model_local = dict()
                     if grid_search:
-                        print("Training model with:\nL2 {}\n learning rate {}\n train batch size {}\n "\
+                        print("Training model with:\n L2 {}\n learning rate {}\n train batch size {}\n "\
                               "test batch size {}\n hidden layer one {}\n hidden layer two {}".format(l2,lr,trn_bs,vali_bs,h1,h2))
                     for epoch in range(epochs):
                         if verbose:
