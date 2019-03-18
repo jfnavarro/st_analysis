@@ -63,6 +63,7 @@ SEARCH_BATCH = [(500,500), (1000,1000), (2000,1000), (3000,1000)]
 L2 = [0.0, 0.01, 0.001]
 SEARCH_LR = [0.1, 0.01, 0.05, 0.001, 0.005]
 SEARCH_HL = [(3000,500), (2000,500), (1000,500), (3000,1000), (2000,1000), (2000,300), (1000,300)]
+SEED = 999
 
 def computeWeightsClasses(dataset):
     # Distribution of labels
@@ -102,10 +103,10 @@ def create_model(n_feature, n_class,
     H2 = hidden_layer_two
     model = torch.nn.Sequential(
         torch.nn.Linear(n_feature, H1),
-        torch.nn.BatchNorm1d(num_features=H1),
+        #torch.nn.BatchNorm1d(num_features=H1),
         str_to_act_func(activation_function),
         torch.nn.Linear(H1, H2),
-        torch.nn.BatchNorm1d(num_features=H2),
+        #torch.nn.BatchNorm1d(num_features=H2),
         str_to_act_func(activation_function),
         torch.nn.Linear(H2, n_class),
     )
@@ -392,7 +393,18 @@ def main(train_data,
     n_ele_train = train_counts.shape[0]
     n_ele_test = vali_counts.shape[0]
     n_class = max(set(train_labels_x)) + 1
-    
+
+    # To ensure reproducibility
+    np.random.seed(SEED)
+    random.seed(SEED)
+    torch.manual_seed(SEED)
+    if use_gpu:
+        torch.cuda.manual_seed(SEED)
+        torch.cuda.manual_seed_all(SEED)
+    torch.backends.cudnn.enabled = False 
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+
     print("CUDA Available: ", torch.cuda.is_available())
     device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
     
@@ -439,6 +451,7 @@ def main(train_data,
     learning_rates = [learning_rate] if not grid_search else SEARCH_LR
     batch_sizes = [(train_batch_size, validation_batch_size)] if not grid_search else SEARCH_BATCH
     hidden_sizes = [(2000, 1000)] if not grid_search else SEARCH_HL
+    l2s = [0] if not grid_search else L2
     best_model = dict()
     best_acc = 0
     best_lr = 0
@@ -448,7 +461,7 @@ def main(train_data,
     TOL = 0.001
     PATIENCE = 10
     for lr in learning_rates:
-        for l2 in L2:
+        for l2 in l2s:
             for (trn_bs, vali_bs) in batch_sizes:
                 for (h1, h2) in hidden_sizes:
                     # Create model
