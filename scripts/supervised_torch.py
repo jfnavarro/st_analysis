@@ -104,10 +104,10 @@ def create_model(n_feature, n_class,
     H2 = hidden_layer_two
     model = torch.nn.Sequential(
         torch.nn.Linear(n_feature, H1),
-        #torch.nn.BatchNorm1d(num_features=H1),
+        torch.nn.BatchNorm1d(num_features=H1),
         str_to_act_func(activation_function),
         torch.nn.Linear(H1, H2),
-        #torch.nn.BatchNorm1d(num_features=H2),
+        torch.nn.BatchNorm1d(num_features=H2),
         str_to_act_func(activation_function),
         torch.nn.Linear(H2, n_class),
     )
