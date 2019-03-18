@@ -59,9 +59,10 @@ import gc
 __spec__ = None
 import multiprocessing
 
-SEARCH_BATCH = [(200,200), (500,500), (1000,1000), (2000,1000), (3000,1000)]
+SEARCH_BATCH = [(500,500), (1000,1000), (2000,1000), (3000,1000)]
+L2 = [0.0, 0.01, 0.001]
 SEARCH_LR = [0.1, 0.01, 0.05, 0.001, 0.005]
-SEARCH_HL = [(3000,500), (2000,500), (1000,500), (3000,1000), (2000,1000), (3000, 300), (2000,300), (1000,300)]
+SEARCH_HL = [(3000,500), (2000,500), (1000,500), (3000,1000), (2000,1000), (2000,300), (1000,300)]
 
 def computeWeightsClasses(dataset):
     # Distribution of labels
@@ -355,6 +356,7 @@ def main(train_data,
     train_labels = [labels_index_map[x] for x in train_labels]
     
     # Split train and test dasasets
+    train_validation_ratio = 1 - train_validation_ratio
     print("Splitting training set into training and validation sets (equally balancing clusters)\n"\
           "with a ratio of {} and discarding classes with less than {} elements".format(train_validation_ratio, min_class_size))
     train_counts_x, train_counts_y, train_labels_x, train_labels_y = split_dataset(train_data_frame, 
@@ -442,81 +444,84 @@ def main(train_data,
     best_lr = 0
     best_bs = (0,0)
     best_h = (0,0)
+    best_l2 = 0
     TOL = 0.001
     PATIENCE = 10
     for lr in learning_rates:
-        for (trn_bs, vali_bs) in batch_sizes:
-            for (h1, h2) in hidden_sizes:
-                # Create model
-                model = create_model(n_feature, n_class, h1, h2, activation_function)
-                model = model.to(device)
-                # Create optimizer
-                optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
-                # Create loaders
-                trn_loader, vali_loader = create_loaders(trn_set, vali_set, 
-                                                         trn_bs, vali_bs,
-                                                         trn_sampler, vali_sampler, 
-                                                         not stratified_sampler, False,
-                                                         kwargs)
-                # Train the model
-                best_local_loss = 10e6
-                best_local_acc = 0
-                counter = 0
-                best_model_local = dict()
-                if grid_search:
-                    print("Training model with:\n learning rate {}\n train batch size {}\n "\
-                          "test batch size {}\n hidden layer one {}\n hidden layer two {}".format(lr,trn_bs,vali_bs,h1,h2))
-                for epoch in range(epochs):
-                    if verbose:
-                        print('Epoch: {}'.format(epoch))
+        for l2 in L2:
+            for (trn_bs, vali_bs) in batch_sizes:
+                for (h1, h2) in hidden_sizes:
+                    # Create model
+                    model = create_model(n_feature, n_class, h1, h2, activation_function)
+                    model = model.to(device)
+                    # Create optimizer
+                    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=l2)
+                    # Create loaders
+                    trn_loader, vali_loader = create_loaders(trn_set, vali_set, 
+                                                             trn_bs, vali_bs,
+                                                             trn_sampler, vali_sampler, 
+                                                             not stratified_sampler, False,
+                                                             kwargs)
+                    # Train the model
+                    best_local_loss = 10e6
+                    best_local_acc = 0
+                    counter = 0
+                    best_model_local = dict()
+                    if grid_search:
+                        print("Training model with:\n learning rate {}\n train batch size {}\n "\
+                              "test batch size {}\n hidden layer one {}\n hidden layer two {}".format(lr,trn_bs,vali_bs,h1,h2))
+                    for epoch in range(epochs):
+                        if verbose:
+                            print('Epoch: {}'.format(epoch))
+                            
+                        # Training
+                        avg_train_loss, avg_training_acc = train(model, trn_loader, optimizer, loss_func, device)
+    
+                        if verbose:
+                            print("Training set accuracy {}".format(avg_training_acc))
+                            print("Training set loss (avg) {}".format(avg_train_loss))
+                            print("Testing set accuracy {}".format(avg_testing_acc))
+                            print("Testing set loss (avg) {}".format(avg_test_loss))
+                            
+                        # Check if the loss is better
+                        if avg_train_loss < best_local_loss:
+                            best_local_acc = avg_training_acc
+                            best_local_loss = avg_train_loss
+                            best_model_local = model.state_dict().copy()
                         
-                    # Training
-                    avg_train_loss, avg_training_acc = train(model, trn_loader, optimizer, loss_func, device)
-
-                    if verbose:
-                        print("Training set accuracy {}".format(avg_training_acc))
-                        print("Training set loss (avg) {}".format(avg_train_loss))
-                        print("Testing set accuracy {}".format(avg_testing_acc))
-                        print("Testing set loss (avg) {}".format(avg_test_loss))
-                        
-                    # Check if the loss is better
-                    if avg_train_loss < best_local_loss:
-                        best_local_acc = avg_training_acc
-                        best_local_loss = avg_train_loss
-                        best_model_local = model.state_dict().copy()
-                    
-                    # Check if the model has converged (loss no changing)
-                    if np.isclose(avg_train_loss, best_local_loss, rtol=TOL, atol=TOL):
-                        counter += 1
-                    else:
-                        counter = 0
-                    # Early out
-                    if counter >= PATIENCE:
-                        if verbose: 
-                            print("Early stopping at epoch {}".format(epoch))
-                        break
-                       
-                # Test the model on the validation set
-                model.load_state_dict(best_model_local) 
-                preds, avg_test_loss = test(model, vali_loader, loss_func, device)
-
-                # Compute accuracy score
-                avg_testing_acc = accuracy_score(y_vali.cpu().numpy(), preds)
-                      
-                # Check the results to keep the best model
-                print("Best training accuracy {} and loss (avg.) {}".format(best_local_acc, best_local_loss))
-                print("Best testing accuracy {} and loss (avg.) {}".format(avg_testing_acc, avg_test_loss))
-                if avg_testing_acc > best_acc:
-                    best_acc = avg_testing_acc
-                    best_model = best_model_local
-                    best_lr = lr
-                    best_bs = (trn_bs, vali_bs)
-                    best_h = (h1,h2)
+                        # Check if the model has converged (loss no changing)
+                        if np.isclose(avg_train_loss, best_local_loss, rtol=TOL, atol=TOL):
+                            counter += 1
+                        else:
+                            counter = 0
+                        # Early out
+                        if counter >= PATIENCE:
+                            if verbose: 
+                                print("Early stopping at epoch {}".format(epoch))
+                            break
+                           
+                    # Test the model on the validation set
+                    model.load_state_dict(best_model_local) 
+                    preds, avg_test_loss = test(model, vali_loader, loss_func, device)
+    
+                    # Compute accuracy score
+                    avg_testing_acc = accuracy_score(y_vali.cpu().numpy(), preds)
+                          
+                    # Check the results to keep the best model
+                    print("Best training accuracy {} and loss (avg.) {}".format(best_local_acc, best_local_loss))
+                    print("Best testing accuracy {} and loss (avg.) {}".format(avg_testing_acc, avg_test_loss))
+                    if avg_testing_acc > best_acc:
+                        best_acc = avg_testing_acc
+                        best_model = best_model_local
+                        best_lr = lr
+                        best_bs = (trn_bs, vali_bs)
+                        best_h = (h1,h2)
+                        best_l2 = l2
 
     print("Model trained!")
     print("Activation function {}".format(activation_function))
     print("Cross entropy loss")
-    print("ADAM optimizer with 0.0001 weight decay")
+    print("ADAM optimizer with {} L2".format(best_l2))
     print("Learning rate {}".format(best_lr))
     print("Train batch size {}".format(best_bs[0]))
     print("Validation batch size {}".format(best_bs[1]))
@@ -586,7 +591,7 @@ if __name__ == '__main__':
                         help="The number of neurons in the first hidden layer (default: %(default)s)")
     parser.add_argument("--hidden-layer-two", type=int, default=1000, metavar="[INT]",
                         help="The number of neurons in the second hidden layer (default: %(default)s)")
-    parser.add_argument("--train-validation-ratio", type=float, default=0.8, metavar="[FLOAT]",
+    parser.add_argument("--train-validation-ratio", type=float, default=0.3, metavar="[FLOAT]",
                         help="The percentage of the training set that will be used to validate"\
                         "the model during training (default: %(default)s)")
     parser.add_argument("--learning-rate", type=float, default=0.001, metavar="[FLOAT]",
