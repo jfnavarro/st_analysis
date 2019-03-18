@@ -399,7 +399,7 @@ def main(train_data,
     np.random.seed(SEED)
     random.seed(SEED)
     torch.manual_seed(SEED)
-    if use_gpu:
+    if use_cuda:
         torch.cuda.manual_seed(SEED)
         torch.cuda.manual_seed_all(SEED)
     torch.backends.cudnn.enabled = False 
