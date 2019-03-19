@@ -61,8 +61,8 @@ __spec__ = None
 import multiprocessing
 
 SEARCH_BATCH = [(500,500), (1000,1000), (2000,1000), (3000,1000)]
-L2 = [0.0, 0.01, 0.001]
-SEARCH_LR = [0.1, 0.01, 0.05, 0.001, 0.005]
+L2 = [0.0, 0.001, 0.0001]
+SEARCH_LR = [0.1, 0.01, 0.05, 0.001, 0.005, 0.0001]
 SEARCH_HL = [(3000,500), (2000,500), (1000,500), (3000,1000), (2000,1000), (2000,300), (1000,300)]
 SEED = 999
 
@@ -541,6 +541,7 @@ def main(train_data,
     print("Validation batch size {}".format(best_bs[1]))
     print("Hidden layer one {}".format(best_h[0]))
     print("Hidden layer two {}".format(best_h[1]))
+    print("Best accuracy {}".format(best_acc))
     
     # Load and save best model
     model = create_model(n_feature, n_class, best_h[0], best_h[1], activation_function)
