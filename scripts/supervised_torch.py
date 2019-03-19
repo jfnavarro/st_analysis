@@ -402,9 +402,6 @@ def main(train_data,
     if use_cuda:
         torch.cuda.manual_seed(SEED)
         torch.cuda.manual_seed_all(SEED)
-    torch.backends.cudnn.enabled = False 
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
 
     print("CUDA Available: ", torch.cuda.is_available())
     device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
@@ -501,7 +498,7 @@ def main(train_data,
                         if avg_train_loss < best_local_loss:
                             best_local_acc = avg_training_acc
                             best_local_loss = avg_train_loss
-                            best_model_local = model.state_dict().copy()
+                            best_model_local = model.state_dict()
                         
                         # Check if the model has converged (loss no changing)
                         if np.isclose(avg_train_loss, best_local_loss, rtol=TOL, atol=TOL):
