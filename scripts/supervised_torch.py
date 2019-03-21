@@ -60,9 +60,9 @@ import gc
 __spec__ = None
 import multiprocessing
 
-SEARCH_BATCH = [(500,500), (1000,1000), (2000,1000), (3000,1000)]
+SEARCH_BATCH = [(200, 200), (500,500), (1000,1000), (2000,1000), (3000,1000)]
 L2 = [0.0, 0.001, 0.0001]
-SEARCH_LR = [0.1, 0.01, 0.05, 0.001, 0.005, 0.0001]
+SEARCH_LR = [0.1, 0.01, 0.001, 0.0001]
 SEARCH_HL = [(3000,500), (2000,500), (1000,500), (3000,1000), (2000,1000), (2000,300), (1000,300)]
 SEED = 999
 
@@ -357,7 +357,7 @@ def main(train_data,
     print(index_label_map)
     train_labels = [labels_index_map[x] for x in train_labels]
     
-    # Split train and test dasasets
+    # Split train and test datasets
     train_validation_ratio = 1 - train_validation_ratio
     print("Splitting training set into training and validation sets (equally balancing clusters)\n"\
           "with a ratio of {} and discarding classes with less than {} elements".format(train_validation_ratio, min_class_size))
@@ -456,8 +456,8 @@ def main(train_data,
     best_bs = (0,0)
     best_h = (0,0)
     best_l2 = 0
-    TOL = 0.001
-    PATIENCE = 10
+    TOL = 0.0001
+    PATIENCE = 20
     for lr in learning_rates:
         for l2 in l2s:
             for (trn_bs, vali_bs) in batch_sizes:
@@ -593,9 +593,9 @@ if __name__ == '__main__':
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
-    parser.add_argument("--train-batch-size", type=int, default=1000, metavar="[INT]",
+    parser.add_argument("--train-batch-size", type=int, default=500, metavar="[INT]",
                         help="The input batch size for training (default: %(default)s)")
-    parser.add_argument("--validation-batch-size", type=int, default=1000, metavar="[INT]",
+    parser.add_argument("--validation-batch-size", type=int, default=500, metavar="[INT]",
                         help="The input batch size for validation (default: %(default)s)")
     parser.add_argument("--epochs", type=int, default=50, metavar="[INT]",
                         help="The number of epochs to train (default: %(default)s)")
