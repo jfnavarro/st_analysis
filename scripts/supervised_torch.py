@@ -60,9 +60,9 @@ import gc
 __spec__ = None
 import multiprocessing
 
-SEARCH_BATCH = [(500,500), (1000,1000), (2000,1000), (3000,1000)]
+SEARCH_BATCH = [(200, 200), (500,500), (1000,1000), (2000,1000), (3000,1000)]
 L2 = [0.0, 0.001, 0.0001]
-SEARCH_LR = [0.1, 0.01, 0.05, 0.001, 0.005, 0.0001]
+SEARCH_LR = [0.1, 0.01, 0.001, 0.0001]
 SEARCH_HL = [(3000,500), (2000,500), (1000,500), (3000,1000), (2000,1000), (2000,300), (1000,300)]
 SEED = 999
 
@@ -357,7 +357,7 @@ def main(train_data,
     print(index_label_map)
     train_labels = [labels_index_map[x] for x in train_labels]
     
-    # Split train and test dasasets
+    # Split train and test datasets
     train_validation_ratio = 1 - train_validation_ratio
     print("Splitting training set into training and validation sets (equally balancing clusters)\n"\
           "with a ratio of {} and discarding classes with less than {} elements".format(train_validation_ratio, min_class_size))
@@ -498,7 +498,7 @@ def main(train_data,
                         if avg_train_loss < best_local_loss:
                             best_local_acc = avg_training_acc
                             best_local_loss = avg_train_loss
-                            best_model_local = model.state_dict().copy()
+                            best_model_local = model.state_dict()
                         
                         # Check if the model has converged (loss no changing)
                         if np.isclose(avg_train_loss, best_local_loss, rtol=TOL, atol=TOL):
