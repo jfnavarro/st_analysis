@@ -50,6 +50,7 @@ import torchvision
 
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
+from sklearn.metrics import f1_score
 from sklearn.metrics import classification_report
 from sklearn.utils import shuffle
 from sklearn.model_selection import StratifiedShuffleSplit
@@ -60,10 +61,10 @@ import gc
 __spec__ = None
 import multiprocessing
 
-SEARCH_BATCH = [(500,500), (1000,1000), (2000,1000), (3000,1000)]
+SEARCH_BATCH = [(200,200), (500,500), (1000,1000), (2000,1000), (3000,1000)]
 L2 = [0.0, 0.001, 0.0001]
-SEARCH_LR = [0.1, 0.01, 0.05, 0.001, 0.005, 0.0001]
-SEARCH_HL = [(3000,500), (2000,500), (1000,500), (3000,1000), (2000,1000), (2000,300), (1000,300)]
+SEARCH_LR = [0.01, 0.001, 0.0001]
+SEARCH_HL = [(3000,2000,1000), (2000,1000,500), (3000,1000,500), (1000,500,300)]
 SEED = 999
 
 def computeWeightsClasses(dataset):
@@ -97,11 +98,12 @@ def str_to_act_func(str):
         return torch.nn.ReLU()
     
 def create_model(n_feature, n_class, 
-                 hidden_layer_one, hidden_layer_two, 
+                 hidden_layer_one, hidden_layer_two, hidden_layer_three,
                  activation_function):
     # Init model
     H1 = hidden_layer_one
     H2 = hidden_layer_two
+    H3 = hidden_layer_three
     model = torch.nn.Sequential(
         torch.nn.Linear(n_feature, H1),
         torch.nn.BatchNorm1d(num_features=H1),
@@ -109,7 +111,10 @@ def create_model(n_feature, n_class,
         torch.nn.Linear(H1, H2),
         torch.nn.BatchNorm1d(num_features=H2),
         str_to_act_func(activation_function),
-        torch.nn.Linear(H2, n_class),
+        torch.nn.Linear(H2, H3),
+        torch.nn.BatchNorm1d(num_features=H3),
+        str_to_act_func(activation_function),
+        torch.nn.Linear(H3, n_class),
     )
     return model   
    
@@ -151,8 +156,11 @@ def train(model, trn_loader, optimizer, loss_func, device):
         optimizer.step()
         # Compute prediction's score
         pred = torch.argmax(output.data, 1)
-        training_acc += accuracy_score(target.data.cpu().numpy(),
-                                       pred.data.cpu().numpy())
+        #training_acc += accuracy_score(target.data.cpu().numpy(),
+        #                               pred.data.cpu().numpy())
+        training_acc += f1_score(target.data.cpu().numpy(), 
+                                 pred.data.cpu().numpy(), 
+                                 average="weighted")
         counter += 1
     avg_loss = training_loss / float(counter)
     avg_acc = training_acc / float(counter)
@@ -448,22 +456,22 @@ def main(train_data,
     
     learning_rates = [learning_rate] if not grid_search else SEARCH_LR
     batch_sizes = [(train_batch_size, validation_batch_size)] if not grid_search else SEARCH_BATCH
-    hidden_sizes = [(2000, 1000)] if not grid_search else SEARCH_HL
+    hidden_sizes = [(2000, 1000, 500)] if not grid_search else SEARCH_HL
     l2s = [0] if not grid_search else L2
     best_model = dict()
     best_acc = 0
     best_lr = 0
     best_bs = (0,0)
-    best_h = (0,0)
+    best_h = (0,0,0)
     best_l2 = 0
     TOL = 0.0001
-    PATIENCE = 20
+    PATIENCE = 10
     for lr in learning_rates:
         for l2 in l2s:
             for (trn_bs, vali_bs) in batch_sizes:
-                for (h1, h2) in hidden_sizes:
+                for (h1, h2, h3) in hidden_sizes:
                     # Create model
-                    model = create_model(n_feature, n_class, h1, h2, activation_function)
+                    model = create_model(n_feature, n_class, h1, h2, h3, activation_function)
                     model = model.to(device)
                     # Create optimizer
                     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=l2)
@@ -480,7 +488,7 @@ def main(train_data,
                     best_model_local = dict()
                     if grid_search:
                         print("Training model with:\n L2 {}\n learning rate {}\n train batch size {}\n "\
-                              "test batch size {}\n hidden layer one {}\n hidden layer two {}".format(l2,lr,trn_bs,vali_bs,h1,h2))
+                              "test batch size {}\n hidden layer one {}\n hidden layer two {}\n hidden layer three".format(l2,lr,trn_bs,vali_bs,h1,h2,h3))
                     for epoch in range(epochs):
                         if verbose:
                             print('Epoch: {}'.format(epoch))
@@ -515,8 +523,9 @@ def main(train_data,
                     preds, avg_test_loss = test(model, vali_loader, loss_func, device)
     
                     # Compute accuracy score
-                    avg_testing_acc = accuracy_score(y_vali.cpu().numpy(), preds)
-                          
+                    #avg_testing_acc = accuracy_score(y_vali.cpu().numpy(), preds)
+                    avg_testing_acc = f1_score(y_vali.cpu().numpy(), preds, average="weighted")
+                         
                     # Check the results to keep the best model
                     print("Best training accuracy {} and loss (avg.) {}".format(best_local_acc, best_local_loss))
                     print("Best testing accuracy {} and loss (avg.) {}".format(avg_testing_acc, avg_test_loss))
@@ -525,7 +534,7 @@ def main(train_data,
                         best_model = best_model_local
                         best_lr = lr
                         best_bs = (trn_bs, vali_bs)
-                        best_h = (h1,h2)
+                        best_h = (h1,h2,h3)
                         best_l2 = l2
 
     print("Model trained!")
@@ -537,10 +546,11 @@ def main(train_data,
     print("Validation batch size {}".format(best_bs[1]))
     print("Hidden layer one {}".format(best_h[0]))
     print("Hidden layer two {}".format(best_h[1]))
+    print("Hidden layer three {}".format(best_h[2]))
     print("Best accuracy {}".format(best_acc))
     
     # Load and save best model
-    model = create_model(n_feature, n_class, best_h[0], best_h[1], activation_function)
+    model = create_model(n_feature, n_class, best_h[0], best_h[1], best_h[2], activation_function)
     model = model.to(device)
     model.load_state_dict(best_model)
     torch.save(model, os.path.join(outdir, "model.pt"))
