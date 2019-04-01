@@ -11,9 +11,9 @@ from stanalysis.normalization import *
 from sklearn.preprocessing import StandardScaler
 
 def ztransformation(counts):
-    """ Applies a zimple z-score transformation
-    which consists of substracting to each count the 
-    the mean of its column (spot) and then divide it by
+    """ Applies a simple z-score transformation
+    which consists of substracting to each count 
+    the mean of its column (gene) and then divide it by its
     the standard deviation
     """
     scaler = StandardScaler()
@@ -23,6 +23,15 @@ def ztransformation(counts):
     return pd.DataFrame(data=scaled_counts,
                         index=rows,
                         columns=cols)
+    
+def rel_transformation(counts):
+    """Compute the total sum for each gene and multiply 
+    the sums by their means to then divide each count by
+    these values (column-wise, aka gene-wise)
+    """
+    col_sums = counts.sum(axis=0)
+    means = counts.mean(axis=0)
+    return counts.divide(col_sums * col_means, axis=1)
     
 def aggregate_datatasets(counts_table_files, add_index=True):
     """ This functions takes a list of data frames with ST data

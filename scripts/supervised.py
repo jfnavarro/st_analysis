@@ -51,7 +51,8 @@ def main(train_data,
          normalization, 
          outdir, 
          batch_correction, 
-         standard_transformation, 
+         standard_transformation,
+         rel_transformation,
          epochs, 
          num_exp_genes, 
          num_exp_spots, 
@@ -114,7 +115,11 @@ def main(train_data,
     if num_exp_spots < 0.0 or num_exp_spots > 1.0:
         sys.stderr.write("Error, invalid number of expressed genes\n")
         sys.exit(1)
-                  
+            
+    if rel_transformation and standard_transformation:
+        sys.stderr.write("Error, relative and standard transformation cannot be applied together\n")
+        sys.exit(1)
+              
     if not outdir or not os.path.isdir(outdir):
         outdir = os.getcwd()   
     print("Output folder {}".format(outdir))
@@ -187,6 +192,12 @@ def main(train_data,
         train_data_frame = ztransformation(train_data_frame)
         test_data_frame = ztransformation(test_data_frame)
 
+    # Apply the rel-transformation
+    if rel_transformation:
+        print("Applying relative transformation...")
+        train_data_frame = rel_transformation(train_data_frame)
+        test_data_frame = rel_transformation(test_data_frame)
+        
     # Update labels again
     train_data_frame, train_labels = update_labels(train_data_frame, train_labels_dict)
     if test_classes_file is not None:
@@ -299,6 +310,9 @@ if __name__ == '__main__':
                         help="Perform batch-correction (Scran::Mnncorrect()) between train and test sets")
     parser.add_argument("--standard-transformation", action="store_true", default=False,
                         help="Apply the z-score transformation to each feature (gene)")
+    parser.add_argument("--rel-transformation", action="store_true", default=False,
+                        help="Apply the relative transformation\n"\
+                        "(divide by the total count adjusted by the mean) for each feature (gene)")
     parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, 
                         choices=["RAW", "DESeq2",  "REL", "Scran"],
@@ -351,7 +365,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
          args.test_classes, args.log_scale, args.normalization, 
-         args.outdir, args.batch_correction, args.standard_transformation, 
+         args.outdir, args.batch_correction, args.standard_transformation, args.rel_transformation,
          args.epochs, args.num_exp_genes, args.num_exp_spots, 
          args.min_gene_expression, args.classifier, args.svm_kernel,
          args.batch_size, args.learning_rate, args.stratified_sampler, 

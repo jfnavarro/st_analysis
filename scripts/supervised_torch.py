@@ -193,6 +193,7 @@ def main(train_data,
          outdir, 
          batch_correction,
          standard_transformation,
+         rel_transformation,
          train_batch_size,
          validation_batch_size, 
          epochs, 
@@ -208,7 +209,8 @@ def main(train_data,
          hidden_layer_two, 
          train_validation_ratio,
          grid_search,
-         activation_function):
+         activation_function,
+         l2):
 
     if not os.path.isfile(train_data):
         sys.stderr.write("Error, the training data input is not valid\n")
@@ -267,7 +269,11 @@ def main(train_data,
     if not torch.cuda.is_available() and use_cuda:
         sys.stderr.write("Error, CUDA is not available in this computer\n")
         sys.exit(1)
-          
+         
+    if rel_transformation and standard_transformation:
+        sys.stderr.write("Error, relative and standard transformation cannot be applied together\n")
+        sys.exit(1)
+         
     if not outdir or not os.path.isdir(outdir):
         outdir = os.getcwd()   
     print("Output folder {}".format(outdir))
@@ -342,6 +348,12 @@ def main(train_data,
         train_data_frame = ztransformation(train_data_frame)
         test_data_frame = ztransformation(test_data_frame)
 
+    # Apply the rel-transformation
+    if rel_transformation:
+        print("Applying relative transformation...")
+        train_data_frame = rel_transformation(train_data_frame)
+        test_data_frame = rel_transformation(test_data_frame)
+        
     # Update labels again
     train_data_frame, train_labels = update_labels(train_data_frame, train_labels_dict)
     if test_classes_file is not None:
@@ -448,8 +460,8 @@ def main(train_data,
     
     learning_rates = [learning_rate] if not grid_search else SEARCH_LR
     batch_sizes = [(train_batch_size, validation_batch_size)] if not grid_search else SEARCH_BATCH
-    hidden_sizes = [(2000, 1000)] if not grid_search else SEARCH_HL
-    l2s = [0] if not grid_search else L2
+    hidden_sizes = [(hidden_layer_one, hidden_layer_two)] if not grid_search else SEARCH_HL
+    l2s = [l2] if not grid_search else L2
     best_model = dict()
     best_acc = 0
     best_lr = 0
@@ -583,6 +595,9 @@ if __name__ == '__main__':
                         help="Perform batch-correction (Scran::Mnncorrect()) between train and test sets")
     parser.add_argument("--standard-transformation", action="store_true", default=False,
                         help="Apply the standard transformation to each gene on the train and test sets")
+    parser.add_argument("--rel-transformation", action="store_true", default=False,
+                        help="Apply the relative transformation\n"\
+                        "(divide by the total count adjusted by the mean) for each feature (gene)")
     parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, 
                         choices=["RAW", "DESeq2",  "REL", "Scran"],
@@ -607,6 +622,8 @@ if __name__ == '__main__':
                         "the model during training (default: %(default)s)")
     parser.add_argument("--learning-rate", type=float, default=0.001, metavar="[FLOAT]",
                         help="The learning rate for the Adam optimizer (default: %(default)s)")
+    parser.add_argument("--l2", type=float, default=0.0, metavar="[FLOAT]",
+                        help="The L2 penalty regularization for the ADAM optimizer (default: %(default)s)")
     parser.add_argument("--activation-function", default="RELU", metavar="[STR]", 
                         type=str, 
                         choices=["RELU", "TANH",  "SELU"],
@@ -642,9 +659,9 @@ if __name__ == '__main__':
     main(args.train_data, args.test_data, args.train_classes, 
          args.test_classes, args.log_scale, args.normalization, 
          args.stratified_loss, args.outdir, args.batch_correction, 
-         args.standard_transformation, args.train_batch_size, args.validation_batch_size, 
+         args.standard_transformation, args.rel_transformation, args.train_batch_size, args.validation_batch_size, 
          args.epochs, args.learning_rate, args.stratified_sampler, 
          args.min_class_size, args.use_cuda, args.num_exp_genes, 
          args.num_exp_spots, args.min_gene_expression, args.verbose,
          args.hidden_layer_one, args.hidden_layer_two, args.train_validation_ratio, 
-         args.grid_search, args.activation_function)
+         args.grid_search, args.activation_function, args.l2)
