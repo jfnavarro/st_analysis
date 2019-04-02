@@ -457,7 +457,7 @@ def main(train_data,
     best_bs = (0,0)
     best_h = (0,0)
     best_l2 = 0
-    TOL = 0.0001
+    TOL = 0.00001
     PATIENCE = 20
     for lr in learning_rates:
         for l2 in l2s:
@@ -604,7 +604,7 @@ if __name__ == '__main__':
                         help="The number of neurons in the first hidden layer (default: %(default)s)")
     parser.add_argument("--hidden-layer-two", type=int, default=1000, metavar="[INT]",
                         help="The number of neurons in the second hidden layer (default: %(default)s)")
-    parser.add_argument("--train-validation-ratio", type=float, default=0.2, metavar="[FLOAT]",
+    parser.add_argument("--train-validation-ratio", type=float, default=0.3, metavar="[FLOAT]",
                         help="The percentage of the training set that will be used to validate"\
                         "the model during training (default: %(default)s)")
     parser.add_argument("--learning-rate", type=float, default=0.001, metavar="[FLOAT]",
