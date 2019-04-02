@@ -193,7 +193,6 @@ def main(train_data,
          outdir, 
          batch_correction,
          standard_transformation,
-         relative_transformation,
          train_batch_size,
          validation_batch_size, 
          epochs, 
@@ -270,10 +269,6 @@ def main(train_data,
         sys.stderr.write("Error, CUDA is not available in this computer\n")
         sys.exit(1)
          
-    if relative_transformation and standard_transformation:
-        sys.stderr.write("Error, relative and standard transformation cannot be applied together\n")
-        sys.exit(1)
-         
     if not outdir or not os.path.isdir(outdir):
         outdir = os.getcwd()   
     print("Output folder {}".format(outdir))
@@ -347,12 +342,6 @@ def main(train_data,
         print("Applying standard transformation...")
         train_data_frame = ztransformation(train_data_frame)
         test_data_frame = ztransformation(test_data_frame)
-
-    # Apply the rel-transformation
-    if relative_transformation:
-        print("Applying relative transformation...")
-        train_data_frame = rel_transformation(train_data_frame)
-        test_data_frame = rel_transformation(test_data_frame)
         
     # Update labels again
     train_data_frame, train_labels = update_labels(train_data_frame, train_labels_dict)
@@ -595,17 +584,15 @@ if __name__ == '__main__':
                         help="Perform batch-correction (Scran::Mnncorrect()) between train and test sets")
     parser.add_argument("--standard-transformation", action="store_true", default=False,
                         help="Apply the standard transformation to each gene on the train and test sets")
-    parser.add_argument("--relative-transformation", action="store_true", default=False,
-                        help="Apply the relative transformation\n"\
-                        "(divide by the total count adjusted by the mean) for each feature (gene)")
-    parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
-                        type=str, 
-                        choices=["RAW", "DESeq2",  "REL", "Scran"],
+    parser.add_argument("--normalization", default="RAW", metavar="[STR]",
+                        type=str,
+                        choices=["RAW", "DESeq2", "REL", "CPM", "Scran"],
                         help="Normalize the counts using:\n" \
                         "RAW = absolute counts\n" \
-                        "DESeq2 = DESeq2::estimateSizeFactors()\n" \
+                        "DESeq2 = DESeq2::estimateSizeFactors(counts)\n" \
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
+                        "CPM = Each gene count divided by the total count of its spots multiplied by its mean\n" \
                         "(default: %(default)s)")
     parser.add_argument("--train-batch-size", type=int, default=500, metavar="[INT]",
                         help="The input batch size for training (default: %(default)s)")
@@ -658,8 +645,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
          args.test_classes, args.log_scale, args.normalization, 
-         args.stratified_loss, args.outdir, args.batch_correction, 
-         args.standard_transformation, args.relative_transformation, 
+         args.stratified_loss, args.outdir, args.batch_correction, args.standard_transformation, 
          args.train_batch_size, args.validation_batch_size, 
          args.epochs, args.learning_rate, args.stratified_sampler, 
          args.min_class_size, args.use_cuda, args.num_exp_genes, 

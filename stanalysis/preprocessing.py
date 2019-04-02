@@ -24,15 +24,6 @@ def ztransformation(counts):
                         index=rows,
                         columns=cols)
     
-def rel_transformation(counts):
-    """Compute the total sum for each gene and multiply 
-    the sums by their means to then divide each count by
-    these values (column-wise, aka gene-wise)
-    """
-    col_sums = counts.sum(axis=0)
-    means = counts.mean(axis=0)
-    return counts.divide(col_sums * col_means, axis=1)
-    
 def aggregate_datatasets(counts_table_files, add_index=True):
     """ This functions takes a list of data frames with ST data
     (genes as columns and spots as rows) and merges them into
@@ -180,6 +171,8 @@ def compute_size_factors(counts, normalization, scran_clusters=True):
         size_factors = computeRLEFactors(counts)
     elif normalization in "REL":
         size_factors = counts.sum(axis=0)
+    elif normalization in "CPM":
+        size_factors = counts.sum(axis=0) * counts.mean(axis=0)
     elif normalization in "RAW":
         size_factors = 1
     elif normalization in "Scran":
