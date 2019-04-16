@@ -232,7 +232,7 @@ def main(train_data,
                                   momentum=0.9)
         elif classifier in "RF":
             print("Random Forest classifier")
-            model = RandomForestClassifier(n_estimators="warn", 
+            model = RandomForestClassifier(n_estimators=100, 
                                            criterion="gini",
                                            max_depth=None,
                                            min_samples_split=2,
