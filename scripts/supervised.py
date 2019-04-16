@@ -40,6 +40,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn import metrics
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.neural_network import MLPClassifier
+from sklearn.ensembl import GradientBoostingClassifier
+from sklearn.ensembl import RandomForestClassifier
 
 from cProfile import label
 
@@ -202,9 +204,9 @@ def main(train_data,
     del train_data_frame
     gc.collect()
 
+    class_weight = "balanced" if stratified_sampler else None
     if model_file is None:
         # Train the classifier and predict
-        class_weight = "balanced" if stratified_sampler else None
         if classifier in "SVC":
             print("One vs rest SVM")
             model = OneVsRestClassifier(SVC(probability=True,
@@ -228,6 +230,46 @@ def main(train_data,
                                   random_state=None,
                                   tol=0.0001,
                                   momentum=0.9)
+        elif classifier in "RF":
+            print("Random Forest classifier")
+            model = RandomForestClassifier(n_estimators="warn", 
+                                           criterion="gini",
+                                           max_depth=None,
+                                           min_samples_split=2,
+                                           min_samples_leaf=1,
+                                           min_weight_fraction_leaf=0.0,
+                                           max_features="auto", 
+                                           max_leaf_nodes=None, 
+                                           min_impurity_decrease=0.0, 
+                                           min_impurity_split=None, 
+                                           bootstrap=True, 
+                                           oob_score=False, 
+                                           n_jobs=-1, 
+                                           random_state=None, 
+                                           warm_start=False, 
+                                           class_weight=class_weight)
+        elif classifier in "RF":
+            print("Gradient Boosting classifier")
+            model = GradientBoostingClassifier(loss="deviance",
+                                               learning_rate=0.1, 
+                                               n_estimators=100, 
+                                               subsample=1.0, 
+                                               criterion="friedman_mse",
+                                               min_samples_split=2, 
+                                               min_samples_leaf=1, 
+                                               min_weight_fraction_leaf=0.0, 
+                                               max_depth=3, 
+                                               min_impurity_decrease=0.0, 
+                                               min_impurity_split=None, 
+                                               init=None, 
+                                               random_state=None, 
+                                               max_features=None, 
+                                               max_leaf_nodes=None, 
+                                               warm_start=False, 
+                                               presort="auto", 
+                                               validation_fraction=0.2, 
+                                               n_iter_no_change=20, 
+                                               tol=0.0001)
         else:
             print("One vs rest Logistic Regression")
             model = OneVsRestClassifier(LogisticRegression(penalty='l2',
@@ -323,11 +365,13 @@ if __name__ == '__main__':
                         "considered expressed when filtering (default: %(default)s)")
     parser.add_argument("--classifier", default="SVC", metavar="[STR]",
                         type=str,
-                        choices=["SVM", "LR", "NN"],
+                        choices=["SVM", "LR", "NN", "GB", "RF"],
                         help="The classifier to use:\n" \
                         "SVM = Support Vector Machine\n" \
                         "LR = Logistic Regression\n" \
                         "NN = Neural Network\n" \
+                        "GB = Gradient Boosting\n" \
+                        "RF = Random Forest\n" \
                         "(default: %(default)s)")
     parser.add_argument("--svm-kernel", default="linear", metavar="[STR]",
                         type=str,
