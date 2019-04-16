@@ -248,7 +248,7 @@ def main(train_data,
                                            random_state=None, 
                                            warm_start=False, 
                                            class_weight=class_weight)
-        elif classifier in "RF":
+        elif classifier in "GB":
             print("Gradient Boosting classifier")
             model = GradientBoostingClassifier(loss="deviance",
                                                learning_rate=0.1, 

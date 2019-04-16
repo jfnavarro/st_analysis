@@ -457,7 +457,7 @@ def main(train_data,
     best_bs = (0,0)
     best_h = (0,0)
     best_l2 = 0
-    TOL = 0.00001
+    TOL = 0.001
     PATIENCE = 20
     for lr in learning_rates:
         for l2 in l2s:
@@ -489,20 +489,22 @@ def main(train_data,
                         # Training
                         avg_train_loss, avg_training_acc = train(model, trn_loader, optimizer, loss_func, device)
     
+                        # Validating
+                        
                         if verbose:
                             print("Training set accuracy {}".format(avg_training_acc))
                             print("Training set loss (avg) {}".format(avg_train_loss))
                             print("Testing set accuracy {}".format(avg_testing_acc))
                             print("Testing set loss (avg) {}".format(avg_test_loss))
                             
-                        # Check if the loss is better
-                        if avg_train_loss < best_local_loss:
+                        # Check if the accuracy is better
+                        if avg_training_acc < best_local_acc:
                             best_local_acc = avg_training_acc
                             best_local_loss = avg_train_loss
                             best_model_local = model.state_dict()
                         
                         # Check if the model has converged (loss no changing)
-                        if np.isclose(avg_train_loss, best_local_loss, rtol=TOL, atol=TOL):
+                        if np.isclose(avg_training_acc, best_local_acc, rtol=TOL, atol=TOL):
                             counter += 1
                         else:
                             counter = 0
