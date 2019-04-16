@@ -60,7 +60,7 @@ import gc
 __spec__ = None
 import multiprocessing
 
-SEARCH_BATCH = [(200, 200), (500,500), (1000,1000), (2000,1000), (3000,1000)]
+SEARCH_BATCH = [(200, 200), (500,500), (1000,1000)]
 L2 = [0.0, 0.001, 0.0001]
 SEARCH_LR = [0.1, 0.01, 0.001, 0.0001]
 SEARCH_HL = [(3000,500), (2000,500), (1000,500), (3000,1000), (2000,1000), (2000,300), (1000,300)]
@@ -207,6 +207,7 @@ def main(train_data,
          hidden_layer_one, 
          hidden_layer_two, 
          train_validation_ratio,
+         train_test_ratio,
          grid_search,
          activation_function,
          l2):
@@ -359,34 +360,38 @@ def main(train_data,
     train_labels = [labels_index_map[x] for x in train_labels]
     
     # Split train and test datasets
-    train_validation_ratio = 1 - train_validation_ratio
-    print("Splitting training set into training and validation sets (equally balancing clusters)\n"\
-          "with a ratio of {} and discarding classes with less than {} elements".format(train_validation_ratio, min_class_size))
-    train_counts_x, train_counts_y, train_labels_x, train_labels_y = split_dataset(train_data_frame, 
-                                                                                   train_labels, 
-                                                                                   train_validation_ratio, 
-                                                                                   min_class_size)
+    print("Validation set ratio {}\nTest set ratio {}".format(train_validation_ratio, train_test_ratio))
+    train_counts_x, vali_countx_x, test_counts_x, \
+    train_labels_y, vali_labels_y, test_labels_y = split_dataset(train_data_frame, 
+                                                                 train_labels,
+                                                                 train_validation_ratio,
+                                                                 train_test_ratio,
+                                                                 min_class_size)
     
     # Update the maps of indexes to labels again since some labels may have been removed
     #TODO this is ugly, a better approach should be implemented
     labels_index_map_filtered = dict()
     index_label_map_filtered = dict()
-    for i,label in enumerate(sorted(set(train_labels_x))):
+    for i,label in enumerate(sorted(set(train_labels_y))):
         labels_index_map_filtered[label] = i
         index_label_map_filtered[i] = index_label_map[label]
     print("Mapping of labels (filtered):")
     print(index_label_map_filtered)
-    train_labels_x = [labels_index_map_filtered[x] for x in train_labels_x]
-    train_labels_y = [labels_index_map_filtered[x] for x in train_labels_y] 
+    train_labels_y = [labels_index_map_filtered[x] for x in train_labels_y]
+    vali_labels_y = [labels_index_map_filtered[x] for x in vali_labels_y] 
+    test_labels_y = [labels_index_map_filtered[x] for x in test_labels_y] 
     
     print("Training set {}".format(train_counts_x.shape[0]))
-    print("Validation set {}".format(train_counts_y.shape[0]))
+    print("Validation set {}".format(vali_countx_x.shape[0]))
+    print("Test set {}".format(test_counts_x.shape[0]))
     
     # PyTorch needs floats
     train_counts = train_counts_x.astype(np.float32).values
-    vali_counts = train_counts_y.astype(np.float32).values
+    vali_counts = vali_countx_x.astype(np.float32).values
+    test_counts = test_counts_x.astype(np.float32).values
     del train_counts_x
-    del train_counts_y
+    del vali_countx_x
+    del test_counts_x
     del train_data_frame
     gc.collect()
     
@@ -394,7 +399,7 @@ def main(train_data,
     n_feature = train_counts.shape[1]
     n_ele_train = train_counts.shape[0]
     n_ele_test = vali_counts.shape[0]
-    n_class = max(set(train_labels_x)) + 1
+    n_class = max(set(train_labels_y)) + 1
 
     # To ensure reproducibility
     np.random.seed(SEED)
@@ -414,10 +419,13 @@ def main(train_data,
     # Create Tensor Flow train dataset
     X_train = torch.tensor(train_counts)
     X_vali = torch.tensor(vali_counts)
-    y_train = torch.from_numpy(np.asarray(train_labels_x, dtype=np.longlong))
-    y_vali = torch.from_numpy(np.asarray(train_labels_y, dtype=np.longlong))
+    X_test = torch.tensor(test_counts)
+    y_train = torch.from_numpy(np.asarray(train_labels_y, dtype=np.longlong))
+    y_vali = torch.from_numpy(np.asarray(vali_labels_y, dtype=np.longlong))
+    y_test = torch.from_numpy(np.asarray(test_labels_y, dtype=np.longlong))
     del train_counts
     del vali_counts
+    del test_counts
     gc.collect()
     
     # Create tensor datasets (train + test)
@@ -457,8 +465,7 @@ def main(train_data,
     best_bs = (0,0)
     best_h = (0,0)
     best_l2 = 0
-    TOL = 0.001
-    PATIENCE = 20
+    PATIENCE = 10
     for lr in learning_rates:
         for l2 in l2s:
             for (trn_bs, vali_bs) in batch_sizes:
@@ -488,43 +495,40 @@ def main(train_data,
                             
                         # Training
                         avg_train_loss, avg_training_acc = train(model, trn_loader, optimizer, loss_func, device)
-    
-                        # Validating
+                        # Test the model on the validation set
+                        preds, avg_vali_loss = test(model, vali_loader, loss_func, device)
+                        avg_vali_acc = accuracy_score(y_vali.cpu().numpy(), preds)
                         
                         if verbose:
                             print("Training set accuracy {}".format(avg_training_acc))
                             print("Training set loss (avg) {}".format(avg_train_loss))
-                            print("Testing set accuracy {}".format(avg_testing_acc))
-                            print("Testing set loss (avg) {}".format(avg_test_loss))
+                            print("Validation set accuracy {}".format(avg_vali_acc))
+                            print("Validation set loss (avg) {}".format(avg_vali_loss))
                             
-                        # Check if the accuracy is better
-                        if avg_training_acc < best_local_acc:
-                            best_local_acc = avg_training_acc
-                            best_local_loss = avg_train_loss
+                        # Keep the parameters of the epoch that gives the best loss
+                        # TODO try accuracy instead
+                        if avg_vali_loss < best_local_loss:
+                            best_local_acc = avg_vali_acc
+                            best_local_loss = avg_vali_loss
                             best_model_local = model.state_dict()
-                        
-                        # Check if the model has converged (loss no changing)
-                        if np.isclose(avg_training_acc, best_local_acc, rtol=TOL, atol=TOL):
-                            counter += 1
-                        else:
                             counter = 0
-                        # Early out
-                        if counter >= PATIENCE:
-                            print("Early stopping at epoch {}".format(epoch))
-                            break
+                        else:
+                            counter += 1
+                            # Early out
+                            if counter >= PATIENCE:
+                                print("Early stopping at epoch {}".format(epoch))
+                                break
                            
-                    # Test the model on the validation set
-                    model.load_state_dict(best_model_local) 
-                    preds, avg_test_loss = test(model, vali_loader, loss_func, device)
-    
-                    # Compute accuracy score
-                    avg_testing_acc = accuracy_score(y_vali.cpu().numpy(), preds)
+                    # Test the model on the test set
+                    model.load_state_dict(best_model_local)
+                    _, preds = predict(model, X_test, device)
+                    test_acc = accuracy_score(y_test.cpu().numpy(), preds)
                           
                     # Check the results to keep the best model
                     print("Best training accuracy {} and loss (avg.) {}".format(best_local_acc, best_local_loss))
-                    print("Best testing accuracy {} and loss (avg.) {}".format(avg_testing_acc, avg_test_loss))
-                    if avg_testing_acc > best_acc:
-                        best_acc = avg_testing_acc
+                    print("Testing accuracy {}".format(test_acc))
+                    if test_acc > best_acc:
+                        best_acc = test_acc
                         best_model = best_model_local
                         best_lr = lr
                         best_bs = (trn_bs, vali_bs)
@@ -540,7 +544,7 @@ def main(train_data,
     print("Validation batch size {}".format(best_bs[1]))
     print("Hidden layer one {}".format(best_h[0]))
     print("Hidden layer two {}".format(best_h[1]))
-    print("Best accuracy {}".format(best_acc))
+    print("Model accuracy {}".format(best_acc))
     
     # Load and save best model
     model = create_model(n_feature, n_class, best_h[0], best_h[1], activation_function)
@@ -586,15 +590,14 @@ if __name__ == '__main__':
                         help="Perform batch-correction (Scran::Mnncorrect()) between train and test sets")
     parser.add_argument("--standard-transformation", action="store_true", default=False,
                         help="Apply the standard transformation to each gene on the train and test sets")
-    parser.add_argument("--normalization", default="RAW", metavar="[STR]",
-                        type=str,
-                        choices=["RAW", "DESeq2", "REL", "CPM", "Scran"],
+    parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
+                        type=str, 
+                        choices=["RAW", "DESeq2",  "REL", "CPM", "Scran"],
                         help="Normalize the counts using:\n" \
                         "RAW = absolute counts\n" \
-                        "DESeq2 = DESeq2::estimateSizeFactors(counts)\n" \
+                        "DESeq2 = DESeq2::estimateSizeFactors()\n" \
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
-                        "CPM = Each gene count divided by the total count of its spots multiplied by its mean\n" \
                         "(default: %(default)s)")
     parser.add_argument("--train-batch-size", type=int, default=500, metavar="[INT]",
                         help="The input batch size for training (default: %(default)s)")
@@ -606,9 +609,12 @@ if __name__ == '__main__':
                         help="The number of neurons in the first hidden layer (default: %(default)s)")
     parser.add_argument("--hidden-layer-two", type=int, default=1000, metavar="[INT]",
                         help="The number of neurons in the second hidden layer (default: %(default)s)")
-    parser.add_argument("--train-validation-ratio", type=float, default=0.3, metavar="[FLOAT]",
+    parser.add_argument("--train-validation-ratio", type=float, default=0.2, metavar="[FLOAT]",
                         help="The percentage of the training set that will be used to validate"\
                         "the model during training (default: %(default)s)")
+    parser.add_argument("--train-test-ratio", type=float, default=0.2, metavar="[FLOAT]",
+                        help="The percentage of the training set that will be used to test"\
+                        "the model after training (default: %(default)s)")
     parser.add_argument("--learning-rate", type=float, default=0.001, metavar="[FLOAT]",
                         help="The learning rate for the Adam optimizer (default: %(default)s)")
     parser.add_argument("--l2", type=float, default=0.0, metavar="[FLOAT]",
@@ -633,7 +639,7 @@ if __name__ == '__main__':
     parser.add_argument("--verbose", action="store_true", default=False,
                         help="Whether to show extra messages")
     parser.add_argument("--grid-search", action="store_true", default=False,
-                        help="Perform a grid search to find the most optimal parameters")
+                        help="Perform a grid search to find the most optimal hyper parameters")
     parser.add_argument("--outdir", help="Path to output directory")
     parser.add_argument("--num-exp-genes", default=0.01, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
@@ -647,10 +653,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
          args.test_classes, args.log_scale, args.normalization, 
-         args.stratified_loss, args.outdir, args.batch_correction, args.standard_transformation, 
-         args.train_batch_size, args.validation_batch_size, 
+         args.stratified_loss, args.outdir, args.batch_correction, 
+         args.standard_transformation, args.train_batch_size, args.validation_batch_size, 
          args.epochs, args.learning_rate, args.stratified_sampler, 
          args.min_class_size, args.use_cuda, args.num_exp_genes, 
          args.num_exp_spots, args.min_gene_expression, args.verbose,
-         args.hidden_layer_one, args.hidden_layer_two, args.train_validation_ratio, 
+         args.hidden_layer_one, args.hidden_layer_two, 
+         args.train_validation_ratio, args.train_test_ratio,
          args.grid_search, args.activation_function, args.l2)

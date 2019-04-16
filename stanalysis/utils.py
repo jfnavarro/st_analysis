@@ -1,15 +1,17 @@
 import pandas as pd
 import numpy as np
 
-def split_dataset(dataset, labels, split_num=0.8, min_size=50):
-    """Splits a dataset into two using the relative frequency
-    given in split_num, the splitting will be performed by label
+def split_dataset(dataset, labels, vali_split, test_split, min_size=50):
+    """Splits a dataset into three using the relative frequency
+    given in vali_size and test_size. The splitting will be performed by label
     so to ensure that all labels are kept and labels with less
     than min_size elements will be discarded
     """
     train_indexes = list()
+    vali_indexes = list()
     test_indexes = list()
     train_labels = list()
+    vali_labels = list()
     test_labels = list()
     label_indexes = dict()
     # Store indexes for each cluster
@@ -18,19 +20,25 @@ def split_dataset(dataset, labels, split_num=0.8, min_size=50):
             label_indexes[label].append(i)
         except KeyError:
             label_indexes[label] = [i]
-    # Split randomly indexes for each cluster into training and testing sets  
+    # Split randomly indexes for each cluster into training, validation and testing sets  
     for label,indexes in label_indexes.items():
         if len(indexes) >= min_size:
             indexes = np.asarray(indexes)
-            np.random.shuffle(indexes)
-            cut = int(split_num * len(indexes))
-            training, test = indexes[:cut], indexes[cut:]
+            np.random.shuffle(indexes) 
+            n_ele_vali = int(vali_split * len(indexes))
+            n_ele_test = int(test_split * len(indexes))
+            n_ele_train = len(indexes) - (n_ele_vali + n_ele_test)
+            training = indexes[:n_ele_train]
+            validation = indexes[n_ele_train:n_ele_vali]
+            testing = indexes[n_ele_train + n_ele_vali:n_ele_test]
             train_indexes += training.tolist()
-            test_indexes += test.tolist()
+            vali_indexes += validation.tolist()
+            test_indexes += testing.tolist()
             train_labels += [label] * len(training)
-            test_labels += [label] * len(test)
-    # Return the splitted datasets and their labels
-    return dataset.iloc[train_indexes,:], dataset.iloc[test_indexes,:], train_labels, test_labels
+            vali_labels += [label] * len(validation)
+            test_labels += [label] * len(testing)         
+    # Return the split datasets and their labels
+    return dataset.iloc[train_indexes,:], dataset.iloc[vali_indexes,:], dataset.iloc[test_indexes,:], train_labels, vali_labels, test_labels
 
 def filter_classes(dataset, labels, min_size=50):
     """Given a dataset and a list of labels per spot (assuming same order)
