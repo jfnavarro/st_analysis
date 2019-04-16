@@ -40,8 +40,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn import metrics
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.neural_network import MLPClassifier
-from sklearn.ensembl import GradientBoostingClassifier
-from sklearn.ensembl import RandomForestClassifier
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier
 
 from cProfile import label
 
