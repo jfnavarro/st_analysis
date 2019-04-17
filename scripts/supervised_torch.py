@@ -36,7 +36,7 @@ import pandas as pd
 import gc
 import platform
 import random
-
+import copy
 from collections import defaultdict
 
 from stanalysis.preprocessing import *
@@ -505,12 +505,11 @@ def main(train_data,
                             print("Validation set accuracy {}".format(avg_vali_acc))
                             print("Validation set loss (avg) {}".format(avg_vali_loss))
                             
-                        # Keep the parameters of the epoch that gives the best loss
-                        # TODO try accuracy instead
-                        if avg_vali_loss < best_local_loss:
+                        # Keep the parameters of the epoch that gives the best accuracy
+                        if avg_vali_acc > best_local_acc:
                             best_local_acc = avg_vali_acc
                             best_local_loss = avg_vali_loss
-                            best_model_local = model.state_dict()
+                            best_model_local = copy.deepcopy(model.state_dict())
                             counter = 0
                         else:
                             counter += 1
@@ -529,7 +528,7 @@ def main(train_data,
                     print("Testing accuracy {}".format(test_acc))
                     if test_acc > best_acc:
                         best_acc = test_acc
-                        best_model = best_model_local
+                        best_model = copy.deepcopy(best_model_local)
                         best_lr = lr
                         best_bs = (trn_bs, vali_bs)
                         best_h = (h1,h2)

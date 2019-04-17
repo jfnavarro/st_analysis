@@ -382,7 +382,7 @@ if __name__ == '__main__':
                         "rbf = a rbf kernel\n" \
                         "sigmoid = a sigmoid kernel\n" \
                         "(default: %(default)s)")
-    parser.add_argument("--batch-size", type=int, default=1000, metavar="[INT]",
+    parser.add_argument("--batch-size", type=int, default=200, metavar="[INT]",
                         help="The batch size for the Neural Network classifier (default: %(default)s)")
     parser.add_argument("--hidden-layers-size", type=int, nargs="+", metavar="[INT]", default=[1000, 500],
                         help="The sizes of the hidden layers for the Neural Network\n " \
