@@ -274,6 +274,14 @@ def main(train_data,
         outdir = os.getcwd()   
     print("Output folder {}".format(outdir))
     
+    # To ensure reproducibility
+    np.random.seed(SEED)
+    random.seed(SEED)
+    torch.manual_seed(SEED)
+    if use_cuda:
+        torch.cuda.manual_seed(SEED)
+        torch.cuda.manual_seed_all(SEED)
+        
     print("Loading training dataset...")
     train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0, 
                                      engine='c', low_memory=True)
@@ -401,14 +409,6 @@ def main(train_data,
     n_ele_test = vali_counts.shape[0]
     n_class = max(set(train_labels_y)) + 1
 
-    # To ensure reproducibility
-    np.random.seed(SEED)
-    random.seed(SEED)
-    torch.manual_seed(SEED)
-    if use_cuda:
-        torch.cuda.manual_seed(SEED)
-        torch.cuda.manual_seed_all(SEED)
-
     print("CUDA Available: ", torch.cuda.is_available())
     device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
     
@@ -506,7 +506,7 @@ def main(train_data,
                             print("Validation set loss (avg) {}".format(avg_vali_loss))
                             
                         # Keep the parameters of the epoch that gives the best loss/accuracy
-                        if avg_vali_loss < best_local_loss:
+                        if avg_vali_acc > best_local_acc:
                             best_local_acc = avg_vali_acc
                             best_local_loss = avg_vali_loss
                             best_model_local = copy.deepcopy(model.state_dict())
@@ -521,7 +521,7 @@ def main(train_data,
                     # Test the model on the test set
                     model.load_state_dict(best_model_local)
                     _, preds = predict(model, X_test, device)
-                    test_acc = accuracy_score(y_test.cpu().numpy(), preds)
+                    test_acc = accuracy_score(y_test.cpu().numpy(), preds.cpu().numpy())
                           
                     # Check the results to keep the best model
                     print("Best training accuracy {} and loss (avg.) {}".format(best_local_acc, best_local_loss))
@@ -565,7 +565,7 @@ def main(train_data,
     preds = [index_label_map_filtered[np.asscalar(x)] for x in preds.cpu().numpy()]
     if y_pre is not None:
         print("Classification report\n{}".
-              format(classification_report(y_pre, preds)))
+              format(classification_report(y_pre, preds.cpu().numpy())))
         print("Confusion matrix:\n{}".format(confusion_matrix(y_pre, preds)))
     with open(os.path.join(outdir, "predicted_classes.tsv"), "w") as filehandler:
         for spot, pred, probs in zip(test_index, preds, out.cpu().numpy()):
@@ -598,9 +598,9 @@ if __name__ == '__main__':
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "(default: %(default)s)")
-    parser.add_argument("--train-batch-size", type=int, default=500, metavar="[INT]",
+    parser.add_argument("--train-batch-size", type=int, default=200, metavar="[INT]",
                         help="The input batch size for training (default: %(default)s)")
-    parser.add_argument("--validation-batch-size", type=int, default=500, metavar="[INT]",
+    parser.add_argument("--validation-batch-size", type=int, default=200, metavar="[INT]",
                         help="The input batch size for validation (default: %(default)s)")
     parser.add_argument("--epochs", type=int, default=50, metavar="[INT]",
                         help="The number of epochs to train (default: %(default)s)")
