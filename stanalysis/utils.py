@@ -1,6 +1,12 @@
 import pandas as pd
 import numpy as np
 
+def parse_label(filename, min_size):
+    labels = pd.read_table(filename, sep="\t", header=None, index_col=0)
+    labels.columns = ["cluster"]
+    unique_elements, counts_elements = np.unique(labels["cluster"], return_counts=True)
+    return labels[labels["cluster"].isin(unique_elements[counts_elements > min_size])]
+    
 def split_dataset(dataset, labels, vali_split, test_split, min_size=50):
     """Splits a dataset into three using the relative frequency
     given in vali_size and test_size. The splitting will be performed by label

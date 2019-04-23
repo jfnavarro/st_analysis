@@ -497,7 +497,7 @@ def main(train_data,
                         avg_train_loss, avg_training_acc = train(model, trn_loader, optimizer, loss_func, device)
                         # Test the model on the validation set
                         preds, avg_vali_loss = test(model, vali_loader, loss_func, device)
-                        avg_vali_acc = accuracy_score(y_vali.cpu().numpy(), preds)
+                        avg_vali_acc = accuracy_score(y_vali.cpu().numpy(), preds.cpu().numpy())
                         
                         if verbose:
                             print("Training set accuracy {}".format(avg_training_acc))
@@ -597,6 +597,7 @@ if __name__ == '__main__':
                         "DESeq2 = DESeq2::estimateSizeFactors()\n" \
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
+                        "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n" \
                         "(default: %(default)s)")
     parser.add_argument("--train-batch-size", type=int, default=500, metavar="[INT]",
                         help="The input batch size for training (default: %(default)s)")

@@ -122,25 +122,21 @@ def main(train_data,
     print("Output folder {}".format(outdir))
 
     print("Loading training dataset...")
-    train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0,
-                                     engine='c', low_memory=True)
+    train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0, engine='c', low_memory=True)
     train_data_frame = remove_noise(train_data_frame, 1.0, num_exp_spots, min_gene_expression)
     train_genes = list(train_data_frame.columns.values)
 
     # Load all the classes for the training set
-    train_labels_dict = load_labels(train_classes_file)
-    train_data_frame, train_labels = update_labels(train_data_frame, train_labels_dict)
+    train_labels = parse_labels(train_classes_file, min_class_size)
 
     print("Loading prediction dataset...")
-    test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0,
-                                    engine='c', low_memory=True)
+    test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0, engine='c', low_memory=True)
     test_data_frame = remove_noise(test_data_frame, 1.0, num_exp_spots, min_gene_expression)
     test_genes = list(test_data_frame.columns.values)
 
-    # Load all the classes for the prediction set
+    # Load all the classes for the prediction set (if given)
     if test_classes_file is not None:
-        test_labels_dict = load_labels(test_classes_file)
-        test_data_frame, test_labels = update_labels(test_data_frame, test_labels_dict)
+        test_labels = parse_labels(test_classes_file, 0)
 
     # Keep only the record in the training set that intersects with the prediction set
     print("Genes in training set {}".format(train_data_frame.shape[1]))
@@ -189,15 +185,9 @@ def main(train_data,
         train_data_frame = ztransformation(train_data_frame)
         test_data_frame = ztransformation(test_data_frame)
 
-    # Update labels again
-    train_data_frame, train_labels = update_labels(train_data_frame, train_labels_dict)
-    if test_classes_file is not None:
-        test_data_frame, test_labels = update_labels(test_data_frame, test_labels_dict)
-
-    # Discard "noisy" classes
-    print("Removing classes with less than {} elements".format(min_class_size))
-    train_data_frame, train_labels = filter_classes(train_data_frame, train_labels, min_class_size)
-    print("Training set {}".format(train_data_frame.shape[0]))
+    # Sort labels/trainnig data together
+    tran_data_frame = tran_data_frame.loc[train_labels.index,:]
+    train_labels = np.asarray(train_labels["cluster"])
 
     # Get the numpy counts
     train_counts = train_data_frame.astype(np.float32).values
@@ -306,6 +296,7 @@ def main(train_data,
 
     # Compute accuracy
     if test_classes_file is not None:
+        test_labels = np.asarray(test_labels["cluster"])
         print("Classification report\n{}".
               format(metrics.classification_report(test_labels, predicted_class)))
         print("Confusion matrix:\n{}".format(metrics.confusion_matrix(test_labels, predicted_class)))
@@ -349,7 +340,7 @@ if __name__ == '__main__':
                         "DESeq2 = DESeq2::estimateSizeFactors(counts)\n" \
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
-                        "CPM = Each gene count divided by the total count of its spots multiplied by its mean\n" \
+                        "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n" \
                         "(default: %(default)s)")
     parser.add_argument("--epochs", type=int, default=1000, metavar="[INT]",
                         help="The number of epochs to train (default: %(default)s)")
