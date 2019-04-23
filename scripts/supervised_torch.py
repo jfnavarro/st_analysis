@@ -496,7 +496,7 @@ def main(train_data,
                             print("Validation set loss (avg) {}".format(avg_vali_loss))
                             
                         # Keep the parameters of the epoch that gives the best loss/accuracy
-                        if avg_vali_acc > best_local_acc:
+                        if avg_vali_loss < best_local_loss:
                             best_local_acc = avg_vali_acc
                             best_local_loss = avg_vali_loss
                             best_model_local = copy.deepcopy(model.state_dict())
