@@ -555,7 +555,7 @@ def main(train_data,
     preds = [index_label_map[np.asscalar(x)] for x in preds.cpu().numpy()]
     if y_pre is not None:
         print("Classification report\n{}".
-              format(classification_report(y_pre, preds.cpu().numpy())))
+              format(classification_report(y_pre, preds)))
         print("Confusion matrix:\n{}".format(confusion_matrix(y_pre, preds)))
     with open(os.path.join(outdir, "predicted_classes.tsv"), "w") as filehandler:
         for spot, pred, probs in zip(test_index, preds, out.cpu().numpy()):
