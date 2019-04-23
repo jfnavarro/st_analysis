@@ -496,7 +496,7 @@ def main(train_data,
                             print("Validation set loss (avg) {}".format(avg_vali_loss))
                             
                         # Keep the parameters of the epoch that gives the best loss/accuracy
-                        if avg_vali_loss < best_local_loss:
+                        if avg_vali_acc > best_local_acc:
                             best_local_acc = avg_vali_acc
                             best_local_loss = avg_vali_loss
                             best_model_local = copy.deepcopy(model.state_dict())
@@ -555,7 +555,7 @@ def main(train_data,
     preds = [index_label_map[np.asscalar(x)] for x in preds.cpu().numpy()]
     if y_pre is not None:
         print("Classification report\n{}".
-              format(classification_report(y_pre, preds)))
+              format(classification_report(y_pre, preds.cpu().numpy())))
         print("Confusion matrix:\n{}".format(confusion_matrix(y_pre, preds)))
     with open(os.path.join(outdir, "predicted_classes.tsv"), "w") as filehandler:
         for spot, pred, probs in zip(test_index, preds, out.cpu().numpy()):
