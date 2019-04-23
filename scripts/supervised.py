@@ -185,10 +185,15 @@ def main(train_data,
         train_data_frame = ztransformation(train_data_frame)
         test_data_frame = ztransformation(test_data_frame)
 
-    # Sort labels/trainnig data together
-    tran_data_frame = tran_data_frame.loc[train_labels.index,:]
-    train_labels = np.asarray(train_labels["cluster"])
-
+    # Sort labels data together
+    shared_spots = np.intersect1d(train_data_frame.index, train_labels.index)
+    train_data_frame = train_data_frame.loc[shared_spots,:]
+    train_labels = np.asarray(train_labels.loc[shared_spots, ["cluster"]]).ravel()
+    if test_classes_file:
+        shared_spots = np.intersect1d(test_data_frame.index, test_labels.index)
+        test_data_frame = test_data_frame.loc[shared_spots,:]
+        test_labels = np.asarray(test_labels.loc[shared_spots, ["cluster"]]).ravel()
+    
     # Get the numpy counts
     train_counts = train_data_frame.astype(np.float32).values
     del train_data_frame
@@ -296,7 +301,6 @@ def main(train_data,
 
     # Compute accuracy
     if test_classes_file is not None:
-        test_labels = np.asarray(test_labels["cluster"])
         print("Classification report\n{}".
               format(metrics.classification_report(test_labels, predicted_class)))
         print("Confusion matrix:\n{}".format(metrics.confusion_matrix(test_labels, predicted_class)))
@@ -308,7 +312,7 @@ def main(train_data,
 
     # Print the weights for each gene
     pd.DataFrame(data=model.coef_,
-                 index=sorted(set(train_labels)),
+                 index=sorted(set(train_labels.tolist())),
                  columns=intersect_genes).to_csv(os.path.join(outdir,
                                                               "genes_contributions.tsv"),
                                                               sep='\t')

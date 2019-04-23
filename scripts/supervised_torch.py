@@ -274,28 +274,32 @@ def main(train_data,
         outdir = os.getcwd()   
     print("Output folder {}".format(outdir))
     
+    # To ensure reproducibility
+    np.random.seed(SEED)
+    random.seed(SEED)
+    torch.manual_seed(SEED)
+    if use_cuda:
+        torch.cuda.manual_seed(SEED)
+        torch.cuda.manual_seed_all(SEED)
+        
     print("Loading training dataset...")
-    train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0, 
-                                     engine='c', low_memory=True)
+    train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0, engine='c', low_memory=True)
     # Remove noisy genes
     train_data_frame = remove_noise(train_data_frame, 1.0, num_exp_spots, min_gene_expression)
     train_genes = list(train_data_frame.columns.values)
     
     # Load all the classes for the training set
-    train_labels_dict = load_labels(train_classes_file)
-    train_data_frame, train_labels = update_labels(train_data_frame, train_labels_dict)
+    train_labels = parse_labels(train_classes_file, min_class_size)
     
     print("Loading testing dataset...")
-    test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0,
-                                    engine='c', low_memory=True)
+    test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0, engine='c', low_memory=True)
     # Remove noisy genes
     test_data_frame = remove_noise(test_data_frame, 1.0, num_exp_spots, min_gene_expression)
     test_genes = list(test_data_frame.columns.values)
     
     # Load all the classes for the prediction set
     if test_classes_file is not None:
-        test_labels_dict = load_labels(test_classes_file)
-        test_data_frame, test_labels = update_labels(test_data_frame, test_labels_dict)
+        test_labels = parse_labels(test_classes_file, 0)
           
     # Keep only the record in the training set that intersects with the prediction set
     print("Genes in training set {}".format(train_data_frame.shape[1]))
@@ -343,21 +347,15 @@ def main(train_data,
         print("Applying standard transformation...")
         train_data_frame = ztransformation(train_data_frame)
         test_data_frame = ztransformation(test_data_frame)
-        
-    # Update labels again
-    train_data_frame, train_labels = update_labels(train_data_frame, train_labels_dict)
-    if test_classes_file is not None:
-        test_data_frame, test_labels = update_labels(test_data_frame, test_labels_dict)
     
-    # Update labels so to ensure they go for 0-N sequentially
-    labels_index_map = dict()
-    index_label_map = dict()
-    for i,label in enumerate(sorted(set(train_labels))):
-        labels_index_map[label] = i
-        index_label_map[i] = label
-    print("Mapping of labels:")
-    print(index_label_map)
-    train_labels = [labels_index_map[x] for x in train_labels]
+    # Sort labels data together
+    shared_spots = np.intersect1d(train_data_frame.index, train_labels.index)
+    train_data_frame = train_data_frame.loc[shared_spots,:]
+    train_labels = np.asarray(train_labels.loc[shared_spots, ["cluster"]]).ravel()
+    if test_classes_file:
+        shared_spots = np.intersect1d(test_data_frame.index, test_labels.index)
+        test_data_frame = test_data_frame.loc[shared_spots,:]
+        test_labels = np.asarray(test_labels.loc[shared_spots, ["cluster"]]).ravel()
     
     # Split train and test datasets
     print("Validation set ratio {}\nTest set ratio {}".format(train_validation_ratio, train_test_ratio))
@@ -368,18 +366,18 @@ def main(train_data,
                                                                  train_test_ratio,
                                                                  min_class_size)
     
-    # Update the maps of indexes to labels again since some labels may have been removed
-    #TODO this is ugly, a better approach should be implemented
-    labels_index_map_filtered = dict()
-    index_label_map_filtered = dict()
-    for i,label in enumerate(sorted(set(train_labels_y))):
-        labels_index_map_filtered[label] = i
-        index_label_map_filtered[i] = index_label_map[label]
-    print("Mapping of labels (filtered):")
-    print(index_label_map_filtered)
-    train_labels_y = [labels_index_map_filtered[x] for x in train_labels_y]
-    vali_labels_y = [labels_index_map_filtered[x] for x in vali_labels_y] 
-    test_labels_y = [labels_index_map_filtered[x] for x in test_labels_y] 
+    
+    # Update labels so to ensure they go from 0-N sequentially
+    labels_index_map = dict()
+    index_label_map = dict()
+    for i,label in enumerate(sorted(set(train_labels_y + vali_labels_y + test_labels_y))):
+        labels_index_map[label] = i
+        index_label_map[i] = label
+    print("Mapping of labels:")
+    print(index_label_map)
+    train_labels_y = [labels_index_map[x] for x in train_labels_y]
+    vali_labels_y = [labels_index_map[x] for x in vali_labels_y] 
+    test_labels_y = [labels_index_map[x] for x in test_labels_y] 
     
     print("Training set {}".format(train_counts_x.shape[0]))
     print("Validation set {}".format(vali_countx_x.shape[0]))
@@ -400,14 +398,6 @@ def main(train_data,
     n_ele_train = train_counts.shape[0]
     n_ele_test = vali_counts.shape[0]
     n_class = max(set(train_labels_y)) + 1
-
-    # To ensure reproducibility
-    np.random.seed(SEED)
-    random.seed(SEED)
-    torch.manual_seed(SEED)
-    if use_cuda:
-        torch.cuda.manual_seed(SEED)
-        torch.cuda.manual_seed_all(SEED)
 
     print("CUDA Available: ", torch.cuda.is_available())
     device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
@@ -497,7 +487,7 @@ def main(train_data,
                         avg_train_loss, avg_training_acc = train(model, trn_loader, optimizer, loss_func, device)
                         # Test the model on the validation set
                         preds, avg_vali_loss = test(model, vali_loader, loss_func, device)
-                        avg_vali_acc = accuracy_score(y_vali.cpu().numpy(), preds.cpu().numpy())
+                        avg_vali_acc = accuracy_score(y_vali.cpu().numpy(), preds)
                         
                         if verbose:
                             print("Training set accuracy {}".format(avg_training_acc))
@@ -521,7 +511,7 @@ def main(train_data,
                     # Test the model on the test set
                     model.load_state_dict(best_model_local)
                     _, preds = predict(model, X_test, device)
-                    test_acc = accuracy_score(y_test.cpu().numpy(), preds)
+                    test_acc = accuracy_score(y_test.cpu().numpy(), preds.cpu().numpy())
                           
                     # Check the results to keep the best model
                     print("Best training accuracy {} and loss (avg.) {}".format(best_local_acc, best_local_loss))
@@ -562,7 +552,7 @@ def main(train_data,
     y_pre = test_labels if test_classes_file is not None else None
     out, preds = predict(model, X_pre, device)
     # Map labels back to their original value
-    preds = [index_label_map_filtered[np.asscalar(x)] for x in preds.cpu().numpy()]
+    preds = [index_label_map[np.asscalar(x)] for x in preds.cpu().numpy()]
     if y_pre is not None:
         print("Classification report\n{}".
               format(classification_report(y_pre, preds)))
@@ -599,9 +589,9 @@ if __name__ == '__main__':
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n" \
                         "(default: %(default)s)")
-    parser.add_argument("--train-batch-size", type=int, default=500, metavar="[INT]",
+    parser.add_argument("--train-batch-size", type=int, default=200, metavar="[INT]",
                         help="The input batch size for training (default: %(default)s)")
-    parser.add_argument("--validation-batch-size", type=int, default=500, metavar="[INT]",
+    parser.add_argument("--validation-batch-size", type=int, default=200, metavar="[INT]",
                         help="The input batch size for validation (default: %(default)s)")
     parser.add_argument("--epochs", type=int, default=50, metavar="[INT]",
                         help="The number of epochs to train (default: %(default)s)")
