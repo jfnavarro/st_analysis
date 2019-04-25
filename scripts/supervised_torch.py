@@ -324,18 +324,6 @@ def main(train_data,
     test_data_frame = normalize_data(test_data_frame, normalization, 
                                      adjusted_log=normalization == "Scran")
     
-    # Perform batch correction (Batches are training and prediction set)
-    if batch_correction:
-        print("Performing batch correction...")
-        batch_corrected = computeMnnBatchCorrection([b.transpose() for b in 
-                                                     [train_data_frame,test_data_frame]])
-        train_data_frame = batch_corrected[0].transpose()
-        test_data_frame = batch_corrected[1].transpose()
-        train_data_frame.to_csv(os.path.join(outdir, "train_bc_final.tsv"), sep="\t")
-        test_data_frame.to_csv(os.path.join(outdir, "test_bc_final.tsv"), sep="\t")
-        del batch_corrected
-        gc.collect()
-        
     # Log the counts
     if log_scale and not batch_correction and not normalization == "Scran":
         print("Transforming datasets to log space...")
@@ -347,6 +335,18 @@ def main(train_data,
         print("Applying standard transformation...")
         train_data_frame = ztransformation(train_data_frame)
         test_data_frame = ztransformation(test_data_frame)
+        
+    # Perform batch correction (Batches are training and prediction set)
+    if batch_correction:
+        print("Performing batch correction...")
+        batch_corrected = computeMnnBatchCorrection([b.transpose() for b in 
+                                                     [train_data_frame,test_data_frame]])
+        train_data_frame = batch_corrected[0].transpose()
+        test_data_frame = batch_corrected[1].transpose()
+        train_data_frame.to_csv(os.path.join(outdir, "train_bc_final.tsv"), sep="\t")
+        test_data_frame.to_csv(os.path.join(outdir, "test_bc_final.tsv"), sep="\t")
+        del batch_corrected
+        gc.collect()
     
     # Sort labels data together
     shared_spots = np.intersect1d(train_data_frame.index, train_labels.index)
@@ -455,7 +455,7 @@ def main(train_data,
     best_bs = (0,0)
     best_h = (0,0)
     best_l2 = 0
-    PATIENCE = 10
+    PATIENCE = 20
     for lr in learning_rates:
         for l2 in l2s:
             for (trn_bs, vali_bs) in batch_sizes:
