@@ -229,10 +229,7 @@ def main(train_data,
         sys.exit(1)
        
     if normalization == "Scran" and log_scale:
-        sys.stderr.write("Warning, when performing Scran normalization log-scale will be ignored\n")
-     
-    if batch_correction and log_scale:
-        sys.stderr.write("Warning, when performing batch correction log-scale will be ignored\n")
+        sys.stderr.write("Warning, when performing Scran normalization log-scale option will be ignored\n")
                   
     if min_class_size < 0:
         sys.stderr.write("Error, invalid minimum class size\n")
@@ -259,7 +256,7 @@ def main(train_data,
         sys.exit(1)
         
     if num_exp_spots < 0.0 or num_exp_spots > 1.0:
-        sys.stderr.write("Error, invalid number of expressed genes\n")
+        sys.stderr.write("Error, invalid number of expressed spots\n")
         sys.exit(1)
 
     if train_validation_ratio < 0.1 or train_validation_ratio > 0.9:
@@ -324,17 +321,17 @@ def main(train_data,
     test_data_frame = normalize_data(test_data_frame, normalization, 
                                      adjusted_log=normalization == "Scran")
     
-    # Log the counts
-    if log_scale and not batch_correction and not normalization == "Scran":
-        print("Transforming datasets to log space...")
-        train_data_frame = np.log1p(train_data_frame)
-        test_data_frame = np.log1p(test_data_frame)
-        
     # Apply the z-transformation
     if standard_transformation:
         print("Applying standard transformation...")
         train_data_frame = ztransformation(train_data_frame)
         test_data_frame = ztransformation(test_data_frame)
+        
+    # Log the counts
+    if log_scale and not normalization == "Scran":
+        print("Transforming datasets to log space...")
+        train_data_frame = np.log1p(train_data_frame)
+        test_data_frame = np.log1p(test_data_frame)
         
     # Perform batch correction (Batches are training and prediction set)
     if batch_correction:
