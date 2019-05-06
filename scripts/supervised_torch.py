@@ -210,7 +210,11 @@ def main(train_data,
          train_test_ratio,
          grid_search,
          activation_function,
-         l2):
+         l2,
+         num_genes_keep_train, 
+         num_genes_keep_test,
+         top_genes_criteria_train, 
+         top_genes_criteria_test):
 
     if not os.path.isfile(train_data):
         sys.stderr.write("Error, the training data input is not valid\n")
@@ -283,7 +287,6 @@ def main(train_data,
     train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0, engine='c', low_memory=True)
     # Remove noisy genes
     train_data_frame = remove_noise(train_data_frame, 1.0, num_exp_spots, min_gene_expression)
-    train_genes = list(train_data_frame.columns.values)
     
     # Load all the classes for the training set
     train_labels = parse_labels(train_classes_file, min_class_size)
@@ -292,18 +295,36 @@ def main(train_data,
     test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0, engine='c', low_memory=True)
     # Remove noisy genes
     test_data_frame = remove_noise(test_data_frame, 1.0, num_exp_spots, min_gene_expression)
-    test_genes = list(test_data_frame.columns.values)
     
     # Load all the classes for the prediction set
     if test_classes_file is not None:
         test_labels = parse_labels(test_classes_file, 0)
-          
+
+    # Normalize counts
+    print("Normalizing...")
+    train_data_frame = normalize_data(train_data_frame, normalization,
+                                      adjusted_log=normalization == "Scran")
+    
+    test_data_frame = normalize_data(test_data_frame, normalization,
+                                     adjusted_log=normalization == "Scran")
+    
+    # Keep top genes (variance or expressed)
+    train_data_frame = keep_top_genes(train_data_frame, num_genes_keep_train / 100.0, 
+                                      criteria=top_genes_criteria_train)
+    test_data_frame = keep_top_genes(test_data_frame, num_genes_keep_test / 100.0, 
+                                     criteria=top_genes_criteria_test)
+    
+    # Remove noisy spots
+    train_data_frame = remove_noise(train_data_frame, num_exp_genes, 1.0, min_gene_expression)
+    test_data_frame = remove_noise(test_data_frame, num_exp_genes, 1.0, min_gene_expression)
+    
     # Keep only the record in the training set that intersects with the prediction set
     print("Genes in training set {}".format(train_data_frame.shape[1]))
     print("Spots in training set {}".format(train_data_frame.shape[0]))
     print("Genes in testing set {}".format(test_data_frame.shape[1]))
     print("Spots in testing set {}".format(test_data_frame.shape[0]))
-    intersect_genes = np.intersect1d(train_genes, test_genes)
+    intersect_genes = np.intersect1d(train_data_frame.columns.values, 
+                                     test_data_frame.columns.values)
     if len(intersect_genes) == 0:
         sys.stderr.write("Error, there are no genes intersecting the train and test datasets\n")
         sys.exit(1)  
@@ -311,15 +332,6 @@ def main(train_data,
     print("Intersected genes {}".format(len(intersect_genes)))
     train_data_frame = train_data_frame.loc[:,intersect_genes]
     test_data_frame = test_data_frame.loc[:,intersect_genes]
-    
-    # Get the normalized counts (prior removing noisy spot)
-    train_data_frame = remove_noise(train_data_frame, num_exp_genes, 1.0, min_gene_expression)
-    train_data_frame = normalize_data(train_data_frame, normalization,
-                                      adjusted_log=normalization == "Scran")
-    
-    test_data_frame = remove_noise(test_data_frame, num_exp_genes, 1.0, min_gene_expression)
-    test_data_frame = normalize_data(test_data_frame, normalization, 
-                                     adjusted_log=normalization == "Scran")
     
     # Apply the z-transformation
     if standard_transformation:
@@ -637,6 +649,22 @@ if __name__ == '__main__':
     parser.add_argument("--min-gene-expression", default=1, type=float, metavar="[FLOAT]",
                         help="The minimum count a gene must have in a spot to be\n"
                         "considered expressed when filtering (default: %(default)s)")
+    parser.add_argument("--num-genes-keep-train", default=50, metavar="[INT]", type=int, choices=range(0, 99),
+                        help="The percentage of genes to discard from the distribution of all the genes\n" \
+                        "across all the spots using the variance or the top highest expressed\n" \
+                        "(see --top-genes-criteria-train)\n " \
+                        "Low variance or low expressed genes will be discarded (default: %(default)s)")
+    parser.add_argument("--num-genes-keep-test", default=50, metavar="[INT]", type=int, choices=range(0, 99),
+                        help="The percentage of genes to discard from the distribution of all the genes\n" \
+                        "across all the spots using the variance or the top highest expressed\n" \
+                        "(see --top-genes-criteria-test)\n " \
+                        "Low variance or low expressed genes will be discarded (default: %(default)s)")
+    parser.add_argument("--top-genes-criteria-train", default="Variance", metavar="[STR]", 
+                        type=str, choices=["Variance", "TopRanked"],
+                        help="What criteria to use to reduce the number of genes (Variance or TopRanked) (default: %(default)s)")
+    parser.add_argument("--top-genes-criteria-test", default="Variance", metavar="[STR]", 
+                        type=str, choices=["Variance", "TopRanked"],
+                        help="What criteria to use to reduce the number of genes (Variance or TopRanked) (default: %(default)s)")
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
          args.test_classes, args.log_scale, args.normalization, 
@@ -647,4 +675,6 @@ if __name__ == '__main__':
          args.num_exp_spots, args.min_gene_expression, args.verbose,
          args.hidden_layer_one, args.hidden_layer_two, 
          args.train_validation_ratio, args.train_test_ratio,
-         args.grid_search, args.activation_function, args.l2)
+         args.grid_search, args.activation_function, args.l2,
+         args.num_genes_keep_train, args.num_genes_keep_test,
+         args.top_genes_criteria_train, args.top_genes_criteria_test)
