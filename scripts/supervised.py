@@ -123,16 +123,18 @@ def main(train_data,
     print("Output folder {}".format(outdir))
 
     print("Loading training dataset...")
-    train_data_frame = pd.read_table(train_data, sep="\t", header=0, index_col=0, engine='c', low_memory=True)
-    train_data_frame = remove_noise(train_data_frame, 1.0, num_exp_spots, min_gene_expression)
-
+    train_data_frame = pd.read_table(train_data, sep="\t", header=0, 
+                                     index_col=0, engine='c', low_memory=True)
+    train_data_frame = remove_noise(train_data_frame, num_exp_genes, 
+                                    num_exp_spots, min_gene_expression)
     # Load all the classes for the training set
     train_labels = parse_labels(train_classes_file, min_class_size)
 
     print("Loading prediction dataset...")
-    test_data_frame = pd.read_table(test_data, sep="\t", header=0, index_col=0, engine='c', low_memory=True)
-    test_data_frame = remove_noise(test_data_frame, 1.0, num_exp_spots, min_gene_expression)
-
+    test_data_frame = pd.read_table(test_data, sep="\t", header=0, 
+                                    index_col=0, engine='c', low_memory=True)
+    test_data_frame = remove_noise(test_data_frame, num_exp_genes, 
+                                   num_exp_spots, min_gene_expression)
     # Load all the classes for the prediction set (if given)
     if test_classes_file is not None:
         test_labels = parse_labels(test_classes_file, 0)
@@ -150,10 +152,6 @@ def main(train_data,
                                       criteria=top_genes_criteria_train)
     test_data_frame = keep_top_genes(test_data_frame, num_genes_keep_test / 100.0, 
                                      criteria=top_genes_criteria_test)
-    
-    # Remove noisy spots
-    train_data_frame = remove_noise(train_data_frame, num_exp_genes, 1.0, min_gene_expression)
-    test_data_frame = remove_noise(test_data_frame, num_exp_genes, 1.0, min_gene_expression)
     
     # Keep only the record in the training set that intersects with the prediction set
     print("Genes in training set {}".format(train_data_frame.shape[1]))
@@ -320,11 +318,15 @@ def main(train_data,
                                                        "\t".join(['{:.4f}'.format(x) for x in probs.tolist()])))
 
     # Print the weights for each gene
-    pd.DataFrame(data=model.coef_,
-                 index=sorted(set(train_labels.tolist())),
-                 columns=intersect_genes).to_csv(os.path.join(outdir,
-                                                              "genes_contributions.tsv"),
-                                                              sep='\t')
+    try:
+        pd.DataFrame(data=model.coef_,
+                     index=sorted(set(train_labels.tolist())),
+                     columns=intersect_genes).to_csv(os.path.join(outdir,
+                                                                  "genes_contributions.tsv"),
+                                                                  sep='\t')
+    except:
+        sys.stdout.write("Warning, model's weights could not be obtained\n")
+        pass
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
