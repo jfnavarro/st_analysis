@@ -329,17 +329,17 @@ def main(train_data,
     train_data_frame = train_data_frame.loc[:,intersect_genes]
     test_data_frame = test_data_frame.loc[:,intersect_genes]
     
-    # Apply the z-transformation
-    if standard_transformation:
-        print("Applying standard transformation...")
-        train_data_frame = ztransformation(train_data_frame)
-        test_data_frame = ztransformation(test_data_frame)
-        
     # Log the counts
     if log_scale and not normalization == "Scran":
         print("Transforming datasets to log space...")
         train_data_frame = np.log1p(train_data_frame)
         test_data_frame = np.log1p(test_data_frame)
+        
+    # Apply the z-transformation
+    if standard_transformation:
+        print("Applying standard transformation...")
+        train_data_frame = ztransformation(train_data_frame)
+        test_data_frame = ztransformation(test_data_frame)
         
     # Perform batch correction (Batches are training and prediction set)
     if batch_correction:
