@@ -172,7 +172,8 @@ def compute_size_factors(counts, normalization, scran_clusters=True):
     elif normalization in "REL":
         size_factors = counts.sum(axis=0)
     elif normalization in "CPM":
-        size_factors = counts.sum(axis=0) * counts.mean(axis=0)
+        col_sums = counts.sum(axis=0)
+        size_factors = col_sums * np.mean(col_sums)
     elif normalization in "RAW":
         size_factors = 1
     elif normalization in "Scran":

@@ -224,7 +224,7 @@ if __name__ == '__main__':
                         help="The size of the dots (default: %(default)s)")
     parser.add_argument("--color-scale", default="YlOrRd", metavar="[STR]", 
                         type=str, 
-                        choices=["hot", "binary", "hsv", "Greys", "inferno", "YlOrRd", "bwr", "Spectral"],
+                        choices=["hot", "binary", "hsv", "Greys", "inferno", "YlOrRd", "bwr", "Spectral", "Blues"],
                         help="Different color scales (default: %(default)s)")
     parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, 
