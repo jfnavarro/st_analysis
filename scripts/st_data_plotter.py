@@ -59,7 +59,7 @@ def filter_data(counts, num_exp_genes, num_exp_spots, min_gene_expression):
                         min_expression=min_gene_expression)
 
 def compute_plotting_data(counts, names, cutoff_lower, 
-                          cutoff_upper, use_log_scale, use_global_scale):
+                          cutoff_upper, use_global_scale):
     plotting_data = list()
     # counts should be a vector and cutoff should be a percentage (0.0 - 1.0)
     min_gene_exp = counts.quantile(cutoff_lower)
@@ -68,9 +68,8 @@ def compute_plotting_data(counts, names, cutoff_lower,
     print("Using upper cutoff of {} percentile {} of total distribution".format(max_gene_exp, cutoff_upper))
     counts[counts < min_gene_exp] = 0
     counts[counts > max_gene_exp] = 0
-    global_sum = np.log2(counts) if use_log_scale else counts
-    vmin_global = global_sum.min()
-    vmax_global = global_sum.max()
+    vmin_global = counts.min()
+    vmax_global = counts.max()
     for i, name in enumerate(names):
         r = re.compile("^{}_".format(i))
         spots = list(filter(r.match, counts.index))
@@ -81,7 +80,7 @@ def compute_plotting_data(counts, names, cutoff_lower,
             x,y = zip(*map(lambda s: (float(s.split("x")[0].split("_")[1]),
                                       float(s.split("x")[1])), spots))
             # Get the the gene values for each spot
-            rel_sum = np.log2(slice.values + 1) if use_log_scale else slice.values
+            rel_sum = slice.values
             if not rel_sum.any():
                 sys.stdout.write("Warning, the gene given is not expressed in {}\n".format(name))
             vmin = vmin_global if use_global_scale else rel_sum.min() 
@@ -138,6 +137,7 @@ def main(counts_table_files,
          filter_genes,
          outdir,
          use_log_scale,
+         standard_transformation,
          num_exp_genes,
          num_exp_spots,
          min_gene_expression,
@@ -175,6 +175,16 @@ def main(counts_table_files,
     # Normalization
     counts_normalized = normalize(counts_filtered, normalization)
     
+    # Log the counts
+    if use_log_scale:
+        print("Transforming datasets to log space...")
+        counts_normalized = np.log1p(counts_normalized)
+        
+    # Apply the z-transformation
+    if standard_transformation:
+        print("Applying standard transformation...")
+        counts_normalized = ztransformation(counts_normalized)
+        
     # Filter
     counts_final = filter_data_genes(counts_normalized, filter_genes)
     
@@ -185,7 +195,6 @@ def main(counts_table_files,
                                               names, 
                                               cutoff,
                                               cutoff_upper,
-                                              use_log_scale, 
                                               use_global_scale)
                 
         # Create a scatter plot for each dataset
@@ -228,13 +237,16 @@ if __name__ == '__main__':
                         help="Different color scales (default: %(default)s)")
     parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, 
-                        choices=["RAW", "DESeq2", "REL", "Scran"],
+                        choices=["RAW", "DESeq2", "REL", "Scran", "CPM"],
                         help="Normalize the counts using:\n" \
                         "RAW = absolute counts\n" \
                         "DESeq2 = DESeq2::estimateSizeFactors(counts)\n" \
                         "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
+                        "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n" \
                         "(default: %(default)s)")
+    parser.add_argument("--standard-transformation", action="store_true", default=False,
+                        help="Apply the z-score transformation to each feature (gene)")
     parser.add_argument("--show-genes", help="Regular expression for gene symbols to be shown\n" \
                         "The genes matching the reg-exp will be shown in separate files.\n" \
                         "Can be given several times.",
@@ -260,6 +272,7 @@ if __name__ == '__main__':
          args.show_genes,
          args.outdir,
          args.use_log_scale,
+         args.standard_transformation,
          args.num_exp_genes,
          args.num_exp_spots,
          args.min_gene_expression,

@@ -63,3 +63,9 @@ Version 0.5.3
 * improvements in st_data_plotter.py 
 * unsupervised.py can generate multiplots
 * remove color-space plots in unsupervised.py
+
+Version 0.5.5
+* Several improvements in supervised.py
+* Added supervised_torch.py that does NN with PyTorch 
+* Improvements in the normalization and filtering
+* Improvements in st_data_potter.py

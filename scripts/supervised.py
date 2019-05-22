@@ -174,12 +174,6 @@ def main(train_data,
         train_data_frame = np.log1p(train_data_frame)
         test_data_frame = np.log1p(test_data_frame)
         
-    # Apply the z-transformation
-    if standard_transformation:
-        print("Applying standard transformation...")
-        train_data_frame = ztransformation(train_data_frame)
-        test_data_frame = ztransformation(test_data_frame)
-        
     # Perform batch correction (Batches are training and prediction set)
     if batch_correction:
         print("Performing batch correction...")
@@ -192,6 +186,12 @@ def main(train_data,
         del batch_corrected
         gc.collect()
 
+    # Apply the z-transformation
+    if standard_transformation:
+        print("Applying standard transformation...")
+        train_data_frame = ztransformation(train_data_frame)
+        test_data_frame = ztransformation(test_data_frame)
+        
     # Sort labels data together
     shared_spots = np.intersect1d(train_data_frame.index, train_labels.index)
     train_data_frame = train_data_frame.loc[shared_spots,:]
