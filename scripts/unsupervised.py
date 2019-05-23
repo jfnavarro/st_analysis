@@ -50,8 +50,6 @@ def main(counts_table_files,
          clustering, 
          dimensionality, 
          use_log_scale, 
-         alignment_files, 
-         image_files, 
          num_dimensions, 
          spot_size,
          top_genes_criteria,
@@ -69,19 +67,7 @@ def main(counts_table_files,
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
         sys.stderr.write("Error, input file/s not present or invalid format\n")
-        sys.exit(1)
-    
-    if image_files is not None and len(image_files) > 0 and \
-    len(image_files) != len(counts_table_files):
-        sys.stderr.write("Error, the number of images given as " \
-        "input is not the same as the number of datasets\n")
-        sys.exit(1)           
-   
-    if alignment_files is not None and len(alignment_files) > 0 \
-    and len(alignment_files) != len(image_files):
-        sys.stderr.write("Error, the number of alignments given as " \
-        "input is not the same as the number of images\n")
-        sys.exit(1)
+        sys.exit(1)         
 
     if batch_correction is not None and len(batch_correction) > 0 \
     and len(batch_correction) != len(counts_table_files):
@@ -292,13 +278,6 @@ def main(counts_table_files,
         y_points = spot_plot_data[i][1]
         colors_classes = spot_plot_data[i][2]
         colors_dimensionality = spot_plot_data[i][3]
-
-        # Retrieve alignment matrix and image if any
-        image = image_files[i] if image_files is not None else None
-        alignment = alignment_files[i] if alignment_files is not None else None
-        
-        # alignment_matrix will be identity if alignment file is None
-        alignment_matrix = parseAlignmentMatrix(alignment)
         
         # Actually plot the data      
         outfile = os.path.join(outdir,
@@ -308,12 +287,12 @@ def main(counts_table_files,
                      y_points=y_points,
                      colors=colors_classes,
                      output=outfile, 
-                     alignment=alignment_matrix, 
+                     alignment=None, 
                      cmap=None, 
                      title=name, 
                      xlabel=None, 
                      ylabel=None,
-                     image=image, 
+                     image=None, 
                      alpha=1.0, 
                      size=spot_size,
                      n_col=n_col,
@@ -377,16 +356,6 @@ if __name__ == '__main__':
                         "(default: %(default)s)")
     parser.add_argument("--use-log-scale", action="store_true", default=False,
                         help="Use log2(counts + 1) values in the dimensionality reduction step")
-    parser.add_argument("--alignment-files", default=None, nargs='+', type=str,
-                        help="One or more tab delimited files containing and alignment matrix for the images as\n" \
-                        "\t a11 a12 a13 a21 a22 a23 a31 a32 a33\n" \
-                        "Only useful is the image has extra borders, for instance not cropped to the array corners\n" \
-                        "or if you want the keep the original image size in the plots.")
-    parser.add_argument("--image-files", default=None, nargs='+', type=str,
-                        help="When provided the data will plotted on top of the image\n" \
-                        "It can be one ore more, ideally one for each input dataset\n " \
-                        "It is desirable that the image is cropped to the array\n" \
-                        "corners otherwise an alignment file is needed")
     parser.add_argument("--num-dimensions", default=2, metavar="[INT]", type=int, choices=range(2, 100),
                         help="The number of dimensions to use in the dimensionality reduction. (default: %(default)s)")
     parser.add_argument("--spot-size", default=20, metavar="[INT]", type=int, choices=range(1, 100),
@@ -429,8 +398,6 @@ if __name__ == '__main__':
          args.clustering, 
          args.dimensionality, 
          args.use_log_scale, 
-         args.alignment_files, 
-         args.image_files, 
          args.num_dimensions, 
          args.spot_size,
          args.top_genes_criteria,

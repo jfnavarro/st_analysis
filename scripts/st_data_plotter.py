@@ -89,7 +89,7 @@ def compute_plotting_data(counts, names, cutoff_lower,
     return plotting_data
     
 def plot_data(plotting_data, n_col, n_row, dot_size, color_scale,
-              xlim=[1,33], ylim=[1,35], invert=True, colorbar=False):
+              xlim, ylim, invert=False, colorbar=False):
     n_col = min(n_col, len(plotting_data))
     n_row = max(int(len(plotting_data) / n_col), 1)
     fig, ax = plt.subplots(n_row, n_col, figsize=(4*n_col, 4*n_row,)) 
@@ -111,7 +111,8 @@ def plot_data(plotting_data, n_col, n_row, dot_size, color_scale,
         a.set_xlim(xlim)
         a.set_ylim(ylim)
         a.set_aspect('equal')
-        a.invert_yaxis()
+        if invert:
+            a.invert_yaxis()
         a.set_xticks([])
         a.set_yticks([])
         if colorbar:
@@ -142,7 +143,11 @@ def main(counts_table_files,
          num_exp_spots,
          min_gene_expression,
          use_global_scale,
-         num_columns):
+         num_columns,
+         xlim,
+         ylim,
+         invert_y_axes,
+         color_bar):
          
     #TODO add sanity checks for the thresholds..
     
@@ -198,8 +203,8 @@ def main(counts_table_files,
                                               use_global_scale)
                 
         # Create a scatter plot for each dataset
-        fig, ax, sc = plot_data(plotting_data, n_col, n_row, dot_size, 
-                                color_scale, colorbar=True)
+        fig, ax, sc = plot_data(plotting_data, n_col, n_row, dot_size, color_scale,
+                                xlim, ylim, invert_y_axes, color_bar)
     
         # Save the plot
         fig.suptitle(gene, fontsize=16)
@@ -221,10 +226,10 @@ if __name__ == '__main__':
     parser.add_argument("--min-gene-expression", default=1, type=int, metavar="[INT]", choices=range(1, 50),
                         help="The minimum count (number of reads) a gene must have in a spot to be\n"
                         "considered expressed (default: %(default)s)")
-    parser.add_argument("--cutoff", default=0.1, metavar="[FLOAT]", type=float,
+    parser.add_argument("--cutoff", default=0.0, metavar="[FLOAT]", type=float,
                         help="The percentage of reads a gene must have in a spot to be counted from" \
                         "the distribution of reads of the gene across all the spots (0.0 - 1.0) (default: %(default)s)")
-    parser.add_argument("--cutoff-upper", default=0.9, metavar="[FLOAT]", type=float,
+    parser.add_argument("--cutoff-upper", default=1.0, metavar="[FLOAT]", type=float,
                         help="The percentage of reads a gene should not have in a spot to be counted from" \
                         "the distribution of reads of the gene across all the spots (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--data-alpha", type=float, default=1.0, metavar="[FLOAT]",
@@ -233,7 +238,7 @@ if __name__ == '__main__':
                         help="The size of the dots (default: %(default)s)")
     parser.add_argument("--color-scale", default="YlOrRd", metavar="[STR]", 
                         type=str, 
-                        choices=["hot", "binary", "hsv", "Greys", "inferno", "YlOrRd", "bwr", "Spectral", "Blues"],
+                        choices=["hot", "binary", "hsv", "Greys", "inferno", "YlOrRd", "bwr", "Spectral", "coolwarm"],
                         help="Different color scales (default: %(default)s)")
     parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, 
@@ -260,6 +265,14 @@ if __name__ == '__main__':
                         help="Use a global scale instead of a relative scale")
     parser.add_argument("--num-columns", default=1, type=int, metavar="[INT]",
                         help="The number of columns (default: %(default)s)")
+    parser.add_argument("--xlim", default=[1,33], nargs='+', metavar="[FLOAT]", type=float,
+                        help="The x axis limits to have equally sized sub-images (default: %(default)s)")
+    parser.add_argument("--ylim", default=[1,35], nargs='+', metavar="[FLOAT]", type=float,
+                        help="The y axis limits to have equally sized sub-images (default: %(default)s)")
+    parser.add_argument("--invert-y-axes", action="store_true", default=True,
+                        help="Whether to invert the y axes or not (default True)")
+    parser.add_argument("--color-bar", action="store_true", default=True,
+                        help="Whether to show the color bar or not (default True)")
     args = parser.parse_args()
 
     main(args.counts_table_files,
@@ -277,4 +290,8 @@ if __name__ == '__main__':
          args.num_exp_spots,
          args.min_gene_expression,
          args.use_global_scale,
-         args.num_columns)
+         args.num_columns,
+         args.xlim,
+         args.ylim,
+         args.invert_y_axes,
+         args.color_bar)
