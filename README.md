@@ -36,20 +36,9 @@ The referred matrix format is the ST data format, a matrix of counts where spot 
 and the genes are column names. This matrix format (.TSV) is generated with the
 [ST Pipeline](https://github.com/SpatialTranscriptomicsResearch/st_pipeline)
 
-The scripts that allows you to pass the tissue HE image can optionally take a 3x3 alignment file.
-If the images are cropped to the exact array boundaries the alignment file is not needed
-unless you want to plot the image in the original image size. If the image is un-cropped
-then you need the alignment file to convert from spot coordinates to pixel coordinates.
-
-The alignment file should look like :
-
-a11 a12 a13 a21 a22 a23 a31 a32 a33
-
-Where each a correspondonds to a cell of the affine transformation matrix.
-
 ### Installation
 
-We recommend that you install the latest R version 3.4 Once you have installed R you can open
+We recommend that you install the latest R version 3.X Once you have installed R you can open
 a R terminal or Rstudio and type the following:
 
     source("https://bioconductor.org/biocLite.R")
@@ -61,21 +50,12 @@ a R terminal or Rstudio and type the following:
     
 Before you install the ST Analysis package we recommend that you create a Python 3 virtual
 environment. We recommend [Anaconda](https://anaconda.org/anaconda/python).
-The latest versions of rpy2 (R binder for Python) are only compatible with Python 3 and R 3.4 but
-older versions of rpy2 are compatible with Python 2 and older R versions.
+
+The ST Analysis is only computatible with Python 3. 
 
 #### OSX
-The following instructions are for installing the ST Analysis package with Python 3.4 and Anaconda
-(should be the same for Python 3.6)
-Note: we advice to update Xcode to the latest version.
+The following instructions are for installing the ST Analysis package with Python 3.6 and Anaconda
 
-    conda create -n python3.4 python=3.4
-    source activate python3.4
-    brew install freetype
-    brew install gcc
-    export CC=/usr/local/Cellar/gcc/7.2.0/bin/gcc-7
-    pip install rpy2
-    export CC=/usr/bin/clang
     conda install matplotlib
     conda install pandas
     conda install scikit-learn
@@ -84,12 +64,8 @@ Note: we advice to update Xcode to the latest version.
     python setup.py install
 
 #### Linux
-The following instructions are for installing the ST Analysis package with Python 3.4 and Anaconda
-(should be the same for Python 3.6)
-Note: we advice to install and update the developer tools packages
+The following instructions are for installing the ST Analysis package with Python 3.6 and Anaconda
 
-    conda create -n python3.4 python=3.4
-    source activate python3.4
     pip install rpy2
     pip install tzlocal
     conda install matplotlib
@@ -103,25 +79,18 @@ Note: we advice to install and update the developer tools packages
 A bunch of scripts (described behind) will then be available in your system.
 Note that you can always type script_name.py --help to get more information
 about how the script works. 
-The ST Analysis package is compatible with Python 2 and 3 and we recomend to use
-a virtual environment to make the installation of the dependencies easier. 
-
-* NOTE that you will need to activate your Python environment before using any of the tools
-
-        source activate python3.4
 
 ## Analysis tools
 
 ### To do un-supervised learning
 To see how spots cluster together based on their expression profiles you can run:
 
-    unsupervised.py --counts-table-files matrix_counts.tsv --normalization DESeq2 --num-clusters 5 --clustering KMeans --dimensionality tSNE --image-files tissue_image.JPG --use-log-scale 
+    unsupervised.py --counts-table-files matrix_counts.tsv --normalization DESeq2 --num-clusters 5 --clustering KMeans --dimensionality tSNE --use-log-scale 
     
 The script can be given one or serveral datasets (matrices with counts). It will perform dimesionality reduction
-and then cluster the spots together based on the dimesionality reduced coordinates.
+and then cluster the spots together based on the dimesionality reduced space.
 It generates a scatter plot of the clusters. It also generates an image for
-each dataset of the predicted classes on top of the tissue image (tissue image for each dataset must be given and optionally
-an alignment file to convert to pixel coordiantes).
+each dataset of the predicted classes on top of the spots.
 It also generate a file with the predicted classes for each spot that can be used in other analysis.
 To know more about the parameters you can type --help
 
@@ -130,11 +99,11 @@ You can train a classifier with the expression profiles of a set of spots
 where you know the class (spot type) and then predict on a new dataset
 of the same tissue. For that you can use the following script:
 
-    supervised.py --train-data data_matrix.tsv --test-data data_matrix.tsv --train-casses train_classes.txt --test-classes test_classes.txt --image tissue_image.jpg
+    supervised.py --train-data data_matrix.tsv --test-data data_matrix.tsv --train-casses train_classes.txt --test-classes test_classes.txt
     
 This will generate some statistics, a file with the predicted classes for each spot and a plot of
 the predicted spots on top of the tissue image (if the image and the alignment matrix are given).
-The script can take several datasets for the training set and it allows to normalize the training and testing data.
+The script allows for several options for normalization and classification settings and algorithms. 
 The test/train classes file shoud look like:
 
     XxY 1
@@ -146,16 +115,15 @@ spot classes (regions).
 To know more about the parameters you can type --help
 
 ### To visualize ST data (output from the ST Pipeline) 
-Use the script st_data_plotter.py to plot ST data, it can use
-filters (counts) and it can plot only selected genes using regular expressions. 
-You can also normalize the data for visualization.
-You need one or many matrices with the gene counts and spots and optionally
-a tissue image and an alignment matrix for each dataset. A example run would be:
+Use the script st_data_plotter.py to plot ST data, you can use different thresholds and
+filters (counts) and different normalization and visualization options. 
+It plots one image for each gene given in the --show-genes option (one sub-image for each input dataset).
+You need one or many matrices with the spots as rows and the genes as columns. 
 
-    st_data_plotter.py --cutoff 2 --show-genes Actb* --image-files tissue_image.jpg --counts-table-files data_matrix.tsv
+    st_data_plotter.py --cutoff 2 --show-genes Actb --counts-table-files data_matrix.tsv --normalization REL
     
-This will generate a scatter plot of the expression of the spots that contain a gene Actb and
-with higher expression than 2 and it will use the tissue image as background.
+This will generate a scatter plot of the expression of the spots that contain a gene Actb and with higher expression than 2.
+
 More info if you type --help
   
 ### To slice a matrix of counts based of regions of interest
