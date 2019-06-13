@@ -45,11 +45,10 @@ def filter_data_genes(counts, filter_genes):
         genes_to_keep = counts.columns
     # Check that we hit some genes
     if len(genes_to_keep) == 0:
-        sys.stderr.write("Warning, no genes found with the " \
-                         "reg-exps given\n{}\n".format(' '.join([x for x in filter_genes])))
-    else:
-        counts = counts.loc[:,genes_to_keep]
-        counts = counts.loc[(counts!=0).any(axis=1)]
+        raise RuntimeError("No genes found in the datasets from the " \
+                         "list given\n{}\n".format(' '.join([x for x in filter_genes])))
+    counts = counts.loc[:,genes_to_keep]
+    #counts = counts.loc[(counts!=0).any(axis=1)]
     return counts
 
 def filter_data(counts, num_exp_genes, num_exp_spots, min_gene_expression):
@@ -191,7 +190,11 @@ def main(counts_table_files,
         counts_normalized = ztransformation(counts_normalized)
         
     # Filter
-    counts_final = filter_data_genes(counts_normalized, filter_genes)
+    try:
+        counts_final = filter_data_genes(counts_normalized, filter_genes)
+    except RuntimeError as e:
+        sys.stderr.write(str(e) + "\n")
+        sys.exit(1)
     
     # Compute plotting data and plot
     for gene in counts_final.columns:
@@ -257,7 +260,7 @@ if __name__ == '__main__':
                         "Can be given several times.",
                         required=True,
                         type=str,
-                        action='append')
+                        nargs='+')
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     parser.add_argument("--use-log-scale", action="store_true", default=False, 
                         help="Plot expression in log space (log2)")
