@@ -24,6 +24,7 @@ import numpy as np
 import os
 import sys
 from matplotlib.pyplot import plotting
+from scipy.special import loggamma
 
 def normalize(counts, normalization):
     return normalize_data(counts,
@@ -48,8 +49,76 @@ def filter_data_genes(counts, filter_genes):
         raise RuntimeError("No genes found in the datasets from the " \
                          "list given\n{}\n".format(' '.join([x for x in filter_genes])))
     counts = counts.loc[:,genes_to_keep]
-    #counts = counts.loc[(counts!=0).any(axis=1)]
     return counts
+
+# Code snippet taken from Alma Andersson 
+# https://github.com/almaan/STDGE/blob/master/enrich.py
+def log_binom(n,k):
+    """
+    Numerically stable binomial coefficient
+    """
+    n1 = loggamma(n+1)
+    d1 = loggamma(k+1)
+    d2 = loggamma(n-k + 1)
+    return n1 - d1 -d2
+
+# Code snippet taken from Alma Andersson 
+# https://github.com/almaan/STDGE/blob/master/enrich.py
+def fex(target_set, query_set, full_set, alpha=0.05):
+    """
+    Fischer Exact test for 3 sets of genes (target, query and full)
+    """
+    ts = set(target_set)
+    qs = set(query_set)
+    fs = set(full_set)
+    
+    qs_and_ts = qs.intersection(ts)
+    qs_not_ts = qs.difference(ts)
+    ts_not_qs = fs.difference(qs).intersection(ts)
+    not_ts_not_qs = fs.difference(qs).difference(ts)
+    
+    x = np.zeros((2,2))
+    x[0,0] = len(qs_and_ts)
+    x[0,1] = len(qs_not_ts)
+    x[1,0] = len(ts_not_qs)
+    x[1,1] = len(not_ts_not_qs)
+    
+    p1 = log_binom(x[0,:].sum(), x[0,0])
+    p2 = log_binom(x[1,:].sum(),x[1,0])
+    p3 = log_binom(x.sum(), x[:,0].sum())
+
+    return np.exp(p1 + p2 - p3)
+
+# Code snippet taken from Alma Andersson 
+# https://github.com/almaan/STDGE/blob/master/enrich.py
+def select_set(counts, names, mass_proportion):
+    """
+    Select the top G genes which constitutes
+    the fraction (mass_proportion) of the counts
+    using a cumulative sum distribution
+    """    
+    sidx = np.fliplr(np.argsort(counts, axis=1)).astype(int)
+    cumsum = np.cumsum(np.take_along_axis(counts, sidx, axis=1), axis=1)
+    lim = np.max(cumsum, axis=1) * mass_proportion
+    lim = lim.reshape(-1,1)
+    q = np.argmin(cumsum <= lim, axis=1)
+    return [names[sidx[x,0:q[x]]].tolist() for x in range(counts.shape[0])]
+
+# Code snippet taken from Alma Andersson 
+# https://github.com/almaan/STDGE/blob/master/enrich.py
+def enrichment_score(counts, target_set, mass_proportion=0.90):
+    """
+    Computes the enrichment score for all
+    spots (rows) based on a gene set (target)
+    using p-values
+    """
+    query_all = counts.columns.values
+    query_top_list = select_set(counts.values,
+                                query_all,
+                                mass_proportion = mass_proportion)
+    full_set =  query_all.tolist() + target_set
+    pvals = [fex(target_set, q, full_set) for q in query_top_list]
+    return -np.log(np.array(pvals))
 
 def filter_data(counts, num_exp_genes, num_exp_spots, min_gene_expression):
     if num_exp_spots <= 0.0 and num_exp_genes <= 0.0:
@@ -146,7 +215,8 @@ def main(counts_table_files,
          xlim,
          ylim,
          invert_y_axes,
-         color_bar):
+         color_bar,
+         combine_genes):
          
     #TODO add sanity checks for the thresholds..
     
@@ -196,6 +266,22 @@ def main(counts_table_files,
         sys.stderr.write(str(e) + "\n")
         sys.exit(1)
     
+    # Add a column with the combined genes plot
+    if combine_genes in "NaiveMean":
+        genes_in_set = counts_final.columns.tolist()
+        present_genes = (counts_final > 0).sum(axis=1) / len(genes_in_set)
+        means = counts_normalized.mean(axis=1)
+        counts_final = counts_final.assign(Combined=((counts_final.mean(axis=1) / means) * present_genes).values)
+    elif combine_genes in "NaiveSum":
+        genes_in_set = counts_final.columns.tolist()
+        present_genes = (counts_final > 0).sum(axis=1) / len(genes_in_set)
+        sums = counts_normalized.sum(axis=1)
+        counts_final = counts_final.assign(Combined=((counts_final.sum(axis=1) / sums) * present_genes).values)        
+    elif combine_genes in "CumSum":
+        # For the CumSum I need to use all the genes so in order to compute p-values
+        genes_in_set = counts_final.columns.tolist()
+        counts_final = counts_final.assign(Combined=enrichment_score(counts_normalized, genes_in_set))
+        
     # Compute plotting data and plot
     for gene in counts_final.columns:
         print("Plotting gene {}".format(gene))
@@ -276,6 +362,15 @@ if __name__ == '__main__':
                         help="Whether to invert the y axes or not (default True)")
     parser.add_argument("--color-bar", action="store_true", default=True,
                         help="Whether to show the color bar or not (default True)")
+    parser.add_argument("--combine-genes", default="None", metavar="[STR]", 
+                        type=str, 
+                        choices=["None", "NaiveMean", "NaiveSum", "CumSum"],
+                        help="Whether to generate a combined plots with the all the genes:\n" \
+                        "None = do not create combined plot\n" \
+                        "NaiveMean = create combine plot using the mean value of the genes in the spot adjusted by size\n" \
+                        "NaiveMean = create combine plot using the sum value of the genes in the spot adjusted by size\n" \
+                        "CumSum = create combined plot using a cumulative sum of the genes (0.90) and the Fisher test\n" \
+                        "(default: %(default)s)")
     args = parser.parse_args()
 
     main(args.counts_table_files,
@@ -297,4 +392,5 @@ if __name__ == '__main__':
          args.xlim,
          args.ylim,
          args.invert_y_axes,
-         args.color_bar)
+         args.color_bar,
+         args.combine_genes)
