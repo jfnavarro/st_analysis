@@ -368,7 +368,7 @@ if __name__ == '__main__':
                         help="Whether to generate a combined plots with the all the genes:\n" \
                         "None = do not create combined plot\n" \
                         "NaiveMean = create combine plot using the mean value of the genes in the spot adjusted by size\n" \
-                        "NaiveMean = create combine plot using the sum value of the genes in the spot adjusted by size\n" \
+                        "NaiveSum = create combine plot using the sum value of the genes in the spot adjusted by size\n" \
                         "CumSum = create combined plot using a cumulative sum of the genes (0.90) and the Fisher test\n" \
                         "(default: %(default)s)")
     args = parser.parse_args()
