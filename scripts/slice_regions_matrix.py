@@ -40,7 +40,7 @@ def main(counts_matrix, class_file, regions):
     # Get the file name
     base_name = os.path.basename(counts_matrix).split(".")[0]
     # Read the data frame (genes as columns)
-    counts_table = pd.read_table(counts_matrix, sep="\t", header=0, index_col=0)
+    counts_table = pd.read_csv(counts_matrix, sep="\t", header=0, index_col=0)
     # Load the spot classes
     spot_classes = defaultdict(list)
     with open(class_file) as filehandler:

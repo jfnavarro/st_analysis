@@ -38,16 +38,13 @@ import platform
 import random
 import copy
 from collections import defaultdict
-
 from stanalysis.preprocessing import *
 from stanalysis.utils import *
-
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import torch.utils.data as utils
 import torchvision
-
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import classification_report
@@ -191,7 +188,6 @@ def main(train_data,
          normalization,
          stratified_loss,
          outdir, 
-         batch_correction,
          standard_transformation,
          train_batch_size,
          validation_batch_size, 
@@ -231,9 +227,6 @@ def main(train_data,
     if test_classes_file is not None and not os.path.isfile(test_classes_file):
         sys.stderr.write("Error, the test labels input is not valid\n")
         sys.exit(1)
-       
-    if normalization == "Scran" and log_scale:
-        sys.stderr.write("Warning, when performing Scran normalization log-scale option will be ignored\n")
                   
     if min_class_size < 0:
         sys.stderr.write("Error, invalid minimum class size\n")
@@ -284,16 +277,16 @@ def main(train_data,
         torch.cuda.manual_seed_all(SEED)
         
     print("Loading training dataset...")
-    train_data_frame = pd.read_table(train_data, sep="\t", header=0, 
-                                     index_col=0, engine='c', low_memory=True)
+    train_data_frame = pd.read_csv(train_data, sep="\t", header=0, 
+                                   index_col=0, engine='c', low_memory=True)
     train_data_frame = remove_noise(train_data_frame, num_exp_genes, 
                                     num_exp_spots, min_gene_expression)
     # Load all the classes for the training set
     train_labels = parse_labels(train_classes_file, min_class_size)
     
     print("Loading testing dataset...")
-    test_data_frame = pd.read_table(test_data, sep="\t", header=0, 
-                                    index_col=0, engine='c', low_memory=True)
+    test_data_frame = pd.read_csv(test_data, sep="\t", header=0, 
+                                  index_col=0, engine='c', low_memory=True)
     test_data_frame = remove_noise(test_data_frame, num_exp_genes, 
                                    num_exp_spots, min_gene_expression)
     # Load all the classes for the prediction set
@@ -302,11 +295,8 @@ def main(train_data,
 
     # Normalize counts
     print("Normalizing...")
-    train_data_frame = normalize_data(train_data_frame, normalization,
-                                      adjusted_log=normalization == "Scran")
-    
-    test_data_frame = normalize_data(test_data_frame, normalization,
-                                     adjusted_log=normalization == "Scran")
+    train_data_frame = normalize_data(train_data_frame, normalization)
+    test_data_frame = normalize_data(test_data_frame, normalization)
     
     # Keep top genes (variance or expressed)
     train_data_frame = keep_top_genes(train_data_frame, num_genes_keep_train / 100.0, 
@@ -330,22 +320,10 @@ def main(train_data,
     test_data_frame = test_data_frame.loc[:,intersect_genes]
     
     # Log the counts
-    if log_scale and not normalization == "Scran":
+    if log_scale:
         print("Transforming datasets to log space...")
         train_data_frame = np.log1p(train_data_frame)
         test_data_frame = np.log1p(test_data_frame)
-        
-    # Perform batch correction (Batches are training and prediction set)
-    if batch_correction:
-        print("Performing batch correction...")
-        batch_corrected = computeMnnBatchCorrection([b.transpose() for b in 
-                                                     [train_data_frame,test_data_frame]])
-        train_data_frame = batch_corrected[0].transpose()
-        test_data_frame = batch_corrected[1].transpose()
-        train_data_frame.to_csv(os.path.join(outdir, "train_bc_final.tsv"), sep="\t")
-        test_data_frame.to_csv(os.path.join(outdir, "test_bc_final.tsv"), sep="\t")
-        del batch_corrected
-        gc.collect()
     
     # Apply the z-transformation
     if standard_transformation:
@@ -392,11 +370,6 @@ def main(train_data,
     train_counts = train_counts_x.astype(np.float32).values
     vali_counts = vali_countx_x.astype(np.float32).values
     test_counts = test_counts_x.astype(np.float32).values
-    del train_counts_x
-    del vali_countx_x
-    del test_counts_x
-    del train_data_frame
-    gc.collect()
     
     # Input and output sizes
     n_feature = train_counts.shape[1]
@@ -418,10 +391,6 @@ def main(train_data,
     y_train = torch.from_numpy(np.asarray(train_labels_y, dtype=np.longlong))
     y_vali = torch.from_numpy(np.asarray(vali_labels_y, dtype=np.longlong))
     y_test = torch.from_numpy(np.asarray(test_labels_y, dtype=np.longlong))
-    del train_counts
-    del vali_counts
-    del test_counts
-    gc.collect()
     
     # Create tensor datasets (train + test)
     trn_set = utils.TensorDataset(X_train, y_train)
@@ -550,8 +519,6 @@ def main(train_data,
     print("Predicting on test data..")
     predict_counts = test_data_frame.astype(np.float32).values
     test_index = test_data_frame.index
-    del test_data_frame
-    gc.collect()
     
     X_pre = torch.tensor(predict_counts)
     y_pre = test_labels if test_classes_file is not None else None
@@ -580,17 +547,13 @@ if __name__ == '__main__':
                         help="Path to the test classes file (SPOT LABEL)")
     parser.add_argument("--log-scale", action="store_true", default=False,
                         help="Convert the training and test sets to log space (not applied when using batch correction)")
-    parser.add_argument("--batch-correction", action="store_true", default=False,
-                        help="Perform batch-correction (Scran::Mnncorrect()) between train and test sets")
     parser.add_argument("--standard-transformation", action="store_true", default=False,
                         help="Apply the standard transformation to each gene on the train and test sets")
     parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, 
-                        choices=["RAW", "DESeq2",  "REL", "CPM", "Scran"],
+                        choices=["RAW", "REL", "CPM"],
                         help="Normalize the counts using:\n" \
                         "RAW = absolute counts\n" \
-                        "DESeq2 = DESeq2::estimateSizeFactors()\n" \
-                        "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n" \
                         "(default: %(default)s)")
@@ -664,7 +627,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes, 
          args.test_classes, args.log_scale, args.normalization, 
-         args.stratified_loss, args.outdir, args.batch_correction, 
+         args.stratified_loss, args.outdir,
          args.standard_transformation, args.train_batch_size, args.validation_batch_size, 
          args.epochs, args.learning_rate, args.stratified_sampler, 
          args.min_class_size, args.use_cuda, args.num_exp_genes, 

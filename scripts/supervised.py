@@ -9,9 +9,8 @@ The training set will be a matrix with counts (genes as columns and spots as row
 and the test set will be a matrix of counts with the same format
 
 One file with class labels for the training set is needed
-so the classifier knows what class each spot(row) in
-the training set belongs to, the file should
-be tab delimited :
+so the classifier knows what to what class each spot(row) in
+the training set belongs to, the file should be tab delimited :
 
 SPOT_NAME(as it in the matrix) CLASS_NUMBER
 
@@ -31,10 +30,8 @@ import numpy as np
 import pandas as pd
 import pickle
 import gc
-
 from stanalysis.preprocessing import *
 from stanalysis.utils import *
-
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
 from sklearn import metrics
@@ -42,7 +39,6 @@ from sklearn.multiclass import OneVsRestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import RandomForestClassifier
-
 from cProfile import label
 
 def main(train_data,
@@ -52,7 +48,6 @@ def main(train_data,
          log_scale,
          normalization,
          outdir,
-         batch_correction,
          standard_transformation,
          epochs,
          num_exp_genes,
@@ -91,9 +86,6 @@ def main(train_data,
         sys.stderr.write("Error, invalid model file\n")
         sys.exit(1)
 
-    if normalization == "Scran" and log_scale:
-        sys.stderr.write("Warning, when performing Scran normalization log-scale option will be ignored\n")
-
     if epochs < 1:
         sys.stderr.write("Error, number of epoch is too small\n")
         sys.exit(1)
@@ -123,16 +115,16 @@ def main(train_data,
     print("Output folder {}".format(outdir))
 
     print("Loading training dataset...")
-    train_data_frame = pd.read_table(train_data, sep="\t", header=0, 
-                                     index_col=0, engine='c', low_memory=True)
+    train_data_frame = pd.read_csv(train_data, sep="\t", header=0,
+                                   index_col=0, engine='c', low_memory=True)
     train_data_frame = remove_noise(train_data_frame, num_exp_genes, 
                                     num_exp_spots, min_gene_expression)
     # Load all the classes for the training set
     train_labels = parse_labels(train_classes_file, min_class_size)
 
     print("Loading prediction dataset...")
-    test_data_frame = pd.read_table(test_data, sep="\t", header=0, 
-                                    index_col=0, engine='c', low_memory=True)
+    test_data_frame = pd.tSNE(test_data, sep="\t", header=0,
+                              index_col=0, engine='c', low_memory=True)
     test_data_frame = remove_noise(test_data_frame, num_exp_genes, 
                                    num_exp_spots, min_gene_expression)
     # Load all the classes for the prediction set (if given)
@@ -141,11 +133,8 @@ def main(train_data,
     
     # Normalize counts
     print("Normalizing...")
-    train_data_frame = normalize_data(train_data_frame, normalization,
-                                      adjusted_log=normalization == "Scran")
-    
-    test_data_frame = normalize_data(test_data_frame, normalization,
-                                     adjusted_log=normalization == "Scran")
+    train_data_frame = normalize_data(train_data_frame, normalization)
+    test_data_frame = normalize_data(test_data_frame, normalization)
     
     # Keep top genes (variance or expressed)
     train_data_frame = keep_top_genes(train_data_frame, num_genes_keep_train / 100.0, 
@@ -169,22 +158,10 @@ def main(train_data,
     test_data_frame = test_data_frame.loc[:,intersect_genes]
 
     # Log the counts
-    if log_scale and not normalization == "Scran":
+    if log_scale:
         print("Transforming datasets to log space...")
         train_data_frame = np.log1p(train_data_frame)
         test_data_frame = np.log1p(test_data_frame)
-        
-    # Perform batch correction (Batches are training and prediction set)
-    if batch_correction:
-        print("Performing batch correction...")
-        batch_corrected = computeMnnBatchCorrection([b.transpose() for b in
-                                                     [train_data_frame,test_data_frame]])
-        train_data_frame = batch_corrected[0].transpose()
-        test_data_frame = batch_corrected[1].transpose()
-        train_data_frame.to_csv(os.path.join(outdir, "train_bc_final.tsv"), sep="\t")
-        test_data_frame.to_csv(os.path.join(outdir, "test_bc_final.tsv"), sep="\t")
-        del batch_corrected
-        gc.collect()
 
     # Apply the z-transformation
     if standard_transformation:
@@ -203,8 +180,6 @@ def main(train_data,
     
     # Get the numpy counts
     train_counts = train_data_frame.astype(np.float32).values
-    del train_data_frame
-    gc.collect()
 
     class_weight = "balanced" if stratified_sampler else None
     if model_file is None:
@@ -300,8 +275,6 @@ def main(train_data,
     print("Predicting on test data..")
     predict_counts = test_data_frame.astype(np.float32).values
     test_index = test_data_frame.index
-    del test_data_frame
-    gc.collect()
 
     predicted_class = model.predict(predict_counts)
     predicted_prob = model.predict_proba(predict_counts)
@@ -343,17 +316,13 @@ if __name__ == '__main__':
                         help="Path to saved model file to avoid recomputing the model and only predict")
     parser.add_argument("--log-scale", action="store_true", default=False,
                         help="Convert the training and test sets to log space (if no batch correction is performed)")
-    parser.add_argument("--batch-correction", action="store_true", default=False,
-                        help="Perform batch-correction (Scran::Mnncorrect()) between train and test sets")
     parser.add_argument("--standard-transformation", action="store_true", default=False,
                         help="Apply the z-score transformation to each feature (gene)")
     parser.add_argument("--normalization", default="RAW", metavar="[STR]",
                         type=str,
-                        choices=["RAW", "DESeq2", "REL", "CPM", "Scran"],
+                        choices=["RAW", "REL", "CPM"],
                         help="Normalize the counts using:\n" \
                         "RAW = absolute counts\n" \
-                        "DESeq2 = DESeq2::estimateSizeFactors(counts)\n" \
-                        "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n" \
                         "(default: %(default)s)")
@@ -418,7 +387,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args.train_data, args.test_data, args.train_classes,
          args.test_classes, args.log_scale, args.normalization,
-         args.outdir, args.batch_correction, args.standard_transformation,
+         args.outdir, args.standard_transformation,
          args.epochs, args.num_exp_genes, args.num_exp_spots,
          args.min_gene_expression, args.classifier, args.svm_kernel,
          args.batch_size, args.learning_rate, args.stratified_sampler,

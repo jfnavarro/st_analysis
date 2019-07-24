@@ -29,9 +29,7 @@ from scipy.special import loggamma
 def normalize(counts, normalization):
     return normalize_data(counts,
                           normalization,
-                          center=False,
-                          adjusted_log=False,
-                          scran_clusters=False)
+                          center=False)
 
 def filter_data_genes(counts, filter_genes):
     # Extract the list of the genes that must be shown
@@ -304,7 +302,7 @@ def main(counts_table_files,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument("--counts-table-files", required=True, nargs='+', type=str,
+    parser.add_argument("--counts-files", required=True, nargs='+', type=str,
                         help="One or more matrices with gene counts per feature/spot (genes as columns)")
     parser.add_argument("--num-exp-genes", default=0.0, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
@@ -331,11 +329,9 @@ if __name__ == '__main__':
                         help="Different color scales (default: %(default)s)")
     parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, 
-                        choices=["RAW", "DESeq2", "REL", "Scran", "CPM"],
+                        choices=["RAW", "REL", "CPM"],
                         help="Normalize the counts using:\n" \
                         "RAW = absolute counts\n" \
-                        "DESeq2 = DESeq2::estimateSizeFactors(counts)\n" \
-                        "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
                         "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n" \
                         "(default: %(default)s)")
@@ -373,7 +369,7 @@ if __name__ == '__main__':
                         "(default: %(default)s)")
     args = parser.parse_args()
 
-    main(args.counts_table_files,
+    main(args.counts_files,
          args.cutoff,
          args.cutoff_upper,
          args.data_alpha,

@@ -29,7 +29,7 @@ def main(counts_matrix, reg_exps, outfile):
         outfile = "filtered_{}.tsv".format(os.path.basename(counts_matrix).split(".")[0])
     
     # Read the data frame (genes as columns)
-    counts_table = pd.read_table(counts_matrix, sep="\t", header=0, index_col=0)
+    counts_table = pd.read_csv(counts_matrix, sep="\t", header=0, index_col=0)
     genes = counts_table.columns
     # Keep the genes that match any of the reg-exps
     genes = [gene for gene in genes if any([re.fullmatch(regex,gene) for regex in reg_exps])]

@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 """ 
-This script performs Differential Expression Analysis 
-using DESeq2 or Scran + DESeq2 on ST datasets.
+This script performs Differential Expression Analysis using DESeq2 on ST datasets.
 
 The script can take one or several datasets with the following format:
 
@@ -21,27 +20,25 @@ DATASET-DATASET DATASET-DATASET ...
 The script will output the list of up-regulated and down-regulated genes
 for each possible DEA comparison (between tables) as well as a set of volcano plots.
 
-NOTE: soon Monocle and edgeR will be added 
-
 @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
 
 #TODO Add option to do pair-wise comparison
 #TODO Add option to choose random spots for each sample (To save computational time)
+#TODO Add edgeR method as option
 
 import argparse
 import sys
 import os
 import numpy as np
 import pandas as pd
-from stanalysis.normalization import RimportLibrary
-from stanalysis.preprocessing import compute_size_factors, aggregate_datatasets, remove_noise
+from stanalysis.preprocessing import aggregate_datatasets, remove_noise
 from stanalysis.visualization import volcano
-from stanalysis.analysis import deaDESeq2, deaScranDESeq2
+from stanalysis.analysis import deaDESeq2
 import matplotlib.pyplot as plt
     
 def main(counts_table_files, conditions, comparisons, outdir, fdr, 
-         normalization, num_exp_spots, num_exp_genes, min_gene_expression):
+         num_exp_spots, num_exp_genes, min_gene_expression):
 
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
@@ -57,7 +54,9 @@ def main(counts_table_files, conditions, comparisons, outdir, fdr,
     counts = aggregate_datatasets(counts_table_files)
     
     # Remove noisy spots and genes (Spots are rows and genes are columns)
-    counts = remove_noise(counts, num_exp_genes / 100.0, num_exp_spots / 100.0, 
+    counts = remove_noise(counts, 
+                          num_exp_genes / 100.0, 
+                          num_exp_spots / 100.0, 
                           min_expression=min_gene_expression)
     
     # Get the comparisons as tuples
@@ -92,20 +91,14 @@ def main(counts_table_files, conditions, comparisons, outdir, fdr,
     print("Doing DEA for the comparisons {} with {} spots and {} genes".format(comparisons,
                                                                               len(counts.index), 
                                                                               len(counts.columns)))
-    # Print the DE 
-    counts.to_csv(os.path.join(outdir, "merged_matrix.tsv"), sep="\t")
     
     # Spots as columns 
     counts = counts.transpose()
     
     # DEA call
     try:
-        if normalization in "DESeq2":
-            dea_results = deaDESeq2(counts, conds, comparisons, 
-                                    alpha=fdr, size_factors=None)
-        else:
-            dea_results = deaScranDESeq2(counts, conds, comparisons, 
-                                         alpha=fdr, scran_clusters=False)
+        dea_results = deaDESeq2(counts, conds, comparisons,
+                                alpha=fdr, size_factors=None)
     except Exception as e:
         sys.stderr.write("Error while performing DEA " + str(e) + "\n")
         sys.exit(1)
@@ -130,15 +123,8 @@ def main(counts_table_files, conditions, comparisons, outdir, fdr,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument("--counts-table-files", required=True, nargs='+', type=str,
-                        help="One or more matrices with gene counts per feature/spot (genes as columns)")
-    parser.add_argument("--normalization", default="DESeq2", metavar="[STR]", 
-                        type=str, 
-                        choices=["DESeq2", "Scran"],
-                        help="Normalize the counts using:\n" \
-                        "DESeq2 = DESeq2::estimateSizeFactors(counts)\n" \
-                        "Scran = Deconvolution Sum Factors (Marioni et al)\n" \
-                        "(default: %(default)s)")
+    parser.add_argument("--counts-files", required=True, nargs='+', type=str,
+                        help="One or more matrices with gene counts per spot (genes as columns)")
     parser.add_argument("--conditions", required=True, nargs='+', type=str,
                         help="One of more tuples that represent what conditions to give to each dataset.\n" \
                         "The notation is simple: DATASET:CONDITION DATASET:CONDITION ...\n" \
@@ -160,6 +146,5 @@ if __name__ == '__main__':
                         help="The FDR minimum confidence threshold (default: %(default)s)")
     parser.add_argument("--outdir", help="Path to output dir")
     args = parser.parse_args()
-    main(args.counts_table_files, args.conditions, args.comparisons, args.outdir,
-         args.fdr, args.normalization, args.num_exp_spots, args.num_exp_genes, 
-         args.min_gene_expression)
+    main(args.counts_files, args.conditions, args.comparisons, args.outdir,
+         args.fdr, args.num_exp_spots, args.num_exp_genes, args.min_gene_expression)

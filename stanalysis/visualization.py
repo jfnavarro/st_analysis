@@ -133,9 +133,9 @@ def grid_plot(x_points, y_points, colors, output=None, alignment=None):
  
 def scatter_plot(x_points, y_points, output=None, colors=None,
                  alignment=None, cmap=None, title='Scatter', xlabel='X', 
-                 ylabel='Y', image=None, alpha=1.0, size=10, 
+                 ylabel='Y', image=None, alpha=1.0, size=20, 
                  show_legend=True, show_color_bar=False, 
-                 vmin=None, vmax=None, n_col=1, n_row=1, n_index=1):
+                 vmin=None, vmax=None, n_col=1, n_row=1, invert_y=True, n_index=1):
     """ 
     This function makes a scatter plot of a set of points (x,y).
     The alignment matrix is optional to transform the coordinates
@@ -210,6 +210,8 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
         a.legend([plt.Line2D((0,1),(0,0), color=x) for x in color_values], 
                  unique_colors, loc="upper right", markerscale=1.0, 
                  ncol=1, scatterpoints=1, fontsize=5)
+    if invert_y:
+        a.invert_yaxis()
     # Add color bar
     if colors is not None and show_color_bar:
         plt.colorbar(sc)

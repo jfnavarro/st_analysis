@@ -7,12 +7,12 @@ import numpy as np
 import pandas as pd
 import math
 import os
-from stanalysis.normalization import *
 from sklearn.preprocessing import StandardScaler
 
 def ztransformation(counts):
-    """ Applies a simple z-score transformation
-    which consists of substracting to each count 
+    """ Applies a simple z-score transformation to 
+    a ST data frame (genes as columns)
+    which consists in substracting to each count 
     the mean of its column (gene) and then divide it by its
     the standard deviation
     """
@@ -35,13 +35,15 @@ def aggregate_datatasets(counts_table_files, add_index=True):
     :return: a Pandas data frame with the merged data frames
     """
     if len(counts_table_files) == 1:
-        return pd.read_csv(counts_table_files[0], sep="\t", header=0, index_col=0)
+        return pd.read_csv(counts_table_files[0], sep="\t", 
+                           header=0, index_col=0, engine='c', low_memory=True)
     # Spots are rows and genes are columns
     counts = pd.DataFrame()
     for i,counts_file in enumerate(counts_table_files):
         if not os.path.isfile(counts_file):
             raise IOError("Error parsing data frame", "Invalid input file")
-        new_counts = pd.read_csv(counts_file, sep="\t", header=0, index_col=0)
+        new_counts = pd.read_csv(counts_file, sep="\t", 
+                                 header=0, index_col=0, engine='c', low_memory=True)
         # Append dataset index to the spots (indexes) so they can be traced
         if add_index:
             new_spots = ["{0}_{1}".format(i, spot) for spot in new_counts.index]
@@ -54,7 +56,7 @@ def aggregate_datatasets(counts_table_files, add_index=True):
   
 def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=1):
     """This functions remove noisy genes and spots 
-    for a given data frame (Genes as columns and spots as rows).
+    for a given ST data frame (Genes as columns and spots as rows).
     - The noisy spots are removed so to keep a percentage
     of the total distribution of spots whose gene counts >= min_expression
     The percentage is given as a parameter (0.0-1.0).
@@ -135,68 +137,33 @@ def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
     print("Dropped {} genes".format(num_genes - len(counts.index)))
     return counts.transpose()
 
-def correct_batch_effects(counts, batch_correction):
-    """Function to perform batch correction using a list
-    of datasets and a list of batch identifiers (one per dataset)
+def compute_size_factors(counts, normalization):
+    """ Helper function to compute normalization size factors
     """
-    # Split and aggregate datasets by batches
-    batches = {batch:pd.DataFrame() for batch in batch_correction}
-    for index, batch in enumerate(batch_correction):
-        slice = counts[counts.index.str.contains("{}_".format(index))]
-        batches[batch] = batches[batch].append(slice)
-    # Transpose all batches to have genes as rows
-    batches = [b.transpose() for b in batches.values()]
-    # Make the batch correction
-    split_corrected_data = computeMnnBatchCorrection(batches)
-    # Transpose all the corrected batches to have genes as columns
-    split_corrected_data = [b.transpose() for b in split_corrected_data]
-    # Aggregate corrected batches back
-    merged_counts = pd.DataFrame()
-    for new_counts in split_corrected_data:
-        merged_counts = merged_counts.append(new_counts)
-    # Replace Nan and Inf by zeroes
-    merged_counts.replace([np.inf, -np.inf], np.nan)
-    merged_counts.fillna(0.0, inplace=True)
-    return counts
-
-def compute_size_factors(counts, normalization, scran_clusters=True):
-    """ Helper function to compute normalization
-    size factors"""
     counts = counts.transpose()
-    if normalization in "DESeq2":
-        size_factors = computeSizeFactors(counts)
-    elif normalization in "TMM":
-        size_factors = computeTMMFactors(counts)
-    elif normalization in "RLE":
-        size_factors = computeRLEFactors(counts)
-    elif normalization in "REL":
+    if normalization in "REL":
         size_factors = counts.sum(axis=0)
     elif normalization in "CPM":
         col_sums = counts.sum(axis=0)
         size_factors = col_sums * np.mean(col_sums)
     elif normalization in "RAW":
         size_factors = 1
-    elif normalization in "Scran":
-        size_factors = computeSumFactors(counts, scran_clusters)
     else:
         raise RunTimeError("Error, incorrect normalization method\n")   
     return size_factors
 
-def normalize_data(counts, normalization, center=False, 
-                   adjusted_log=False, scran_clusters=True):
+def normalize_data(counts, normalization, center=False):
     """This functions takes a data frame as input
     with ST data (genes as columns and spots as rows) and 
     returns a data frame with the normalized counts using
     different methods.
     :param counts: a data frame with the counts
-    :param normalization: the normalization method to use
+    :param normalization: the normalization method to use (RAW, REL or CPM)
     :param center: if True the size factors will be centered by their mean
-    :param adjusted_log: return adjusted logged normalized counts if True
-    :param scran_clusters: performs clustering for cell pooling in Scran
     :return: a Pandas data frame with the normalized counts (genes as columns)
     """
     # Compute the size factors
-    size_factors = compute_size_factors(counts, normalization, scran_clusters)
+    size_factors = compute_size_factors(counts, normalization)
     if np.all(size_factors == 1.0):
         return counts
     if np.isnan(size_factors).any() or np.isinf(size_factors).any() \
@@ -208,12 +175,9 @@ def normalize_data(counts, normalization, center=False,
         size_factors = size_factors[valid]
     # Spots as columns and genes as rows
     counts = counts.transpose()
-    # Center and/or adjust log the size_factors and counts
+    # Center size factors if requested
     if center: 
         size_factors = size_factors - np.mean(size_factors)
-    if adjusted_log:
-        norm_counts = logCountsWithFactors(counts, size_factors)
-    else:
-        norm_counts = counts / size_factors
+    norm_counts = counts / size_factors
     # return normalize counts (genes as columns)
     return norm_counts.transpose()
