@@ -156,8 +156,6 @@ def compute_plotting_data(counts, names, cutoff_lower,
     
 def plot_data(plotting_data, n_col, n_row, dot_size, color_scale,
               xlim, ylim, invert=False, colorbar=False):
-    n_col = min(n_col, len(plotting_data))
-    n_row = max(int(len(plotting_data) / n_col), 1)
     fig, ax = plt.subplots(n_row, n_col, figsize=(4*n_col, 4*n_row,)) 
     fig.subplots_adjust(left = 0.1, 
                         right = 0.9,
