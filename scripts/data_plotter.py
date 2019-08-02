@@ -12,117 +12,20 @@ It allows to apply different thresholds
 
 It allows to plot multiple genes (one plot per gene)
 
+It allows to plot combined gene sets
+
 @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
 
 import argparse
-import re
 from matplotlib import pyplot as plt
 from stanalysis.preprocessing import *
+from stanalysis.analysis import *
 import pandas as pd
 import numpy as np
 import os
 import sys
 from matplotlib.pyplot import plotting
-from scipy.special import loggamma
-
-def normalize(counts, normalization):
-    return normalize_data(counts,
-                          normalization,
-                          center=False)
-
-def filter_data_genes(counts, filter_genes):
-    # Extract the list of the genes that must be shown
-    genes_to_keep = list()
-    if filter_genes:
-        for gene in counts.columns:
-            for regex in filter_genes:
-                if re.fullmatch(regex, gene):
-                    genes_to_keep.append(gene)
-                    break                         
-    else: 
-        genes_to_keep = counts.columns
-    # Check that we hit some genes
-    if len(genes_to_keep) == 0:
-        raise RuntimeError("No genes found in the datasets from the " \
-                         "list given\n{}\n".format(' '.join([x for x in filter_genes])))
-    counts = counts.loc[:,genes_to_keep]
-    return counts
-
-# Code snippet taken from Alma Andersson 
-# https://github.com/almaan/STDGE/blob/master/enrich.py
-def log_binom(n,k):
-    """
-    Numerically stable binomial coefficient
-    """
-    n1 = loggamma(n+1)
-    d1 = loggamma(k+1)
-    d2 = loggamma(n-k + 1)
-    return n1 - d1 -d2
-
-# Code snippet taken from Alma Andersson 
-# https://github.com/almaan/STDGE/blob/master/enrich.py
-def fex(target_set, query_set, full_set, alpha=0.05):
-    """
-    Fischer Exact test for 3 sets of genes (target, query and full)
-    """
-    ts = set(target_set)
-    qs = set(query_set)
-    fs = set(full_set)
-    
-    qs_and_ts = qs.intersection(ts)
-    qs_not_ts = qs.difference(ts)
-    ts_not_qs = fs.difference(qs).intersection(ts)
-    not_ts_not_qs = fs.difference(qs).difference(ts)
-    
-    x = np.zeros((2,2))
-    x[0,0] = len(qs_and_ts)
-    x[0,1] = len(qs_not_ts)
-    x[1,0] = len(ts_not_qs)
-    x[1,1] = len(not_ts_not_qs)
-    
-    p1 = log_binom(x[0,:].sum(), x[0,0])
-    p2 = log_binom(x[1,:].sum(),x[1,0])
-    p3 = log_binom(x.sum(), x[:,0].sum())
-
-    return np.exp(p1 + p2 - p3)
-
-# Code snippet taken from Alma Andersson 
-# https://github.com/almaan/STDGE/blob/master/enrich.py
-def select_set(counts, names, mass_proportion):
-    """
-    Select the top G genes which constitutes
-    the fraction (mass_proportion) of the counts
-    using a cumulative sum distribution
-    """    
-    sidx = np.fliplr(np.argsort(counts, axis=1)).astype(int)
-    cumsum = np.cumsum(np.take_along_axis(counts, sidx, axis=1), axis=1)
-    lim = np.max(cumsum, axis=1) * mass_proportion
-    lim = lim.reshape(-1,1)
-    q = np.argmin(cumsum <= lim, axis=1)
-    return [names[sidx[x,0:q[x]]].tolist() for x in range(counts.shape[0])]
-
-# Code snippet taken from Alma Andersson 
-# https://github.com/almaan/STDGE/blob/master/enrich.py
-def enrichment_score(counts, target_set, mass_proportion=0.90):
-    """
-    Computes the enrichment score for all
-    spots (rows) based on a gene set (target)
-    using p-values
-    """
-    query_all = counts.columns.values
-    query_top_list = select_set(counts.values,
-                                query_all,
-                                mass_proportion = mass_proportion)
-    full_set =  query_all.tolist() + target_set
-    pvals = [fex(target_set, q, full_set) for q in query_top_list]
-    return -np.log(np.array(pvals))
-
-def filter_data(counts, num_exp_genes, num_exp_spots, min_gene_expression):
-    if num_exp_spots <= 0.0 and num_exp_genes <= 0.0:
-        return counts
-    return remove_noise(counts, num_exp_genes, num_exp_spots,
-                        min_expression=min_gene_expression)
 
 def compute_plotting_data(counts, names, cutoff_lower, 
                           cutoff_upper, use_global_scale):
@@ -137,13 +40,14 @@ def compute_plotting_data(counts, names, cutoff_lower,
     vmin_global = counts.min()
     vmax_global = counts.max()
     for i, name in enumerate(names):
-        r = re.compile("^{}_".format(i))
-        spots = list(filter(r.match, counts.index))
+        r = re.compile("^{}_".format(i + 1))
+        # Filter spot by index (section) unless only one section is given
+        spots = list(filter(r.match, counts.index)) if len(names) > 1 else counts.index
         if len(spots) > 0:
             # Compute the expressions for each spot
             # as the sum of the counts above threshold
             slice = counts.reindex(spots)
-            x,y = zip(*map(lambda s: (float(s.split("x")[0].split("_")[1]),
+            x,y = zip(*map(lambda s: (float(s.split("x")[0].split("_")[1] if len(names) > 1 else s.split("x")[0]),
                                       float(s.split("x")[1])), spots))
             # Get the the gene values for each spot
             rel_sum = slice.values
@@ -154,9 +58,9 @@ def compute_plotting_data(counts, names, cutoff_lower,
             plotting_data.append((x,y,rel_sum,vmin,vmax,name))
     return plotting_data
     
-def plot_data(plotting_data, n_col, n_row, dot_size, color_scale,
-              xlim, ylim, invert=False, colorbar=False):
-    fig, ax = plt.subplots(n_row, n_col, figsize=(4*n_col, 4*n_row,)) 
+def plot_data(plotting_data, n_col, n_row, dot_size, data_alpha,
+              color_scale, xlim, ylim, invert=False, colorbar=False):
+    fig, ax = plt.subplots(n_row, n_col, figsize=(5*n_col, 5*n_row,)) 
     fig.subplots_adjust(left = 0.1, 
                         right = 0.9,
                         bottom = 0.1,
@@ -170,6 +74,7 @@ def plot_data(plotting_data, n_col, n_row, dot_size, color_scale,
         s = a.scatter(data[0], data[1], s=dot_size,
                       cmap=plt.get_cmap(color_scale),
                       c=data[2], edgecolor="none",
+                      alpha=data_alpha,
                       vmin=data[3], vmax=data[4])
         a.set_title(data[5])
         a.set_xlim(xlim)
@@ -210,8 +115,8 @@ def main(counts_table_files,
          num_columns,
          xlim,
          ylim,
-         invert_y_axes,
-         color_bar,
+         disable_invert_y_axes,
+         disable_color_bar,
          combine_genes):
          
     #TODO add sanity checks for the thresholds..
@@ -220,7 +125,15 @@ def main(counts_table_files,
     any([not os.path.isfile(f) for f in counts_table_files]):
         sys.stderr.write("Error, input file/s not present or invalid format\n")
         sys.exit(1)
-    
+        
+    if num_exp_genes < 0 or num_exp_genes > 1:
+        sys.stderr.write("Error, invalid number of expressed genes \n")
+        sys.exit(1)
+         
+    if num_exp_spots < 0 or num_exp_spots > 1:
+        sys.stderr.write("Error, invalid number of expressed genes \n")
+        sys.exit(1)
+        
     if outdir is None or not os.path.isdir(outdir): 
         outdir = os.getcwd()
     outdir = os.path.abspath(outdir)
@@ -288,8 +201,8 @@ def main(counts_table_files,
                                               use_global_scale)
                 
         # Create a scatter plot for each dataset
-        fig, ax, sc = plot_data(plotting_data, n_col, n_row, dot_size, color_scale,
-                                xlim, ylim, invert_y_axes, color_bar)
+        fig, ax, sc = plot_data(plotting_data, n_col, n_row, dot_size, data_alpha, color_scale,
+                                xlim, ylim, not disable_invert_y_axes, not disable_color_bar)
     
         # Save the plot
         fig.suptitle(gene, fontsize=16)
@@ -338,7 +251,8 @@ if __name__ == '__main__':
     parser.add_argument("--show-genes", help="Regular expression for gene symbols to be shown\n" \
                         "The genes matching the reg-exp will be shown in separate files.\n" \
                         "Can be given several times.",
-                        required=True,
+                        required=False,
+                        default=None,
                         type=str,
                         nargs='+')
     parser.add_argument("--outdir", default=None, help="Path to output dir")
@@ -352,10 +266,10 @@ if __name__ == '__main__':
                         help="The x axis limits to have equally sized sub-images (default: %(default)s)")
     parser.add_argument("--ylim", default=[1,35], nargs='+', metavar="[FLOAT]", type=float,
                         help="The y axis limits to have equally sized sub-images (default: %(default)s)")
-    parser.add_argument("--invert-y-axes", action="store_true", default=True,
-                        help="Whether to invert the y axes or not (default True)")
-    parser.add_argument("--color-bar", action="store_true", default=True,
-                        help="Whether to show the color bar or not (default True)")
+    parser.add_argument("--disable-invert-y-axes", action="store_true", default=False,
+                        help="Whether to disable the invert of the y axes or not (default True)")
+    parser.add_argument("--disable-color-bar", action="store_true", default=False,
+                        help="Whether to disable the color bar or not (default True)")
     parser.add_argument("--combine-genes", default="None", metavar="[STR]", 
                         type=str, 
                         choices=["None", "NaiveMean", "NaiveSum", "CumSum"],
@@ -385,6 +299,6 @@ if __name__ == '__main__':
          args.num_columns,
          args.xlim,
          args.ylim,
-         args.invert_y_axes,
-         args.color_bar,
+         args.disable_invert_y_axes,
+         args.disable_color_bar,
          args.combine_genes)

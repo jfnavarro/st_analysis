@@ -123,8 +123,8 @@ def main(train_data,
     train_labels = parse_labels(train_classes_file, min_class_size)
 
     print("Loading prediction dataset...")
-    test_data_frame = pd.tSNE(test_data, sep="\t", header=0,
-                              index_col=0, engine='c', low_memory=True)
+    test_data_frame = pd.read_csv(test_data, sep="\t", header=0,
+                                  index_col=0, engine='c', low_memory=True)
     test_data_frame = remove_noise(test_data_frame, num_exp_genes, 
                                    num_exp_spots, min_gene_expression)
     # Load all the classes for the prediction set (if given)

@@ -8,7 +8,37 @@ import pandas as pd
 import math
 import os
 from sklearn.preprocessing import StandardScaler
+import re
 
+def normalize(counts, normalization):
+    return normalize_data(counts,
+                          normalization,
+                          center=False)
+
+def filter_data_genes(counts, filter_genes):
+    # Extract the list of the genes that must be shown
+    genes_to_keep = list()
+    if filter_genes:
+        for gene in counts.columns:
+            for regex in filter_genes:
+                if re.fullmatch(regex, gene):
+                    genes_to_keep.append(gene)
+                    break                         
+    else: 
+        genes_to_keep = counts.columns
+    # Check that we hit some genes
+    if len(genes_to_keep) == 0:
+        raise RuntimeError("No genes found in the datasets from the " \
+                         "list given\n{}\n".format(' '.join([x for x in filter_genes])))
+    counts = counts.loc[:,genes_to_keep]
+    return counts
+
+def filter_data(counts, num_exp_genes, num_exp_spots, min_gene_expression):
+    if num_exp_spots <= 0.0 and num_exp_genes <= 0.0:
+        return counts
+    return remove_noise(counts, num_exp_genes, num_exp_spots,
+                        min_expression=min_gene_expression)
+    
 def ztransformation(counts):
     """ Applies a simple z-score transformation to 
     a ST data frame (genes as columns)
@@ -46,7 +76,7 @@ def aggregate_datatasets(counts_table_files, add_index=True):
                                  header=0, index_col=0, engine='c', low_memory=True)
         # Append dataset index to the spots (indexes) so they can be traced
         if add_index:
-            new_spots = ["{0}_{1}".format(i, spot) for spot in new_counts.index]
+            new_spots = ["{0}_{1}".format(i + 1, spot) for spot in new_counts.index]
             new_counts.index = new_spots
         counts = counts.append(new_counts, sort=True)
     # Replace Nan and Inf by zeroes
@@ -99,38 +129,40 @@ def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=
     
     return counts 
     
-def keep_top_genes(counts, num_genes_keep, criteria="Variance"):
+def keep_top_genes(counts, num_genes_discard, criteria="Variance"):
     """ This function takes a data frame
     with ST data (Genes as columns and spots as rows)
     and returns a new data frame where only the top
     genes are kept by using the variance or the total count.
     :param counts: a data frame with the counts
-    :param num_genes_keep: the % (1-100) of genes to keep
+    :param num_genes_discard: the % (1-100) of genes to keep
     :param criteria: the criteria used to select ("Variance or "TopRanked")
     :return: a new data frame with only the top ranked genes. 
     """
+    if num_genes_discard <= 0:
+        return counts
     # Spots as columns and genes as rows
     counts = counts.transpose()
     # Keep only the genes with higher over-all variance
     num_genes = len(counts.index)
-    print("Removing {}% of genes based on the {}".format(num_genes_keep * 100, criteria))
+    print("Removing {}% of genes based on the {}".format(num_genes_discard * 100, criteria))
     if criteria == "Variance":
         var = counts.var(axis=1)
-        min_genes_spot_var = var.quantile(num_genes_keep)
+        min_genes_spot_var = var.quantile(num_genes_discard)
         if math.isnan(min_genes_spot_var):
             print("Computed variance is NaN! Check your normalization factors..")
         else:
             print("Min normalized variance a gene must have over all spots " \
-            "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_var))
+            "to be kept ({0}% of total) {1}".format(num_genes_discard, min_genes_spot_var))
             counts = counts[var >= min_genes_spot_var]
     elif criteria == "TopRanked":
         sum = counts.sum(axis=1)
-        min_genes_spot_sum = sum.quantile(num_genes_keep)
+        min_genes_spot_sum = sum.quantile(num_genes_discard)
         if math.isnan(min_genes_spot_var):
             print("Computed sum is NaN! Check your normalization factors..")
         else:
             print("Min normalized total count a gene must have over all spots " \
-            "to be kept ({0}% of total) {1}".format(num_genes_keep, min_genes_spot_sum))
+            "to be kept ({0}% of total) {1}".format(num_genes_discard, min_genes_spot_sum))
             counts = counts[sum >= min_genes_spot_var]
     else:
         raise RunTimeError("Error, incorrect criteria method\n")  
