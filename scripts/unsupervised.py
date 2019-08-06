@@ -27,6 +27,7 @@ from sklearn.decomposition import PCA, FastICA, SparsePCA, FactorAnalysis
 from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering
 from sklearn.mixture import GaussianMixture
 from sklearn.manifold import TSNE
+import umap
 from stanalysis.visualization import scatter_plot, scatter_plot3d, histogram
 from stanalysis.preprocessing import *
 from stanalysis.analysis import linear_conv
@@ -49,6 +50,8 @@ def main(counts_table_files,
          outdir,
          tsne_perplexity,
          tsne_theta,
+         umap_neighbors,
+         umap_min_dist,
          tsne_initial_dims,
          pca_auto_components,
          dbscan_min_size,
@@ -109,7 +112,9 @@ def main(counts_table_files,
     print("Total number of genes {}".format(len(counts.columns)))
     
     # Remove noisy spots and genes (Spots are rows and genes are columns)
-    counts = remove_noise(counts, num_exp_genes, num_exp_spots, 
+    counts = remove_noise(counts, 
+                          num_exp_genes, 
+                          num_exp_spots, 
                           min_expression=min_gene_expression)
 
     if len(counts.index) < 5 or len(counts.columns) < 5:
@@ -135,12 +140,14 @@ def main(counts_table_files,
     if "tSNE" in dimensionality:
         # First PCA and then TSNE
         if norm_counts.shape[1] > tsne_initial_dims:
-            y = PCA(n_components=tsne_initial_dims).fit_transform(norm_counts)
+            y = PCA(whiten=True, 
+                    n_components=tsne_initial_dims).fit_transform(norm_counts)
         else:
             y = norm_counts
         local_perplexity = min(y.shape[0] / 3.5, tsne_perplexity)
         reduced_data = TSNE(n_components=num_dimensions,
-                            angle=tsne_theta, random_state=SEED,
+                            angle=tsne_theta, 
+                            random_state=SEED,
                             perplexity=tsne_perplexity).fit_transform(y)
     elif "PCA" in dimensionality:
         n_comps = num_dimensions
@@ -163,11 +170,18 @@ def main(counts_table_files,
     elif "SPCA" in dimensionality:
         import multiprocessing
         reduced_data = SparsePCA(n_components=num_dimensions, 
-                                 alpha=1, random_state=SEED,
+                                 alpha=1, 
+                                 random_state=SEED,
                                  n_jobs=multiprocessing.cpu_count()-1)
     elif "FactorAnalysis" in dimensionality:
         reduced_data = FactorAnalysis(n_components=num_dimensions,
                                       random_state=SEED).fit_transform(norm_counts)
+    elif "UMAP" in dimensionality:
+        reduced_data = umap.UMAP(n_neighbors=umap_neighbors,
+                                 min_dist=umap_min_dist,
+                                 n_components=num_dimensions,
+                                 random_state=SEED,
+                                 metric='euclidean').fit_transform(norm_counts)
     else:
         sys.stderr.write("Error, incorrect dimensionality reduction method\n")
         sys.exit(1)
@@ -180,7 +194,7 @@ def main(counts_table_files,
                        colors="grey", 
                        output=os.path.join(outdir,"computed_clusters_3D.pdf"), 
                        title='Computed classes', 
-                       alpha=1.0, 
+                       alpha=0.8, 
                        size=spot_size)
     else:
         scatter_plot(x_points=reduced_data[:,0], 
@@ -188,7 +202,7 @@ def main(counts_table_files,
                      colors="grey", 
                      output=os.path.join(outdir,"computed_clusters_2D.pdf"), 
                      title='Computed classes', 
-                     alpha=1.0, 
+                     alpha=0.8, 
                      size=spot_size)
         
     print("Performing clustering...")
@@ -227,7 +241,7 @@ def main(counts_table_files,
                        colors=labels, 
                        output=os.path.join(outdir,"computed_clusters_color_3D.pdf"), 
                        title='Computed classes (color)', 
-                       alpha=1.0,
+                       alpha=0.8,
                        size=spot_size)
         with open(os.path.join(outdir,"computed_clusters_3D.tsv"), "w") as filehandler: 
             for s,x,y,z,l in zip(norm_counts.index,
@@ -242,7 +256,7 @@ def main(counts_table_files,
                      colors=labels, 
                      output=os.path.join(outdir,"computed_clusters_color_2D.pdf"), 
                      title='Computed classes (color)', 
-                     alpha=1.0,
+                     alpha=0.8,
                      invert_y=False,
                      size=spot_size)
         with open(os.path.join(outdir,"computed_clusters_color_2D.tsv"), "w") as filehandler: 
@@ -277,7 +291,7 @@ if __name__ == '__main__':
     parser.add_argument("--min-gene-expression", default=1, type=int, metavar="[INT]", choices=range(1, 50),
                         help="The minimum count (number of reads) a gene must have in a spot to be\n"
                         "considered expressed (default: %(default)s)")
-    parser.add_argument("--num-genes-discard", default=0.2, metavar="[FLOAT]", type=float,
+    parser.add_argument("--num-genes-discard", default=0.5, metavar="[FLOAT]", type=float,
                         help="The percentage of genes (0.0 - 1.0) to discard from the distribution of all the genes\n" \
                         "across all the spots using the variance or the top highest expressed\n" \
                         "(see --top-genes-criteria)\n " \
@@ -291,35 +305,40 @@ if __name__ == '__main__':
                         "Gaussian = Gaussian Mixtures Model\n" \
                         "(default: %(default)s)")
     parser.add_argument("--dimensionality", default="tSNE", metavar="[STR]", 
-                        type=str, choices=["tSNE", "PCA", "ICA", "SPCA", "FactorAnalysis"],
+                        type=str, choices=["tSNE", "PCA", "ICA", "SPCA", "FactorAnalysis", "UMAP"],
                         help="What dimensionality reduction algorithm to use:\n" \
                         "tSNE = t-distributed stochastic neighbor embedding\n" \
                         "PCA = Principal component analysis\n" \
                         "ICA = Independent component analysis\n" \
                         "SPCA = Sparse principal component analysis\n" \
                         "FactorAnalysis = Linear model with Gaussian latent variables\n" \
+                        "UMAP = Uniform Manifold Approximation and Projection\n" \
                         "(default: %(default)s)")
     parser.add_argument("--use-log-scale", action="store_true", default=False,
                         help="Use log2(counts + 1) values in the dimensionality reduction step")
-    parser.add_argument("--num-dimensions", default=2, metavar="[INT]", type=int, choices=range(2, 100),
+    parser.add_argument("--num-dimensions", default=2, metavar="[INT]", type=int,
                         help="The number of dimensions to use in the dimensionality reduction. (default: %(default)s)")
-    parser.add_argument("--spot-size", default=20, metavar="[INT]", type=int, choices=range(1, 100),
+    parser.add_argument("--spot-size", default=4, metavar="[INT]", type=int,
                         help="The size of the spots when generating the plots. (default: %(default)s)")
     parser.add_argument("--top-genes-criteria", default="Variance", metavar="[STR]", 
                         type=str, choices=["Variance", "TopRanked"],
                         help="What criteria to use to keep top genes before doing\n" \
                         "the dimensionality reduction (Variance or TopRanked) (default: %(default)s)")
-    parser.add_argument("--tsne-perplexity", default=30, metavar="[INT]", type=int, choices=range(5,500),
+    parser.add_argument("--tsne-perplexity", default=30, metavar="[INT]", type=int,
                         help="The value of the perplexity for the t-SNE method. (default: %(default)s)")
     parser.add_argument("--tsne-theta", default=0.5, metavar="[FLOAT]", type=float,
                         help="The value of theta for the t-SNE method. (default: %(default)s)")
+    parser.add_argument("--umap-neighbors", default=15, metavar="[INT]", type=int,
+                        help="The number of neighboring points used in local approximations of manifold structure (UMAP) (default: %(default)s)")
+    parser.add_argument("--umap-min-dist", default=0.1, metavar="[FLOAT]", type=float,
+                        help="This controls how tightly the embedding is allowed compress points together (UMAP) (default: %(default)s)")
     parser.add_argument("--tsne-initial-dims", default=50, metavar="[INT]", type=int,
                         help="The number of initial dimensions of the PCA step in the t-SNE clustering. (default: %(default)s)")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     parser.add_argument("--pca-auto-components", default=None, metavar="[FLOAT]", type=float,
                         help="For the PCA dimensionality reduction the number of dimensions\n" \
                         "are computed so to include the percentage of variance given as input [0.1-1].")
-    parser.add_argument("--dbscan-min-size", default=5, metavar="[INT]", type=int, choices=range(5,500),
+    parser.add_argument("--dbscan-min-size", default=5, metavar="[INT]", type=int,
                         help="The value of the minimum cluster sizer for DBSCAN. (default: %(default)s)")
     parser.add_argument("--dbscan-eps", default=0.5, metavar="[FLOAT]", type=float,
                         help="The value of the EPS parameter for DBSCAN. (default: %(default)s)")
@@ -342,6 +361,8 @@ if __name__ == '__main__':
          args.outdir,
          args.tsne_perplexity,
          args.tsne_theta,
+         args.umap_neighbors,
+         args.umap_min_dist,
          args.tsne_initial_dims,
          args.pca_auto_components,
          args.dbscan_min_size,

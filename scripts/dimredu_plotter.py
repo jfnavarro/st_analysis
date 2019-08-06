@@ -14,15 +14,17 @@ import numpy as np
 import os
 import sys
 from matplotlib.pyplot import plotting
-import matplotlib
+from stanalysis.visualization import color_map
 
-def plot_tsne(x, y, c, filename, title, xlab, ylab, alpha, size, legend, color_bar):
+def plot_tsne(x, y, c, filename, title, xlab, ylab, alpha, size, color_scale, legend, color_bar):
     a = plt.subplot(1, 1, 1)
     # Create the scatter plot
-    sc = a.scatter(x, y, c=c, edgecolor="none", s=size, alpha=alpha)
+    sc = a.scatter(x, y, c=c, edgecolor="none", 
+                   cmap=plt.get_cmap(color_scale), 
+                   s=size, alpha=alpha)
     # Add legend
     if legend is not None:
-        cmap = matplotlib.cm.get_cmap('viridis')
+        cmap = plt.get_cmap(color_scale)
         unique_c = np.unique(sorted(c))
         unique_c = unique_c / max(unique_c)
         a.legend([plt.Line2D((0,1),(0,0), color=cmap(x)) for x in unique_c], 
@@ -48,7 +50,8 @@ def plot_tsne(x, y, c, filename, title, xlab, ylab, alpha, size, legend, color_b
     if filename is not None:
         fig = plt.gcf()
         fig.savefig(filename, format='pdf', dpi=180)
-        plt.figure()
+        plt.cla()
+        plt.close(fig)
     else:
         plt.show()
     
@@ -123,8 +126,8 @@ def main(counts_files,
         counts_normalized = ztransformation(counts_normalized)
         
     # Make sure the order of rows is the same
-    common = np.intersect1d(np.intersect1d(counts.index, meta.index), dim_redu.index)
-    counts = counts.reindex(common)
+    common = np.intersect1d(np.intersect1d(counts_normalized.index, meta.index), dim_redu.index)
+    counts_normalized = counts_normalized.reindex(common)
     meta = meta.reindex(common)
     dim_redu = dim_redu.reindex(common)
     
@@ -136,13 +139,15 @@ def main(counts_files,
     color_rgb = coord_to_rgb(x, y, z)
 
     # Plot the cluster colors 
-    plot_tsne(x, y, c=color_clusters, filename="dim_red_cluster_colors.pdf",
-              title="Cluster colors", xlab="1 DIM", ylab="2 DIM", alpha=data_alpha, 
-              size=dot_size, legend=np.unique(sorted(color_clusters)), color_bar=False)
+    plot_tsne(x, y, c=color_clusters, filename="dim_red_clusters.pdf",
+              title="Clusters", xlab=None, ylab=None, alpha=data_alpha, 
+              size=dot_size, color_scale="gist_ncar", 
+              legend=np.unique(sorted(color_clusters)), color_bar=False)
     # Plot the RGB colors 
     plot_tsne(x, y, c=color_rgb, filename="rgb_colors.pdf",
-              title="RGB colors", xlab="1 DIM", ylab="2 DIM", 
-              alpha=data_alpha, size=dot_size, legend=None, color_bar=False)
+              title="RGB colors", xlab=None, ylab=None, 
+              alpha=data_alpha, size=dot_size, 
+              color_scale="gist_ncar", legend=None, color_bar=False)
     # Plot the different variables in metadata
     for var in meta.columns:
         values = meta.loc[:,var].to_numpy()
@@ -153,17 +158,19 @@ def main(counts_files,
             tmp_dict[u] = i + 1
         vals = [tmp_dict[x] for x in values]
         # Plot the variable
-        plot_tsne(x, y, c=vals, filename="{}_colors.pdf".format(var),
-                  title="{} colors".format(var), xlab="1 DIM", ylab="2 DIM", 
-                  alpha=data_alpha, size=dot_size, legend=unique_vals, color_bar=False)
+        plot_tsne(x, y, c=vals, filename="{}.pdf".format(var),
+                  title=var, xlab=None, ylab=None, 
+                  alpha=data_alpha, size=dot_size, color_scale="gist_ncar",
+                  legend=unique_vals, color_bar=False)
     # Plot the genes
     if show_genes is not None:
         for gene in show_genes:
             try:
-                row_values = counts.loc[:,gene].to_numpy()
-                plot_tsne(x, y, c=row_values, filename="{}_colors.pdf".format(gene),
-                          title="{} colors".format(gene), xlab="1 DIM", ylab="2 DIM", 
-                          alpha=data_alpha, size=dot_size, legend=None, color_bar=True)
+                row_values = counts_normalized.loc[:,gene].to_numpy()
+                plot_tsne(x, y, c=row_values, filename="{}.pdf".format(gene),
+                          title=gene, xlab=None, ylab=None, 
+                          alpha=data_alpha, size=dot_size, color_scale=color_scale,
+                          legend=None, color_bar=True)
             except Exception:
                 pass
 
@@ -178,14 +185,14 @@ if __name__ == '__main__':
     parser.add_argument("--meta-file", required=True, metavar="[STR]", type=str,
                         help="One meta info file (matrix) where rows are the same as the counts matrices\n" \
                         "(same order) and columns are info variables")
-    parser.add_argument("--data-alpha", type=float, default=1.0, metavar="[FLOAT]",
+    parser.add_argument("--data-alpha", type=float, default=0.8, metavar="[FLOAT]",
                         help="The transparency level for the data points, 0 min and 1 max (default: %(default)s)")
-    parser.add_argument("--dot-size", type=int, default=20, metavar="[INT]", choices=range(1, 100),
-                        help="The size of the dots (default: %(default)s)")
+    parser.add_argument("--dot-size", type=int, default=4, metavar="[INT]",
+                        help="The size of the dots in the scatter plots (default: %(default)s)")
     parser.add_argument("--color-scale", default="YlOrRd", metavar="[STR]", 
                         type=str, 
-                        choices=["hot", "binary", "hsv", "Greys", "inferno", "YlOrRd", "bwr", "Spectral", "coolwarm"],
-                        help="Different color scales when plotting individual genes (default: %(default)s)")
+                        choices=["viridis", "hot", "binary", "hsv", "Greys", "inferno", "YlOrRd", "bwr", "Spectral", "coolwarm"],
+                        help="Different color scales for individual gene scatter plots (default: %(default)s)")
     parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
                         type=str, 
                         choices=["RAW", "REL", "CPM"],
@@ -198,14 +205,14 @@ if __name__ == '__main__':
                         help="Apply the z-score transformation to each feature (gene)")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     parser.add_argument("--use-log-scale", action="store_true", default=False, 
-                        help="Plot expression in log space (log2)")
+                        help="Plot expression in log space (log2 + 1)")
     parser.add_argument("--num-exp-genes", default=0.01, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
                         "must have to be kept from the distribution of all expressed genes (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--num-exp-spots", default=0.01, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed spots a gene\n" \
                         "must have to be kept from the total number of spots (0.0 - 1.0) (default: %(default)s)")
-    parser.add_argument("--min-gene-expression", default=1, type=int, metavar="[INT]", choices=range(1, 50),
+    parser.add_argument("--min-gene-expression", default=1, type=int, metavar="[INT]",
                         help="The minimum count (number of reads) a gene must have in a spot to be\n"
                         "considered expressed (default: %(default)s)")
     parser.add_argument("--show-genes", help="List of genes to plot on top of the dimensionality reduction.\n" \

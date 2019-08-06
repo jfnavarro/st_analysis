@@ -74,8 +74,8 @@ def histogram(x_points, output, title="Histogram", xlabel="X", color="blue"):
                 format='pdf', dpi=300)
     
 def scatter_plot3d(x_points, y_points, z_points, output=None,
-                   colors=None, cmap=None, title='Scatter', xlabel='X', 
-                   ylabel='Y', zlabel="Z", alpha=1.0, size=10, vmin=None, vmax=None):
+                   colors=None, cmap=None, title='Scatter', xlabel=None, 
+                   ylabel=None, zlabel=None, alpha=1.0, size=10, vmin=None, vmax=None):
     """ 
     This function makes a scatter 3d plot of a set of points (x,y,z).
     The plot will always use a predefine set of colors unless specified otherwise.
@@ -125,6 +125,8 @@ def scatter_plot3d(x_points, y_points, z_points, output=None,
     if output is not None:
         fig.savefig("{}.pdf".format(os.path.splitext(os.path.basename(output))[0]), 
                     format='pdf', dpi=300)
+        plt.cla()
+        plt.close(fig)
     else:
         fig.show()
    
@@ -132,8 +134,8 @@ def grid_plot(x_points, y_points, colors, output=None, alignment=None):
      return
  
 def scatter_plot(x_points, y_points, output=None, colors=None,
-                 alignment=None, cmap=None, title='Scatter', xlabel='X', 
-                 ylabel='Y', image=None, alpha=1.0, size=20, 
+                 alignment=None, cmap=None, title='Scatter', xlabel=None, 
+                 ylabel=None, image=None, alpha=1.0, size=10, 
                  show_legend=True, show_color_bar=False, 
                  vmin=None, vmax=None, n_col=1, n_row=1, invert_y=True, n_index=1):
     """ 
@@ -219,4 +221,5 @@ def scatter_plot(x_points, y_points, output=None, colors=None,
     if output is not None:
         fig = plt.gcf()
         fig.savefig(output, format='pdf', dpi=180)
-        plt.figure()
+        plt.cla()
+        plt.close(fig)
