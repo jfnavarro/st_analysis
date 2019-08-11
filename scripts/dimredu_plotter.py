@@ -15,19 +15,27 @@ import os
 import sys
 from matplotlib.pyplot import plotting
 from stanalysis.visualization import color_map
+from matplotlib import cm
+from matplotlib import colors 
 
 def plot_tsne(x, y, c, filename, title, xlab, ylab, alpha, size, color_scale, legend, color_bar):
     a = plt.subplot(1, 1, 1)
     # Create the scatter plot
-    sc = a.scatter(x, y, c=c, edgecolor="none", 
-                   cmap=plt.get_cmap(color_scale), 
-                   s=size, alpha=alpha)
+    cmap = cm.get_cmap(color_scale)
+    min_v = min(c)
+    max_v = max(c)
+    sc = a.scatter(x, y, c=c, 
+                   edgecolor="none", 
+                   cmap=cmap, 
+                   s=size,
+                   alpha=alpha,
+                   vmin=min_v,
+                   vmax=max_v)
     # Add legend
     if legend is not None:
-        cmap = plt.get_cmap(color_scale)
+        norm = colors.Normalize(vmin=min_v, vmax=max_v)
         unique_c = np.unique(sorted(c))
-        unique_c = unique_c / max(unique_c)
-        a.legend([plt.Line2D((0,1),(0,0), color=cmap(x)) for x in unique_c], 
+        a.legend([plt.Line2D((0,1),(0,0), color=cmap(norm(x))) for x in unique_c], 
                  legend, loc="upper right", markerscale=1.0, 
                  ncol=1, scatterpoints=1, fontsize=5)
     # Add x/y labels
@@ -42,7 +50,7 @@ def plot_tsne(x, y, c, filename, title, xlab, ylab, alpha, size, color_scale, le
         a.set_xticklabels([])
         a.axes.get_yaxis().set_visible(False)
     # Add title
-    a.set_title(title, size=10)
+    a.set_title(title, size=12)
     # Add color bar
     if color_bar:
         plt.colorbar(sc)
@@ -141,13 +149,13 @@ def main(counts_files,
     # Plot the cluster colors 
     plot_tsne(x, y, c=color_clusters, filename="dim_red_clusters.pdf",
               title="Clusters", xlab=None, ylab=None, alpha=data_alpha, 
-              size=dot_size, color_scale="gist_ncar", 
+              size=dot_size, color_scale="tab20", 
               legend=np.unique(sorted(color_clusters)), color_bar=False)
     # Plot the RGB colors 
     plot_tsne(x, y, c=color_rgb, filename="rgb_colors.pdf",
               title="RGB colors", xlab=None, ylab=None, 
               alpha=data_alpha, size=dot_size, 
-              color_scale="gist_ncar", legend=None, color_bar=False)
+              color_scale="tab20", legend=None, color_bar=False)
     # Plot the different variables in metadata
     for var in meta.columns:
         values = meta.loc[:,var].to_numpy()
@@ -160,7 +168,7 @@ def main(counts_files,
         # Plot the variable
         plot_tsne(x, y, c=vals, filename="{}.pdf".format(var),
                   title=var, xlab=None, ylab=None, 
-                  alpha=data_alpha, size=dot_size, color_scale="gist_ncar",
+                  alpha=data_alpha, size=dot_size, color_scale="tab20",
                   legend=unique_vals, color_bar=False)
     # Plot the genes
     if show_genes is not None:

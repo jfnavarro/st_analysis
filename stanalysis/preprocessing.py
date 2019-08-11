@@ -64,9 +64,6 @@ def aggregate_datatasets(counts_table_files, add_index=True):
     :param add_index: add the dataset index to the spot's
     :return: a Pandas data frame with the merged data frames
     """
-    if len(counts_table_files) == 1:
-        return pd.read_csv(counts_table_files[0], sep="\t", 
-                           header=0, index_col=0, engine='c', low_memory=True)
     # Spots are rows and genes are columns
     counts = pd.DataFrame()
     for i,counts_file in enumerate(counts_table_files):
@@ -74,8 +71,9 @@ def aggregate_datatasets(counts_table_files, add_index=True):
             raise IOError("Error parsing data frame", "Invalid input file")
         new_counts = pd.read_csv(counts_file, sep="\t", 
                                  header=0, index_col=0, engine='c', low_memory=True)
+        new_counts = new_counts[~new_counts.index.duplicated()]
         # Append dataset index to the spots (indexes) so they can be traced
-        if add_index:
+        if add_index and len(counts_table_files) > 1:
             new_spots = ["{0}_{1}".format(i + 1, spot) for spot in new_counts.index]
             new_counts.index = new_spots
         counts = counts.append(new_counts, sort=True)

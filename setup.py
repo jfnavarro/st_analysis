@@ -34,7 +34,7 @@ setup(
     'numpy',
     'pandas',
     'sklearn',
-    'matplotlib',
+    'matplotlib>=3.1.0',
     'rpy2',
     'Pillow',
     'jinja2',

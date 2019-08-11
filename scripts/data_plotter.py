@@ -232,8 +232,8 @@ if __name__ == '__main__':
                         "the distribution of reads of the gene across all the spots (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--data-alpha", type=float, default=1.0, metavar="[FLOAT]",
                         help="The transparency level for the data points, 0 min and 1 max (default: %(default)s)")
-    parser.add_argument("--dot-size", type=int, default=20, metavar="[INT]", choices=range(1, 100),
-                        help="The size of the dots (default: %(default)s)")
+    parser.add_argument("--dot-size", type=int, default=20, metavar="[INT]",
+                        help="The size of the data points (default: %(default)s)")
     parser.add_argument("--color-scale", default="YlOrRd", metavar="[STR]", 
                         type=str, 
                         choices=["hot", "binary", "hsv", "Greys", "inferno", "YlOrRd", "bwr", "Spectral", "coolwarm"],
@@ -251,7 +251,7 @@ if __name__ == '__main__':
     parser.add_argument("--show-genes", help="Regular expression for gene symbols to be shown\n" \
                         "The genes matching the reg-exp will be shown in separate files.\n" \
                         "Can be given several times.",
-                        required=False,
+                        required=True,
                         default=None,
                         type=str,
                         nargs='+')
@@ -267,9 +267,9 @@ if __name__ == '__main__':
     parser.add_argument("--ylim", default=[1,35], nargs='+', metavar="[FLOAT]", type=float,
                         help="The y axis limits to have equally sized sub-images (default: %(default)s)")
     parser.add_argument("--disable-invert-y-axes", action="store_true", default=False,
-                        help="Whether to disable the invert of the y axes or not (default True)")
+                        help="Whether to disable the invert of the y axes or not (default False)")
     parser.add_argument("--disable-color-bar", action="store_true", default=False,
-                        help="Whether to disable the color bar or not (default True)")
+                        help="Whether to disable the color bar or not (default False)")
     parser.add_argument("--combine-genes", default="None", metavar="[STR]", 
                         type=str, 
                         choices=["None", "NaiveMean", "NaiveSum", "CumSum"],
