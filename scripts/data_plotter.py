@@ -60,7 +60,7 @@ def compute_plotting_data(counts, names, cutoff_lower,
     
 def plot_data(plotting_data, n_col, n_row, dot_size, data_alpha,
               color_scale, xlim, ylim, invert=False, colorbar=False):
-    fig, ax = plt.subplots(n_row, n_col, figsize=(5*n_col, 5*n_row,)) 
+    fig, ax = plt.subplots(n_row, n_col, figsize=(4*n_col, 4*n_row,)) 
     fig.subplots_adjust(left = 0.1, 
                         right = 0.9,
                         bottom = 0.1,

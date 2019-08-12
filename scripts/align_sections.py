@@ -499,8 +499,8 @@ def transform_counts(counts_list, image_list, warp_list):
         spot_coords = np.zeros((counts.shape[0],2), dtype=np.float32)
         for i,spot in enumerate(counts.index):
             x,y = spot.split("x")
-            spot_coords[i,0] = float(y)
-            spot_coords[i,1] = float(x)
+            spot_coords[i,0] = float(x)
+            spot_coords[i,1] = float(y)
         spot_coords = np.hstack([spot_coords, np.ones((spot_coords.shape[0], 1))])
         M = np.vstack([warp_matrix, [0, 0, 1]])
         A = t_inv @ M @ t 
