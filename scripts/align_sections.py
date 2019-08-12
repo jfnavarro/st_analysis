@@ -1,3 +1,12 @@
+#! /usr/bin/env python
+""" 
+This script aligns a set of images/counts matrices using the first
+image as reference. It provides different alignment methods (manual
+and automatic) and it outputs the aligned images, the aligned counts
+matrices and the aligment matrices. 
+
+@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
+"""
 import tissue_recognition as tr
 import numpy as np
 from imageio import imread
@@ -473,25 +482,25 @@ def transform_original_image(image_list, warp_list_backtransf):
         transformed_images.append(img_aligned)
     return transformed_images
 
-def transform_counts(counts_list, image_list, warp_list_backtransf):
+def transform_counts(counts_list, image_list, warp_list):
     """ Given a list of counts matrices and a list of affine matrices
     transform the spots in the matrices with the affine matrices and returns the 
     transformed counts matrices
     """
-    assert(len(warp_list_backtransf) == len(image_list) == len(counts_list))
+    assert(len(warp_list) == len(image_list) == len(counts_list))
     transformed_counts = list()
     # Run trough counts and apply the transformation matrix
-    for counts, img, warp_matrix in zip(counts_list, image_list, warp_list_backtransf):
+    for counts, img, warp_matrix in zip(counts_list, image_list, warp_list):
         height, width, _ = img.shape
         sx = width / 32
         sy = height / 34
         t = np.array([[sx, 0, -sx], [0, sy, -sy], [0, 0, 1]])
         t_inv = np.linalg.inv(t)
-        spot_coords = np.zeros((counts.shape[0],2), dtype=np.uint8)
+        spot_coords = np.zeros((counts.shape[0],2), dtype=np.float32)
         for i,spot in enumerate(counts.index):
             x,y = spot.split("x")
-            spot_coords[i,0] = float(x)
-            spot_coords[i,1] = float(y)
+            spot_coords[i,0] = float(y)
+            spot_coords[i,1] = float(x)
         spot_coords = np.hstack([spot_coords, np.ones((spot_coords.shape[0], 1))])
         M = np.vstack([warp_matrix, [0, 0, 1]])
         A = t_inv @ M @ t 
@@ -626,6 +635,11 @@ def main(counts_files, images_files, down_width, down_height, outdir,
     print("Transforming original counts matrices...")
     transformed_counts = transform_counts(counts, transformed_original_images, warp_list_backtransf)
     
+    # Save transformations
+    for tr, name in zip(warp_list_backtransf, counts_files):
+        clean_name = os.path.basename(name).split(".")[0]
+        np.savetxt(os.path.join(outdir, "aligment_{}.txt".format(clean_name)), tr, delimiter="\t")
+        
     # Save images
     for img, name in zip(transformed_original_images, images_files):
         matplotlib.image.imsave(os.path.join(outdir, "aligned_" + name), img)
@@ -649,9 +663,10 @@ if __name__ == '__main__':
     parser.add_argument("--debug", action="store_true", default=False,
                         help="Whether to generate debug images for each step")
     parser.add_argument("--border", action="store_true", default=False,
-                        help="Whether to add a white border to images prior alignment")
+                        help="Whether to add a white border to images prior alignment (recommended for EDGES alignment method)")
     parser.add_argument("--normalize", action="store_true", default=False,
-                        help="Whether to perform a cumulative histogram normalization on the images to equalize the intensities")
+                        help="Whether to perform a cumulative histogram normalization on the images\n" \
+                        "to equalize the intensities (recommended for ECC alignment method")
     parser.add_argument("--alignment-method", default="ECC", metavar="[STR]", 
                         type=str, 
                         choices=["ECC", "EDGES", "MANUAL"],

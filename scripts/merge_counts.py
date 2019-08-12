@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 """ 
-
+This script simply merges ST matrices of counts into one 
+(adding an index to the spots of each matrix)
 
 @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
