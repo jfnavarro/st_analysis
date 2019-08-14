@@ -10,17 +10,8 @@ where the data is stored as a matrix of counts (genes as columns and spot/cells 
 
 This package makes use of the following R packages:
 
-t-SNE
-https://github.com/lvdmaaten/bhtsne
-
-Scran
-https://github.com/MarioniLab/Deconvolution2016
-
 DESeq2
 http://bioconductor.org/packages/devel/bioc/html/DESeq2.html
-
-EdgeR
-https://bioconductor.org/packages/release/bioc/html/edgeR.html
 
 ### License
 MIT License, see LICENSE file.
@@ -42,11 +33,7 @@ We recommend that you install the latest R version 3.X Once you have installed R
 a R terminal or Rstudio and type the following:
 
     source("https://bioconductor.org/biocLite.R")
-    biocLite("BiocParallel")
-    biocLite("scran")
     biocLite("DESeq2")
-    biocLite("Rtsne")
-    biocLite("edgeR")
     
 Before you install the ST Analysis package we recommend that you create a Python 3 virtual
 environment. We recommend [Anaconda](https://anaconda.org/anaconda/python).
@@ -85,12 +72,11 @@ about how the script works.
 ### To do un-supervised learning
 To see how spots cluster together based on their expression profiles you can run:
 
-    unsupervised.py --counts-table-files matrix_counts.tsv --normalization DESeq2 --num-clusters 5 --clustering KMeans --dimensionality tSNE --use-log-scale 
+    unsupervised.py --counts-files matrix_counts.tsv --normalization REL --num-clusters 5 --clustering KMeans --dimensionality tSNE --use-log-scale 
     
 The script can be given one or serveral datasets (matrices with counts). It will perform dimesionality reduction
 and then cluster the spots together based on the dimesionality reduced space.
-It generates a scatter plot of the clusters. It also generates an image for
-each dataset of the predicted classes on top of the spots.
+It generates a scatter plot of the clusters. 
 It also generate a file with the predicted classes for each spot that can be used in other analysis.
 To know more about the parameters you can type --help
 
@@ -120,7 +106,7 @@ filters (counts) and different normalization and visualization options.
 It plots one image for each gene given in the --show-genes option (one sub-image for each input dataset).
 You need one or many matrices with the spots as rows and the genes as columns. 
 
-    st_data_plotter.py --cutoff 2 --show-genes Actb --counts-table-files data_matrix.tsv --normalization REL
+    data_plotter.py --cutoff 2 --show-genes Actb --counts-files data_matrix.tsv --normalization REL
     
 This will generate a scatter plot of the expression of the spots that contain a gene Actb and with higher expression than 2.
 
