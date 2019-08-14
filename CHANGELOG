@@ -73,3 +73,10 @@ Version 0.5.5
 Version 0.5.6
 * Removed most of the R dependencies
 * Added option to make a joint plot of a gene set in st_data_plotter
+
+Version 0.6.0
+* Improvements in data_plotter
+* Improvements in unsupervised
+* Removed deprecated scripts
+* Added script to perform image alignment
+* Added script to plot genes and covariates onto a dimensionality reduced space

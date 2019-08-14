@@ -1,6 +1,15 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 """ 
+Script that creates takes as input a dimensionality reduced set of coordinates (For each spot),
+a matrix counts (spots x genes), a set of of covariates (per spot) and a list of genes
+and generates a set of scatter plots:
+
+- dimensionality reduced spots colored by proximity and cluster id
+- one plot for each covariate in the dimensionality reduced space
+- one plot for each gene in the dimensionality reduced space
+
+The script allows to normalize and filter the data too. 
 
 @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
