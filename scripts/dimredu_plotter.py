@@ -144,9 +144,9 @@ def main(counts_files,
         
     # Make sure the order of rows is the same
     common = np.intersect1d(np.intersect1d(counts_normalized.index, meta.index), dim_redu.index)
-    counts_normalized = counts_normalized.reindex(common)
-    meta = meta.reindex(common)
-    dim_redu = dim_redu.reindex(common)
+    counts_normalized = counts_normalized.loc[common,:]
+    meta = meta.loc[common,:]
+    dim_redu = dim_redu.loc[common,:]
     
     # Plot dimensionality reduced coordinates for each meta-var
     x = dim_redu.iloc[:,0].to_numpy()
@@ -206,11 +206,11 @@ if __name__ == '__main__':
                         help="The transparency level for the data points, 0 min and 1 max (default: %(default)s)")
     parser.add_argument("--dot-size", type=int, default=4, metavar="[INT]",
                         help="The size of the dots in the scatter plots (default: %(default)s)")
-    parser.add_argument("--color-scale", default="YlOrRd", metavar="[STR]", 
+    parser.add_argument("--color-scale", default="YlOrRd", 
                         type=str, 
                         choices=["viridis", "hot", "binary", "hsv", "Greys", "inferno", "YlOrRd", "bwr", "Spectral", "coolwarm"],
-                        help="Different color scales for individual gene scatter plots (default: %(default)s)")
-    parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
+                        help="Different color scales for individual gene plots (default: %(default)s)")
+    parser.add_argument("--normalization", default="RAW", 
                         type=str, 
                         choices=["RAW", "REL", "CPM"],
                         help="Normalize the counts using:\n" \
@@ -229,7 +229,7 @@ if __name__ == '__main__':
     parser.add_argument("--num-exp-spots", default=0.01, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed spots a gene\n" \
                         "must have to be kept from the total number of spots (0.0 - 1.0) (default: %(default)s)")
-    parser.add_argument("--min-gene-expression", default=1, type=int, metavar="[INT]",
+    parser.add_argument("--min-gene-expression", default=1, type=float, metavar="[FLOAT]",
                         help="The minimum count (number of reads) a gene must have in a spot to be\n"
                         "considered expressed (default: %(default)s)")
     parser.add_argument("--show-genes", help="List of genes to plot on top of the dimensionality reduction.\n" \

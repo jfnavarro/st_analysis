@@ -54,7 +54,7 @@ def ztransformation(counts):
                         index=rows,
                         columns=cols)
     
-def aggregate_datatasets(counts_table_files, add_index=True):
+def aggregate_datatasets(counts_table_files, add_index=True, header=0):
     """ This functions takes a list of data frames with ST data
     (genes as columns and spots as rows) and merges them into
     one data frame using the genes as merging criteria. 
@@ -70,7 +70,7 @@ def aggregate_datatasets(counts_table_files, add_index=True):
         if not os.path.isfile(counts_file):
             raise IOError("Error parsing data frame", "Invalid input file")
         new_counts = pd.read_csv(counts_file, sep="\t", 
-                                 header=0, index_col=0, engine='c', low_memory=True)
+                                 header=header, index_col=0, engine='c', low_memory=True)
         new_counts = new_counts[~new_counts.index.duplicated()]
         # Append dataset index to the spots (indexes) so they can be traced
         if add_index and len(counts_table_files) > 1:

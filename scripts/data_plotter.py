@@ -12,7 +12,9 @@ It allows to apply different thresholds
 
 It allows to plot multiple genes (one plot per gene)
 
-It allows to plot combined gene sets
+It allows to plot combined gene sets (one plot for the whole set)
+
+It allows to plot clusters (one cluster per spot) 
 
 @Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
 """
@@ -27,6 +29,11 @@ import os
 import sys
 from matplotlib.pyplot import plotting
 
+def get_spot_coordinates(spots):
+    has_index = "_" in spots[0]
+    return zip(*map(lambda s: (float(s.split("x")[0].split("_")[1] if has_index else s.split("x")[0]),
+                               float(s.split("x")[1])), spots))
+    
 def compute_plotting_data(counts, names, cutoff_lower, 
                           cutoff_upper, use_global_scale):
     plotting_data = list()
@@ -45,12 +52,9 @@ def compute_plotting_data(counts, names, cutoff_lower,
         spots = list(filter(r.match, counts.index)) if len(names) > 1 else counts.index
         if len(spots) > 0:
             # Compute the expressions for each spot
-            # as the sum of the counts above threshold
-            slice = counts.reindex(spots)
-            x,y = zip(*map(lambda s: (float(s.split("x")[0].split("_")[1] if len(names) > 1 else s.split("x")[0]),
-                                      float(s.split("x")[1])), spots))
-            # Get the the gene values for each spot
-            rel_sum = slice.values
+            # as the sum of the counts over the gene
+            rel_sum = counts.reindex(spots).values
+            x,y = get_spot_coordinates(spots)
             if not rel_sum.any():
                 sys.stdout.write("Warning, the gene given is not expressed in {}\n".format(name))
             vmin = vmin_global if use_global_scale else rel_sum.min() 
@@ -58,6 +62,20 @@ def compute_plotting_data(counts, names, cutoff_lower,
             plotting_data.append((x,y,rel_sum,vmin,vmax,name))
     return plotting_data
     
+def compute_plotting_data_clusters(counts, names, clusters):
+    plotting_data = list()
+    vmin_global = int(clusters.iloc[:,0].min())
+    vmax_global = int(clusters.iloc[:,0].max())
+    for i, name in enumerate(names):
+        r = re.compile("^{}_".format(i + 1))
+        # Filter spot by index (section) unless only one section is given
+        spots = list(filter(r.match, counts.index)) if len(names) > 1 else counts.index
+        if len(spots) > 0:
+            x,y = get_spot_coordinates(spots)
+            c = np.ravel(clusters.loc[spots,:].values.astype(int))
+            plotting_data.append((x,y,c,vmin_global,vmax_global,name))
+    return plotting_data
+
 def plot_data(plotting_data, n_col, n_row, dot_size, data_alpha,
               color_scale, xlim, ylim, invert=False, colorbar=False):
     fig, ax = plt.subplots(n_row, n_col, figsize=(4*n_col, 4*n_row,)) 
@@ -89,14 +107,6 @@ def plot_data(plotting_data, n_col, n_row, dot_size, data_alpha,
         sc.append(s)
     return fig, ax, sc
     
-def update_plot_data(sc, fig, plotting_data, color_scale):
-    for i,s in enumerate(sc):
-        xy = np.vstack((plotting_data[i][0], plotting_data[i][1]))
-        s.set_offsets(xy.T)
-        s.set_array(plotting_data[i][2])
-        s.set_cmap(plt.get_cmap(color_scale))
-    fig.canvas.draw_idle()    
-    
 def main(counts_table_files,
          cutoff,
          cutoff_upper,
@@ -104,7 +114,9 @@ def main(counts_table_files,
          dot_size,
          normalization,
          color_scale,
+         color_scale_clusters,
          filter_genes,
+         clusters_file,
          outdir,
          use_log_scale,
          standard_transformation,
@@ -119,8 +131,18 @@ def main(counts_table_files,
          disable_color_bar,
          combine_genes):
          
-    #TODO add sanity checks for the thresholds..
-    
+    if cutoff_upper <= cutoff:
+        sys.stderr.write("Error, incorrect cut-off values\n")
+        sys.exit(1)
+        
+    if dot_size < 0:
+        sys.stderr.write("Error, incorrect dot size\n")
+        sys.exit(1)
+        
+    if data_alpha < 0 or data_alpha > 1:
+        sys.stderr.write("Error, incorrect alpha value\n")
+        sys.exit(1)
+        
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
         sys.stderr.write("Error, input file/s not present or invalid format\n")
@@ -146,8 +168,10 @@ def main(counts_table_files,
     print("Total number of spots {}".format(len(counts.index)))
     print("Total number of genes {}".format(len(counts.columns)))
     
+    # Get the names of the datasets
     names = [os.path.splitext(os.path.basename(x))[0] for x in counts_table_files]
      
+    # Compute number of columns/rows
     n_col = min(num_columns, len(counts_table_files))
     n_row = max(int(len(counts_table_files) / n_col), 1)
     
@@ -155,6 +179,19 @@ def main(counts_table_files,
     counts_filtered = filter_data(counts, num_exp_genes, 
                                   num_exp_spots, min_gene_expression)
     
+    has_clusters = False
+    if clusters_file and os.path.isfile(clusters_file):
+        clusters = pd.read_csv(clusters_file, sep="\t", header=None,
+                               index_col=0, engine='c', low_memory=True)
+        clusters = clusters.reindex(np.intersect1d(counts_filtered.index, clusters.index))
+        if clusters.shape[0] == 0 or clusters.isna().values.any():
+            sys.stderr.write("Error, cluster file does not match the input data\n")
+            sys.exit(1)
+        has_clusters = True
+    elif clusters_file:
+        sys.stderr.write("Error, clusters file is not valid\n")
+        sys.exit(1)
+        
     # Normalization
     counts_normalized = normalize(counts_filtered, normalization)
     
@@ -168,77 +205,96 @@ def main(counts_table_files,
         print("Applying standard transformation...")
         counts_normalized = ztransformation(counts_normalized)
         
-    # Filter
-    try:
-        counts_final = filter_data_genes(counts_normalized, filter_genes)
-    except RuntimeError as e:
-        sys.stderr.write(str(e) + "\n")
-        sys.exit(1)
-    
-    # Add a column with the combined genes plot
-    if combine_genes in "NaiveMean":
-        genes_in_set = counts_final.columns.tolist()
-        present_genes = (counts_final > 0).sum(axis=1) / len(genes_in_set)
-        means = counts_normalized.mean(axis=1)
-        counts_final = counts_final.assign(Combined=((counts_final.mean(axis=1) / means) * present_genes).values)
-    elif combine_genes in "NaiveSum":
-        genes_in_set = counts_final.columns.tolist()
-        present_genes = (counts_final > 0).sum(axis=1) / len(genes_in_set)
-        sums = counts_normalized.sum(axis=1)
-        counts_final = counts_final.assign(Combined=((counts_final.sum(axis=1) / sums) * present_genes).values)        
-    elif combine_genes in "CumSum":
-        # For the CumSum I need to use all the genes so in order to compute p-values
-        genes_in_set = counts_final.columns.tolist()
-        counts_final = counts_final.assign(Combined=enrichment_score(counts_normalized, genes_in_set))
-        
-    # Compute plotting data and plot
-    for gene in counts_final.columns:
-        print("Plotting gene {}".format(gene))
-        plotting_data = compute_plotting_data(counts_final.loc[:,gene], 
-                                              names, 
-                                              cutoff,
-                                              cutoff_upper,
-                                              use_global_scale)
+    # Gene plots
+    if filter_genes:
+        try:
+            counts_final = filter_data_genes(counts_normalized, filter_genes)
+            # Add a column with the combined genes plot
+            if combine_genes in "NaiveMean":
+                genes_in_set = counts_final.columns.tolist()
+                present_genes = (counts_final > 0).sum(axis=1) / len(genes_in_set)
+                means = counts_normalized.mean(axis=1)
+                counts_final = counts_final.assign(Combined=((counts_final.mean(axis=1) / means) * present_genes).values)
+            elif combine_genes in "NaiveSum":
+                genes_in_set = counts_final.columns.tolist()
+                present_genes = (counts_final > 0).sum(axis=1) / len(genes_in_set)
+                sums = counts_normalized.sum(axis=1)
+                counts_final = counts_final.assign(Combined=((counts_final.sum(axis=1) / sums) * present_genes).values)        
+            elif combine_genes in "CumSum":
+                # For the CumSum I need to use all the genes so in order to compute p-values
+                genes_in_set = counts_final.columns.tolist()
+                counts_final = counts_final.assign(Combined=enrichment_score(counts_normalized, genes_in_set))
                 
-        # Create a scatter plot for each dataset
-        fig, ax, sc = plot_data(plotting_data, n_col, n_row, dot_size, data_alpha, color_scale,
+            # Compute plotting data and plot genes
+            for gene in counts_final.columns:
+                print("Plotting gene {}".format(gene))
+                plotting_data = compute_plotting_data(counts_final.loc[:,gene], 
+                                                      names, 
+                                                      cutoff,
+                                                      cutoff_upper,
+                                                      use_global_scale)
+                if len(plotting_data) == 0:
+                    sys.stderr.write("Error, plotting data is empty!\n")
+                    sys.exit(1)  
+                        
+                # Create a scatter plot for each dataset
+                fig, ax, sc = plot_data(plotting_data, n_col, n_row, dot_size, data_alpha, color_scale,
+                                        xlim, ylim, not disable_invert_y_axes, not disable_color_bar)
+            
+                # Save the plot
+                fig.suptitle(gene, fontsize=16)
+                fig.savefig(os.path.join(outdir,"{}_joint_plot.pdf".format(gene)), format='pdf', dpi=90)
+                plt.close(fig)
+        except RuntimeError as e:
+            sys.stdount.write("No genes could be found in the data...\n")
+
+    if has_clusters:
+        # Compute data for clusters and plot
+        plotting_data = compute_plotting_data_clusters(counts_normalized, names, clusters)
+        if len(plotting_data) == 0:
+            sys.stderr.write("Error, plotting data is empty!\n")
+            sys.exit(1)  
+        fig, ax, sc = plot_data(plotting_data, n_col, n_row, dot_size, data_alpha, color_scale_clusters,
                                 xlim, ylim, not disable_invert_y_axes, not disable_color_bar)
-    
+        
         # Save the plot
-        fig.suptitle(gene, fontsize=16)
-        fig.savefig(os.path.join(outdir,"{}_joint_plot.pdf".format(gene)),
-                    format='pdf', dpi=90)
+        fig.suptitle("Clusters", fontsize=16)
+        fig.savefig(os.path.join(outdir,"Clusters_joint_plot.pdf"), format='pdf', dpi=90)
         plt.close(fig)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--counts-files", required=True, nargs='+', type=str,
-                        help="One or more matrices with gene counts per feature/spot (genes as columns)")
+                        help="One or more matrices of counts (spots as rows and genes as columns)")
     parser.add_argument("--num-exp-genes", default=0.0, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
                         "must have to be kept from the distribution of all expressed genes (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--num-exp-spots", default=0.0, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed spots a gene\n" \
                         "must have to be kept from the total number of spots (0.0 - 1.0) (default: %(default)s)")
-    parser.add_argument("--min-gene-expression", default=1, type=int, metavar="[INT]", choices=range(1, 50),
+    parser.add_argument("--min-gene-expression", default=1, type=float, metavar="[FLOAT]",
                         help="The minimum count (number of reads) a gene must have in a spot to be\n"
                         "considered expressed (default: %(default)s)")
     parser.add_argument("--cutoff", default=0.0, metavar="[FLOAT]", type=float,
-                        help="The percentage of reads a gene must have in a spot to be counted from" \
+                        help="The percentage of reads a gene must have in a spot to be included in the plots from\n" \
                         "the distribution of reads of the gene across all the spots (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--cutoff-upper", default=1.0, metavar="[FLOAT]", type=float,
-                        help="The percentage of reads a gene should not have in a spot to be counted from" \
+                        help="The percentage of reads a gene should not have in a spot to be included in the plots from\n" \
                         "the distribution of reads of the gene across all the spots (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--data-alpha", type=float, default=1.0, metavar="[FLOAT]",
                         help="The transparency level for the data points, 0 min and 1 max (default: %(default)s)")
     parser.add_argument("--dot-size", type=int, default=20, metavar="[INT]",
                         help="The size of the data points (default: %(default)s)")
-    parser.add_argument("--color-scale", default="YlOrRd", metavar="[STR]", 
+    parser.add_argument("--color-scale", default="YlOrRd", 
                         type=str, 
                         choices=["hot", "binary", "hsv", "Greys", "inferno", "YlOrRd", "bwr", "Spectral", "coolwarm"],
-                        help="Different color scales (default: %(default)s)")
-    parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
+                        help="Different color scales for the gene plots (default: %(default)s)")
+    parser.add_argument("--color-scale-clusters", default="tab20", 
+                        type=str, 
+                        choices=["tab20", "tab20b", "tab20c" "Set3", "Paired"],
+                        help="Different color scales for the cluster plots (default: %(default)s)")
+    parser.add_argument("--normalization", default="RAW", 
                         type=str, 
                         choices=["RAW", "REL", "CPM"],
                         help="Normalize the counts using:\n" \
@@ -248,18 +304,22 @@ if __name__ == '__main__':
                         "(default: %(default)s)")
     parser.add_argument("--standard-transformation", action="store_true", default=False,
                         help="Apply the z-score transformation to each feature (gene)")
-    parser.add_argument("--show-genes", help="Regular expression for gene symbols to be shown\n" \
+    parser.add_argument("--show-genes", help="Regular expression for gene symbols to be shown (one image per gene).\n" \
                         "The genes matching the reg-exp will be shown in separate files.\n" \
                         "Can be given several times.",
-                        required=True,
+                        required=False,
                         default=None,
                         type=str,
                         nargs='+')
+    parser.add_argument("--clusters-file", help="Path to a tab delimited file containing clustering results for each spot.\n" \
+                        "First column spot id and second column the cluster number (integer).",
+                        default=None,
+                        type=str,)
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     parser.add_argument("--use-log-scale", action="store_true", default=False, 
                         help="Plot expression in log space (log2)")
     parser.add_argument("--use-global-scale", action="store_true", default=False, 
-                        help="Use a global scale instead of a relative scale")
+                        help="Use a global color scale instead of a relative color scale")
     parser.add_argument("--num-columns", default=1, type=int, metavar="[INT]",
                         help="The number of columns (default: %(default)s)")
     parser.add_argument("--xlim", default=[1,33], nargs='+', metavar="[FLOAT]", type=float,
@@ -270,10 +330,10 @@ if __name__ == '__main__':
                         help="Whether to disable the invert of the y axes or not (default False)")
     parser.add_argument("--disable-color-bar", action="store_true", default=False,
                         help="Whether to disable the color bar or not (default False)")
-    parser.add_argument("--combine-genes", default="None", metavar="[STR]", 
+    parser.add_argument("--combine-genes", default="None", 
                         type=str, 
                         choices=["None", "NaiveMean", "NaiveSum", "CumSum"],
-                        help="Whether to generate a combined plots with the all the genes:\n" \
+                        help="Whether to generate a combined plot with the all the genes given in --show-genes:\n" \
                         "None = do not create combined plot\n" \
                         "NaiveMean = create combine plot using the mean value of the genes in the spot adjusted by size\n" \
                         "NaiveSum = create combine plot using the sum value of the genes in the spot adjusted by size\n" \
@@ -288,7 +348,9 @@ if __name__ == '__main__':
          args.dot_size,
          args.normalization,
          args.color_scale,
+         args.color_scale_clusters,
          args.show_genes,
+         args.clusters_file,
          args.outdir,
          args.use_log_scale,
          args.standard_transformation,

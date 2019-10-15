@@ -135,8 +135,10 @@ def main(counts_table_files,
     norm_counts = keep_top_genes(norm_counts, 
                                  num_genes_discard, 
                                  criteria=top_genes_criteria)
-      
-    print("Performing dimensionality reduction...")   
+    
+    if "None" not in dimensionality:
+        print("Performing dimensionality reduction...") 
+        
     if "tSNE" in dimensionality:
         # First PCA and then TSNE
         if norm_counts.shape[1] > tsne_initial_dims:
@@ -176,15 +178,12 @@ def main(counts_table_files,
     elif "FactorAnalysis" in dimensionality:
         reduced_data = FactorAnalysis(n_components=num_dimensions,
                                       random_state=SEED).fit_transform(norm_counts)
-    elif "UMAP" in dimensionality:
+    else: 
         reduced_data = umap.UMAP(n_neighbors=umap_neighbors,
                                  min_dist=umap_min_dist,
                                  n_components=num_dimensions,
                                  random_state=SEED,
                                  metric='euclidean').fit_transform(norm_counts)
-    else:
-        sys.stderr.write("Error, incorrect dimensionality reduction method\n")
-        sys.exit(1)
     
     # Plot the unclustered spots with the class color in the reduced space
     if num_dimensions == 3:
@@ -220,18 +219,19 @@ def main(counts_table_files,
                         min_samples=dbscan_min_size, 
                         metric='euclidean', 
                         n_jobs=-1).fit_predict(reduced_data)
-    elif "Gaussian" in clustering:
+    else:
         gm = GaussianMixture(n_components=num_clusters,
                              covariance_type='full').fit(reduced_data)
         labels = gm.predict(reduced_data)
-    else:
-        sys.stderr.write("Error, incorrect clustering method\n")
-        sys.exit(1)
         
     # Check if there are -1 in the labels and that the number of labels is correct
     if -1 in labels or len(labels) != len(norm_counts.index):
         sys.stderr.write("Error, something went wrong in the clustering..\n")
         sys.exit(1)
+        
+    # If cluster 0 sum 1
+    if 0 in labels:
+        labels = labels + 1
         
     # Plot the clustered spots with the class color in the reduced space
     if num_dimensions == 3:
@@ -261,9 +261,9 @@ def main(counts_table_files,
                      size=spot_size)
         with open(os.path.join(outdir,"computed_clusters_color_2D.tsv"), "w") as filehandler: 
             for s,x,y,l in zip(norm_counts.index,
-                             reduced_data[:,0], 
-                             reduced_data[:,1], 
-                             labels):
+                               reduced_data[:,0], 
+                               reduced_data[:,1], 
+                               labels):
                 filehandler.write("{}\t{}\t{}\t{}\n".format(s,x,y,l))          
                                 
 if __name__ == '__main__':
@@ -271,7 +271,7 @@ if __name__ == '__main__':
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--counts-files", required=True, nargs='+', type=str,
                         help="One or more matrices with gene counts per spot (genes as columns)")
-    parser.add_argument("--normalization", default="RAW", metavar="[STR]", 
+    parser.add_argument("--normalization", default="RAW",
                         type=str, 
                         choices=["RAW", "REL", "CPM"],
                         help="Normalize the counts using:\n" \
@@ -280,7 +280,7 @@ if __name__ == '__main__':
                         "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n" \
                         "(default: %(default)s)")
     parser.add_argument("--num-clusters", default=None, metavar="[INT]", type=int, choices=range(2, 30),
-                        help="The number of clusters/regions expected to be found.\n" \
+                        help="The number of clusters/regions expected to find.\n" \
                         "Note that this parameter has no effect with DBSCAN clustering.")
     parser.add_argument("--num-exp-genes", default=0.01, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
@@ -296,7 +296,7 @@ if __name__ == '__main__':
                         "across all the spots using the variance or the top highest expressed\n" \
                         "(see --top-genes-criteria)\n " \
                         "Low variance or lowly expressed will be discarded (default: %(default)s)")
-    parser.add_argument("--clustering", default="KMeans", metavar="[STR]", 
+    parser.add_argument("--clustering", default="KMeans",
                         type=str, choices=["Hierarchical", "KMeans", "DBSCAN", "Gaussian"],
                         help="What clustering algorithm to use after the dimensionality reduction:\n" \
                         "Hierarchical = Hierarchical clustering (Ward)\n" \
@@ -304,9 +304,10 @@ if __name__ == '__main__':
                         "DBSCAN = Number of clusters will be automatically inferred\n" \
                         "Gaussian = Gaussian Mixtures Model\n" \
                         "(default: %(default)s)")
-    parser.add_argument("--dimensionality", default="tSNE", metavar="[STR]", 
-                        type=str, choices=["tSNE", "PCA", "ICA", "SPCA", "FactorAnalysis", "UMAP"],
-                        help="What dimensionality reduction algorithm to use:\n" \
+    parser.add_argument("--dimensionality", default="tSNE",
+                        type=str, choices=["None", "tSNE", "PCA", "ICA", "SPCA", "FactorAnalysis", "UMAP"],
+                        help="What dimensionality reduction algorithm to use before the clustering:\n" \
+                        "None = no dimensionality reduction\n" \
                         "tSNE = t-distributed stochastic neighbor embedding\n" \
                         "PCA = Principal component analysis\n" \
                         "ICA = Independent component analysis\n" \
@@ -315,7 +316,7 @@ if __name__ == '__main__':
                         "UMAP = Uniform Manifold Approximation and Projection\n" \
                         "(default: %(default)s)")
     parser.add_argument("--use-log-scale", action="store_true", default=False,
-                        help="Use log2(counts + 1) values in the dimensionality reduction step")
+                        help="Transform the counts to log2(counts + 1) after normalization")
     parser.add_argument("--num-dimensions", default=2, metavar="[INT]", type=int,
                         help="The number of dimensions to use in the dimensionality reduction. (default: %(default)s)")
     parser.add_argument("--spot-size", default=4, metavar="[INT]", type=int,
