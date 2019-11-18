@@ -66,7 +66,7 @@ def plot_tsne(x, y, c, filename, title, xlab, ylab, alpha, size, color_scale, le
     # Save the plot in a file if the file name is given
     if filename is not None:
         fig = plt.gcf()
-        fig.savefig(filename, format='pdf', dpi=180)
+        fig.savefig("{}.pdf".format(filename), format='pdf')
         plt.cla()
         plt.close(fig)
     else:
@@ -156,12 +156,12 @@ def main(counts_files,
     color_rgb = coord_to_rgb(x, y, z)
 
     # Plot the cluster colors 
-    plot_tsne(x, y, c=color_clusters, filename="dim_red_clusters.pdf",
+    plot_tsne(x, y, c=color_clusters, filename="dim_red_clusters",
               title="Clusters", xlab=None, ylab=None, alpha=data_alpha, 
               size=dot_size, color_scale="tab20", 
               legend=np.unique(sorted(color_clusters)), color_bar=False)
     # Plot the RGB colors 
-    plot_tsne(x, y, c=color_rgb, filename="rgb_colors.pdf",
+    plot_tsne(x, y, c=color_rgb, filename="rgb_colors",
               title="RGB colors", xlab=None, ylab=None, 
               alpha=data_alpha, size=dot_size, 
               color_scale="tab20", legend=None, color_bar=False)
@@ -175,7 +175,7 @@ def main(counts_files,
             tmp_dict[u] = i + 1
         vals = [tmp_dict[x] for x in values]
         # Plot the variable
-        plot_tsne(x, y, c=vals, filename="{}.pdf".format(var),
+        plot_tsne(x, y, c=vals, filename=var,
                   title=var, xlab=None, ylab=None, 
                   alpha=data_alpha, size=dot_size, color_scale="tab20",
                   legend=unique_vals, color_bar=False)
@@ -184,7 +184,7 @@ def main(counts_files,
         for gene in show_genes:
             try:
                 row_values = counts_normalized.loc[:,gene].to_numpy()
-                plot_tsne(x, y, c=row_values, filename="{}.pdf".format(gene),
+                plot_tsne(x, y, c=row_values, filename=gene,
                           title=gene, xlab=None, ylab=None, 
                           alpha=data_alpha, size=dot_size, color_scale=color_scale,
                           legend=None, color_bar=True)

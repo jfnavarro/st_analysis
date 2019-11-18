@@ -117,6 +117,7 @@ def main(counts_table_files,
          color_scale_clusters,
          filter_genes,
          clusters_file,
+         gene_family,
          outdir,
          use_log_scale,
          standard_transformation,
@@ -189,7 +190,7 @@ def main(counts_table_files,
             sys.exit(1)
         has_clusters = True
     elif clusters_file:
-        sys.stderr.write("Error, clusters file is not valid\n")
+        sys.stderr.write("Error, {} is not a valid file\n".format(clusters_file))
         sys.exit(1)
         
     # Normalization
@@ -205,26 +206,58 @@ def main(counts_table_files,
         print("Applying standard transformation...")
         counts_normalized = ztransformation(counts_normalized)
         
+        
+    # Gene family plots
+    if gene_family and combine_genes != "None":
+        for f in gene_family:
+            if not os.path.isfile(f):
+                sys.stderr.write("Error, {} is not a valid file\n".format(f))
+                sys.exit(1)
+            with open(f, "r") as filehandler:
+                genes = [x.rstrip() for x in filehandler.readlines()]
+            if len(genes) == 0:
+                print("Error, no genes were found in {}\n".format(f))
+                continue
+            # Filter the data with the genes in the set
+            counts = counts_normalized.loc[:,genes]
+            if counts.shape[1] == 0:
+                print("Error, none of the genes from {} were found in the data\n".format(f))
+                continue
+            # Compute the combined score
+            if combine_genes in "NaiveMean":
+                genes_in_set = counts.columns.tolist()
+                present_genes = (counts > 0).sum(axis=1) / len(genes_in_set)
+                counts = counts.assign(Combined=((counts.mean(axis=1) * present_genes).values))
+            elif combine_genes in "NaiveSum":
+                genes_in_set = counts.columns.tolist()
+                present_genes = (counts > 0).sum(axis=1) / len(genes_in_set)
+                counts = counts.assign(Combined=((counts.sum(axis=1) * present_genes).values))      
+            else:
+                # For the CumSum we need to use all the genes so in order to compute p-values
+                genes_in_set = counts_normalized.columns.tolist()
+                counts = counts.assign(Combined=enrichment_score(counts, genes_in_set))
+            # Plot the data
+            plotting_data = compute_plotting_data(counts.loc[:,"Combined"], 
+                                                  names, 
+                                                  0.0,
+                                                  1.0,
+                                                  use_global_scale)
+            if len(plotting_data) == 0:
+                sys.stderr.write("Error, plotting data is empty!\n")
+                sys.exit(1)  
+            fig, ax, sc = plot_data(plotting_data, n_col, n_row, dot_size, data_alpha, color_scale,
+                                    xlim, ylim, not disable_invert_y_axes, not disable_color_bar)
+            # Save the plot
+            clean_name = os.path.splitext(os.path.basename(f))[0]
+            fig.suptitle(clean_name, fontsize=16)
+            fig.savefig(os.path.join(outdir,"Combined_{}_joint_plot.pdf".format(clean_name)), 
+                        format='pdf', dpi=90)
+            plt.close(fig)
+                
     # Gene plots
     if filter_genes:
         try:
             counts_final = filter_data_genes(counts_normalized, filter_genes)
-            # Add a column with the combined genes plot
-            if combine_genes in "NaiveMean":
-                genes_in_set = counts_final.columns.tolist()
-                present_genes = (counts_final > 0).sum(axis=1) / len(genes_in_set)
-                means = counts_normalized.mean(axis=1)
-                counts_final = counts_final.assign(Combined=((counts_final.mean(axis=1) / means) * present_genes).values)
-            elif combine_genes in "NaiveSum":
-                genes_in_set = counts_final.columns.tolist()
-                present_genes = (counts_final > 0).sum(axis=1) / len(genes_in_set)
-                sums = counts_normalized.sum(axis=1)
-                counts_final = counts_final.assign(Combined=((counts_final.sum(axis=1) / sums) * present_genes).values)        
-            elif combine_genes in "CumSum":
-                # For the CumSum I need to use all the genes so in order to compute p-values
-                genes_in_set = counts_final.columns.tolist()
-                counts_final = counts_final.assign(Combined=enrichment_score(counts_normalized, genes_in_set))
-                
             # Compute plotting data and plot genes
             for gene in counts_final.columns:
                 print("Plotting gene {}".format(gene))
@@ -236,11 +269,8 @@ def main(counts_table_files,
                 if len(plotting_data) == 0:
                     sys.stderr.write("Error, plotting data is empty!\n")
                     sys.exit(1)  
-                        
-                # Create a scatter plot for each dataset
                 fig, ax, sc = plot_data(plotting_data, n_col, n_row, dot_size, data_alpha, color_scale,
                                         xlim, ylim, not disable_invert_y_axes, not disable_color_bar)
-            
                 # Save the plot
                 fig.suptitle(gene, fontsize=16)
                 fig.savefig(os.path.join(outdir,"{}_joint_plot.pdf".format(gene)), format='pdf', dpi=90)
@@ -256,10 +286,9 @@ def main(counts_table_files,
             sys.exit(1)  
         fig, ax, sc = plot_data(plotting_data, n_col, n_row, dot_size, data_alpha, color_scale_clusters,
                                 xlim, ylim, not disable_invert_y_axes, not disable_color_bar)
-        
         # Save the plot
         fig.suptitle("Clusters", fontsize=16)
-        fig.savefig(os.path.join(outdir,"Clusters_joint_plot.pdf"), format='pdf', dpi=90)
+        fig.savefig(os.path.join(outdir, "Clusters_joint_plot.pdf"), format='pdf', dpi=90)
         plt.close(fig)
 
 if __name__ == '__main__':
@@ -305,16 +334,21 @@ if __name__ == '__main__':
     parser.add_argument("--standard-transformation", action="store_true", default=False,
                         help="Apply the z-score transformation to each feature (gene)")
     parser.add_argument("--show-genes", help="Regular expression for gene symbols to be shown (one image per gene).\n" \
-                        "The genes matching the reg-exp will be shown in separate files.\n" \
-                        "Can be given several times.",
+                        "The genes matching the reg-exp will be shown in separate files.",
                         required=False,
                         default=None,
                         type=str,
                         nargs='+')
-    parser.add_argument("--clusters-file", help="Path to a tab delimited file containing clustering results for each spot.\n" \
+    parser.add_argument("--clusters", help="Path to a tab delimited file containing clustering results for each spot.\n" \
                         "First column spot id and second column the cluster number (integer).",
                         default=None,
-                        type=str,)
+                        type=str)
+    parser.add_argument("--gene-family", help="Path to one or more files containing set of genes (one per row).\n" \
+                        "A combined image will be generated using the value of --combine-genes",
+                        required=False,
+                        default=None,
+                        type=str,
+                        nargs='+')
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     parser.add_argument("--use-log-scale", action="store_true", default=False, 
                         help="Plot expression in log space (log2)")
@@ -350,7 +384,8 @@ if __name__ == '__main__':
          args.color_scale,
          args.color_scale_clusters,
          args.show_genes,
-         args.clusters_file,
+         args.clusters,
+         args.gene_family,
          args.outdir,
          args.use_log_scale,
          args.standard_transformation,
