@@ -149,6 +149,11 @@ def main(counts_table_files,
         sys.stderr.write("Error, input file/s not present or invalid format\n")
         sys.exit(1)
         
+    if gene_family and \
+    any([not os.path.isfile(f) for f in counts_table_files]):
+        sys.stderr.write("Error, {} is not a valid file\n".format(f))
+        sys.exit(1)
+        
     if num_exp_genes < 0 or num_exp_genes > 1:
         sys.stderr.write("Error, invalid number of expressed genes \n")
         sys.exit(1)
@@ -209,35 +214,36 @@ def main(counts_table_files,
         
     # Gene family plots
     if gene_family and combine_genes != "None":
-        for f in gene_family:
-            if not os.path.isfile(f):
-                sys.stderr.write("Error, {} is not a valid file\n".format(f))
-                sys.exit(1)
+        families = [os.path.splitext(os.path.basename(x))[0] for x in gene_family]
+        counts_families = pd.DataFrame(index=counts_normalized.index, columns=families)
+        for f, name in zip(gene_family, families):
+            
             with open(f, "r") as filehandler:
                 genes = [x.rstrip() for x in filehandler.readlines()]
             if len(genes) == 0:
                 print("Error, no genes were found in {}\n".format(f))
                 continue
+            
             # Filter the data with the genes in the set
-            counts = counts_normalized.loc[:,genes]
+            counts = counts_normalized.loc[:,np.intersect1d(genes, counts_normalized.columns)]
             if counts.shape[1] == 0:
                 print("Error, none of the genes from {} were found in the data\n".format(f))
                 continue
+            genes_in_set = counts.columns.tolist()
+            
             # Compute the combined score
             if combine_genes in "NaiveMean":
-                genes_in_set = counts.columns.tolist()
                 present_genes = (counts > 0).sum(axis=1) / len(genes_in_set)
-                counts = counts.assign(Combined=((counts.mean(axis=1) * present_genes).values))
+                counts_families.loc[:,name] = (counts.mean(axis=1) * present_genes).values
             elif combine_genes in "NaiveSum":
-                genes_in_set = counts.columns.tolist()
                 present_genes = (counts > 0).sum(axis=1) / len(genes_in_set)
-                counts = counts.assign(Combined=((counts.sum(axis=1) * present_genes).values))      
+                counts_families.loc[:,name] = (counts.sum(axis=1) * present_genes).values    
             else:
                 # For the CumSum we need to use all the genes so in order to compute p-values
-                genes_in_set = counts_normalized.columns.tolist()
-                counts = counts.assign(Combined=enrichment_score(counts, genes_in_set))
+                counts_families.loc[:,name] = enrichment_score(counts_normalized, genes_in_set)
+                
             # Plot the data
-            plotting_data = compute_plotting_data(counts.loc[:,"Combined"], 
+            plotting_data = compute_plotting_data(counts_families.loc[:,name], 
                                                   names, 
                                                   0.0,
                                                   1.0,
@@ -253,6 +259,9 @@ def main(counts_table_files,
             fig.savefig(os.path.join(outdir,"Combined_{}_joint_plot.pdf".format(clean_name)), 
                         format='pdf', dpi=90)
             plt.close(fig)
+            
+        # Save the proportions
+        counts_families.to_csv("gene_families.tsv", sep="\t")
                 
     # Gene plots
     if filter_genes:
