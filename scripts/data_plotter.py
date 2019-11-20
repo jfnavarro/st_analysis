@@ -133,33 +133,33 @@ def main(counts_table_files,
          combine_genes):
          
     if cutoff_upper <= cutoff:
-        sys.stderr.write("Error, incorrect cut-off values\n")
+        sys.stderr.write("Error, incorrect cut-off values {}\n".format(cutoff))
         sys.exit(1)
         
     if dot_size < 0:
-        sys.stderr.write("Error, incorrect dot size\n")
+        sys.stderr.write("Error, incorrect dot size {}\n".format(dot_size))
         sys.exit(1)
         
     if data_alpha < 0 or data_alpha > 1:
-        sys.stderr.write("Error, incorrect alpha value\n")
+        sys.stderr.write("Error, incorrect alpha value {}\n".format(data_alpha))
         sys.exit(1)
         
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
-        sys.stderr.write("Error, input file/s not present or invalid format\n")
+        sys.stderr.write("Error, input counts not present or invalid format {}.\n".format('\n'.join(counts_table_files)))
         sys.exit(1)
         
     if gene_family and \
     any([not os.path.isfile(f) for f in counts_table_files]):
-        sys.stderr.write("Error, {} is not a valid file\n".format(f))
+        sys.stderr.write("Error, input gene family not present or invalid format {}.\n".format('\n'.join(counts_table_files)))
         sys.exit(1)
         
     if num_exp_genes < 0 or num_exp_genes > 1:
-        sys.stderr.write("Error, invalid number of expressed genes \n")
+        sys.stderr.write("Error, invalid number of expressed genes {}\n".format(num_exp_genes))
         sys.exit(1)
          
     if num_exp_spots < 0 or num_exp_spots > 1:
-        sys.stderr.write("Error, invalid number of expressed genes \n")
+        sys.stderr.write("Error, invalid number of expressed genes {}\n".format(num_exp_spots))
         sys.exit(1)
         
     if outdir is None or not os.path.isdir(outdir): 
@@ -244,7 +244,7 @@ def main(counts_table_files,
                 
             # Plot the data
             plotting_data = compute_plotting_data(counts_families.loc[:,name], 
-                                                  names, 
+                                                  families, 
                                                   0.0,
                                                   1.0,
                                                   use_global_scale)
@@ -254,9 +254,8 @@ def main(counts_table_files,
             fig, ax, sc = plot_data(plotting_data, n_col, n_row, dot_size, data_alpha, color_scale,
                                     xlim, ylim, not disable_invert_y_axes, not disable_color_bar)
             # Save the plot
-            clean_name = os.path.splitext(os.path.basename(f))[0]
-            fig.suptitle(clean_name, fontsize=16)
-            fig.savefig(os.path.join(outdir,"Combined_{}_joint_plot.pdf".format(clean_name)), 
+            fig.suptitle(name, fontsize=16)
+            fig.savefig(os.path.join(outdir,"Combined_{}_joint_plot.pdf".format(name)), 
                         format='pdf', dpi=90)
             plt.close(fig)
             
