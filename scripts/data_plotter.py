@@ -146,12 +146,14 @@ def main(counts_table_files,
         
     if len(counts_table_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_table_files]):
-        sys.stderr.write("Error, input counts not present or invalid format {}.\n".format('\n'.join(counts_table_files)))
+        sys.stderr.write("Error, input counts not present or invalid " \
+                         "format\n{}.\n".format('\n'.join(counts_table_files)))
         sys.exit(1)
         
     if gene_family and \
     any([not os.path.isfile(f) for f in counts_table_files]):
-        sys.stderr.write("Error, input gene family not present or invalid format {}.\n".format('\n'.join(counts_table_files)))
+        sys.stderr.write("Error, input gene family not present or invalid " \
+                         "format\n{}.\n".format('\n'.join(counts_table_files)))
         sys.exit(1)
         
     if num_exp_genes < 0 or num_exp_genes > 1:
@@ -244,7 +246,7 @@ def main(counts_table_files,
                 
             # Plot the data
             plotting_data = compute_plotting_data(counts_families.loc[:,name], 
-                                                  families, 
+                                                  names, 
                                                   0.0,
                                                   1.0,
                                                   use_global_scale)
