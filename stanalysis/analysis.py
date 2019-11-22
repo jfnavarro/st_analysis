@@ -68,7 +68,7 @@ def weighted_color(colors, probs, n_bins=100):
     a list of colours, probabalities and number of bins"""
     n_classes = float(len(colors)-1)
     l = 1.0 / n_bins
-    h = 1-l
+    h = 1 - l
     p = 0.0
     for i,prob in enumerate(probs):
         wi = linear_conv(float(i),0.0,n_classes,h,l)
@@ -121,7 +121,7 @@ def log_binom(n,k):
 # https://github.com/almaan/STDGE/blob/master/enrich.py
 def fex(target_set, query_set, full_set, alpha=0.05):
     """
-    Fischer Exact test for 3 sets of genes (target, query and full)
+    Fisher Exact test for 3 sets of genes (target, query and full)
     """
     ts = set(target_set)
     qs = set(query_set)

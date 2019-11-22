@@ -262,7 +262,7 @@ def main(counts_table_files,
             plt.close(fig)
             
         # Save the proportions
-        counts_families.to_csv("gene_families.tsv", sep="\t")
+        counts_families.to_csv(os.path.join(outdir,"gene_families.tsv"), sep="\t")
                 
     # Gene plots
     if filter_genes:
