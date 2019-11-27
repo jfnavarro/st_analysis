@@ -52,6 +52,7 @@ def main(counts_table_files,
          tsne_theta,
          umap_neighbors,
          umap_min_dist,
+         umap_metric,
          tsne_initial_dims,
          pca_auto_components,
          dbscan_min_size,
@@ -183,7 +184,7 @@ def main(counts_table_files,
                                  min_dist=umap_min_dist,
                                  n_components=num_dimensions,
                                  random_state=SEED,
-                                 metric='euclidean').fit_transform(norm_counts)
+                                 metric=umap_metric).fit_transform(norm_counts)
     
     # Plot the unclustered spots with the class color in the reduced space
     if num_dimensions == 3:
@@ -332,7 +333,9 @@ if __name__ == '__main__':
     parser.add_argument("--umap-neighbors", default=15, metavar="[INT]", type=int,
                         help="The number of neighboring points used in local approximations of manifold structure (UMAP) (default: %(default)s)")
     parser.add_argument("--umap-min-dist", default=0.1, metavar="[FLOAT]", type=float,
-                        help="This controls how tightly the embedding is allowed compress points together (UMAP) (default: %(default)s)")
+                        help="This controls how tightly the embedding is allowed to compress points together (UMAP) (default: %(default)s)")
+    parser.add_argument("--umap-metric", default="euclidean", metavar="[STR]", type=str,
+                        help="This controls how the distance is computed in the ambient space of the input data (UMAP) (default: %(default)s)")
     parser.add_argument("--tsne-initial-dims", default=50, metavar="[INT]", type=int,
                         help="The number of initial dimensions of the PCA step in the t-SNE clustering. (default: %(default)s)")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
@@ -364,6 +367,7 @@ if __name__ == '__main__':
          args.tsne_theta,
          args.umap_neighbors,
          args.umap_min_dist,
+         args.umap_metric,
          args.tsne_initial_dims,
          args.pca_auto_components,
          args.dbscan_min_size,
