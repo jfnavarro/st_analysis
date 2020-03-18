@@ -32,7 +32,7 @@ def main(counts_matrix, reg_exps, outfile):
     counts_table = pd.read_csv(counts_matrix, sep="\t", header=0, index_col=0)
     genes = counts_table.columns
     # Filter out genes that match any of the reg-exps
-    genes = [gene for gene in genes if any([re.fullmatch(regex,gene) for regex in reg_exps])]
+    genes = [gene for gene in genes if any([re.match(regex,gene) for regex in reg_exps])]
     counts_table.drop(genes, axis=1, inplace=True)
     # Write filtered table
     counts_table.to_csv(outfile, sep='\t')
