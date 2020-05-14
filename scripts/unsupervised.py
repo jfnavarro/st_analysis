@@ -16,7 +16,7 @@ dimensionality reduction technique to use and normalization method to use.
 Noisy spots (very few genes expressed) are removed using a parameter.
 Noisy genes (expressed in very few spots) are removed using a parameter.
 
-@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
+@Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """
 import argparse
 import sys

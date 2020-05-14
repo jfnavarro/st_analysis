@@ -5,7 +5,7 @@ image as reference. It provides different alignment methods (manual
 and automatic) and it outputs the aligned images, the aligned counts
 matrices and the aligment matrices. 
 
-@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
+@Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """
 import tissue_recognition as tr
 import numpy as np

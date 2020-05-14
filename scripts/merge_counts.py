@@ -3,7 +3,7 @@
 This script simply merges matrices of counts (ST datasets) into a combined one.\n
 The merging is done by rows adding an optional index to the rows that corresponds to the order in the input.
 
-@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
+@Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """
 
 import argparse

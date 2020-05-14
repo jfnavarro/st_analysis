@@ -21,7 +21,7 @@ are given the script will compute accuracy of the prediction.
 The script allows to normalize the train/test counts using different
 methods as well as pre-filtering operations.
 
-@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
+@Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """
 import argparse
 import sys

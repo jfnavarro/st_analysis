@@ -1,6 +1,6 @@
 #!/usr/bin/python
 """
-A tool kit for analysis, visualization and machine learning 
+A tool kit for analysis and visualization 
 of Spatial Transcriptomics datasets
 """
 
@@ -21,7 +21,7 @@ setup(
   long_description = long_description,
   keywords = 'rna-seq analysis machine_learning spatial transcriptomics toolkit',
   author = 'Jose Fernandez Navarro',
-  author_email = 'jose.fernandez.navarro@scilifelab.se',
+  author_email = 'jc.fernandez.navarro@gmail.com',
   license = 'MIT',
   packages = find_packages(),
   include_package_data = False,
@@ -35,11 +35,7 @@ setup(
     'pandas',
     'sklearn',
     'matplotlib>=3.1.0',
-    'rpy2',
-    'Pillow',
-    'jinja2',
-    'tzlocal',
-    'tqdm'
+    'pytorch'
   ],
   #test_suite = 'tests',
   scripts = glob.glob('scripts/*.py'),

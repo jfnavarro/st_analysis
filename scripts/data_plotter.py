@@ -16,7 +16,7 @@ It allows to plot combined gene sets (one plot for the whole set)
 
 It allows to plot clusters (one cluster per spot) 
 
-@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
+@Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """
 
 import argparse

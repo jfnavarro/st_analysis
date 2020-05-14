@@ -10,7 +10,7 @@ XxY
 And keeps the columns of genes
 matching the regular expression given as input.
 
-@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
+@Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """
 
 import argparse

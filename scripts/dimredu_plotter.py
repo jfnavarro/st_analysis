@@ -11,7 +11,7 @@ and generates a set of scatter plots:
 
 The script allows to normalize and filter the data too. 
 
-@Author Jose Fernandez Navarro <jose.fernandez.navarro@scilifelab.se>
+@Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """
 
 import argparse

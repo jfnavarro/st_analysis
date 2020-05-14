@@ -5,58 +5,7 @@ from matplotlib import colors as mpcolors
 from scipy.special import loggamma
 from collections import Counter
 import numpy as np
-from rpy2.robjects import pandas2ri, r, numpy2ri, globalenv
-import rpy2.robjects as ro
-from rpy2.robjects.conversion import localconverter
-import rpy2.robjects.packages as rpackages
-base = rpackages.importr("base")
 
-def RimportLibrary(lib_name):
-    """ Helper function to import R libraries
-    using the rpy2 binder
-    """
-    if not rpackages.isinstalled(lib_name):
-        base.source("http://www.bioconductor.org/biocLite.R")
-        biocinstaller = rpackages.importr("BiocInstaller")
-        biocinstaller.biocLite(lib_name)
-    return rpackages.importr(lib_name)
-
-def deaDESeq2(counts, conds, comparisons, alpha):
-    """Makes a call to DESeq2 to perform D.E.A. in the given
-    counts matrix with the given conditions and comparisons.
-    Returns a list of DESeq2 results for each comparison
-    """
-    pandas2ri.activate()
-    results = list()
-    try:
-        deseq2 = RimportLibrary("DESeq2")
-        # Create the R conditions and counts data
-        with localconverter(ro.default_converter + pandas2ri.converter):
-            r_counts = ro.conversion.py2rpy(counts)
-        cond = robjects.DataFrame({"conditions": robjects.StrVector(conds)})
-        design = r('formula(~ conditions)')
-        dds = r.DESeqDataSetFromMatrix(countData=r_counts, colData=cond, design=design)
-        dds = r.DESeq(dds, parallel=False, useT=True, 
-                      minmu=1e-6, minReplicatesForReplace=np.inf)
-        # Perform the comparisons and store results in list
-        for A,B in comparisons:
-            result = r.results(dds, 
-                               contrast=r.c("conditions", A, B), 
-                               alpha=alpha, 
-                               parallel=False)
-            result = r['as.data.frame'](result)
-            genes = r['rownames'](result)
-            with localconverter(ro.default_converter + pandas2ri.converter):
-                result = ro.conversion.rpy2py(result)
-            # There seems to be a problem parsing the rownames from R to pandas
-            # so we do it manually
-            result.index = genes
-            results.append(result)
-    except Exception as e:
-        raise e
-    finally:
-        pandas2ri.deactivate()
-    return results
 
 def linear_conv(old, min, max, new_min, new_max):
     """ A simple linear conversion of one value for one scale to another
