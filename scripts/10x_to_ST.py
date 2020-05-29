@@ -12,6 +12,7 @@ import pandas as pd
 import loompy as lp
 import sys
 
+# Most of this code was borrowed from Alma Anderson
 def main(matrix, features, barcodes, positions, outdir):
     
     if not outdir:
