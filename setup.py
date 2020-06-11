@@ -35,7 +35,8 @@ setup(
     'pandas',
     'sklearn',
     'matplotlib>=3.1.0',
-    'torch'
+    'torch',
+    'umap-learn',
   ],
   #test_suite = 'tests',
   scripts = glob.glob('scripts/*.py'),

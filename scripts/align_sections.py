@@ -7,7 +7,10 @@ matrices and the aligment matrices.
 
 @Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """
-import tissue_recognition as tr
+try:
+    import tissue_recognition as tr
+except ImportError as e:
+    print("Error importing st_tissue_recognition")
 import numpy as np
 from imageio import imread
 from matplotlib import pyplot as plt
@@ -642,11 +645,13 @@ def main(counts_files, images_files, down_width, down_height, outdir,
         
     # Save images
     for img, name in zip(transformed_original_images, images_files):
-        matplotlib.image.imsave(os.path.join(outdir, "aligned_" + name), img)
+        clean_name = os.path.basename(name).split(".")[0]
+        matplotlib.image.imsave(os.path.join(outdir, "aligned_{}.jpg".format(clean_name)), img)
     
     # Save counts
     for counts, name in zip(transformed_counts, counts_files):
-        counts.to_csv(os.path.join(outdir, "aligned_" + name), sep="\t")
+        clean_name = os.path.basename(name).split(".")[0]
+        counts.to_csv(os.path.join(outdir, "aligned_{}.tsv".format(clean_name)), sep="\t")
         
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
