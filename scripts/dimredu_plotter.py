@@ -1,13 +1,13 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 """ 
-Script that creates takes as input a dimensionality reduced set of coordinates (For each spot),
-a matrix counts (spots x genes), a set of of covariates (per spot) and a list of genes
-and generates a set of scatter plots:
+Script that takes as input a dimensionality reduced set of coordinates (per spot),
+a matrix counts (spots x genes), a set of of covariates (per spot) and an
+optional list of genes and generates a set of scatter plots:
 
 - dimensionality reduced spots colored by proximity and cluster id
 - one plot for each covariate in the dimensionality reduced space
-- one plot for each gene in the dimensionality reduced space
+- one plot for each gene in the dimensionality reduced space (if provided)
 
 The script allows to normalize and filter the data too. 
 
@@ -197,10 +197,10 @@ if __name__ == '__main__':
     parser.add_argument("--counts-files", required=True, nargs='+', type=str,
                         help="One or more matrices with gene counts per feature/spot (genes as columns)")
     parser.add_argument("--dim-redu-file", required=True, metavar="[STR]", type=str,
-                        help="One file containing the dimensionality reduction results\n" \
+                        help="One file containing the dimensionality reduction results\n"
                         "for each spot (same order as provided in --counts-files)")
     parser.add_argument("--meta-file", required=True, metavar="[STR]", type=str,
-                        help="One meta info file (matrix) where rows are the same as the counts matrices\n" \
+                        help="One meta info file (matrix) where rows are the same as the counts matrices\n"
                         "(same order) and columns are info variables")
     parser.add_argument("--data-alpha", type=float, default=0.8, metavar="[FLOAT]",
                         help="The transparency level for the data points, 0 min and 1 max (default: %(default)s)")
@@ -216,7 +216,7 @@ if __name__ == '__main__':
                         help="Normalize the counts using:\n" \
                         "RAW = absolute counts\n" \
                         "REL = Each gene count divided by the total count of its spot\n" \
-                        "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n" \
+                        "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n"
                         "(default: %(default)s)")
     parser.add_argument("--standard-transformation", action="store_true", default=False,
                         help="Apply the z-score transformation to each feature (gene)")
@@ -224,7 +224,7 @@ if __name__ == '__main__':
     parser.add_argument("--use-log-scale", action="store_true", default=False, 
                         help="Plot expression in log space (log2 + 1)")
     parser.add_argument("--num-exp-genes", default=0.01, metavar="[FLOAT]", type=float,
-                        help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
+                        help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n"
                         "must have to be kept from the distribution of all expressed genes (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--num-exp-spots", default=0.01, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed spots a gene\n" \
@@ -232,7 +232,7 @@ if __name__ == '__main__':
     parser.add_argument("--min-gene-expression", default=1, type=float, metavar="[FLOAT]",
                         help="The minimum count (number of reads) a gene must have in a spot to be\n"
                         "considered expressed (default: %(default)s)")
-    parser.add_argument("--show-genes", help="List of genes to plot on top of the dimensionality reduction.\n" \
+    parser.add_argument("--show-genes", help="List of genes to plot on top of the dimensionality reduction.\n"
                         "One plot per gene will be created. Can be given several times.",
                         required=False,
                         default=None,

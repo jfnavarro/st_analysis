@@ -3,7 +3,10 @@
 This script aligns a set of images/counts matrices using the first
 image as reference. It provides different alignment methods (manual
 and automatic) and it outputs the aligned images, the aligned counts
-matrices and the aligment matrices. 
+matrices and the alignment matrices.
+
+@TODO remove spots outside frame when converted
+@TODO allow to pass spot coordinates files and transform it too
 
 @Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """
@@ -12,31 +15,20 @@ try:
 except ImportError as e:
     print("Error importing st_tissue_recognition")
 import numpy as np
-from imageio import imread
 from matplotlib import pyplot as plt
 import matplotlib
-from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
-from matplotlib.text import Text
 from matplotlib.image import AxesImage
 import cv2
 import os
 import pandas as pd
-import re
 import sys
 import argparse
-import scipy
-from math import sqrt
-from sklearn.neighbors import NearestNeighbors 
-from skimage import feature
+from sklearn.neighbors import NearestNeighbors
 from skimage.measure import regionprops
 from skimage import filters
-from skimage.exposure import cumulative_distribution
-from skimage import img_as_bool
-from skimage.transform import resize, AffineTransform, warp
 
 def best_fit_transform(A, B):
-    '''
+    """
     Calculates the least-squares best-fit transform that maps 
     corresponding points A to B in m spatial dimensions
     Input:
@@ -46,7 +38,7 @@ def best_fit_transform(A, B):
       T: (m+1)x(m+1) homogeneous transformation matrix that maps A on to B
       R: mxm rotation matrix
       t: mx1 translation vector
-    '''
+    """
     assert A.shape == B.shape
     # get number of dimensions
     m = A.shape[1]
@@ -72,7 +64,7 @@ def best_fit_transform(A, B):
     return T, R, t
 
 def nearest_neighbor(src, dst):
-    '''
+    """
     Find the nearest (Euclidean) neighbor in dst for each point in src
     Input:
         src: Nxm array of points
@@ -80,7 +72,7 @@ def nearest_neighbor(src, dst):
     Output:
         distances: Euclidean distances of the nearest neighbor
         indices: dst indices of the nearest neighbor
-    '''
+    """
     assert src.shape == dst.shape
     neigh = NearestNeighbors(n_neighbors=1)
     neigh.fit(dst)
@@ -88,7 +80,7 @@ def nearest_neighbor(src, dst):
     return distances.ravel(), indices.ravel()
 
 def icp(A, B, init_pose=None, max_iterations=50, tolerance=0.001):
-    '''
+    """
     The Iterative Closest Point method: finds best-fit transform that maps points A on to points B
     Input:
         A: Nxm numpy array of source mD points
@@ -100,7 +92,7 @@ def icp(A, B, init_pose=None, max_iterations=50, tolerance=0.001):
         T: final homogeneous transformation that maps A on to B
         distances: Euclidean distances (errors) of the nearest neighbor
         i: number of iterations to converge
-    '''
+    """
     assert A.shape == B.shape
     # get number of dimensions
     m = A.shape[1]
@@ -130,6 +122,16 @@ def icp(A, B, init_pose=None, max_iterations=50, tolerance=0.001):
     return T, distances, i
 
 def plot_images(image_list, is_gray=False, filename=None):
+    """
+    Helper function to debug
+    Args:
+        image_list: list of images (OpenCV)
+        is_gray: whether the images are in grayscale or not
+        filename: name of the output file
+
+    Returns: None
+
+    """
     columns = int(round(np.sqrt(len(image_list))))
     rows = int(np.ceil(np.sqrt(len(image_list))))
     fig = plt.figure(figsize = (16, 16))
@@ -149,24 +151,9 @@ def plot_images(image_list, is_gray=False, filename=None):
     plt.clf()
     plt.cla()
     
-def plot_points(x, y, xlim=None, ylim=None, filename=None, invert=False):
-    a = plt.subplot(1, 1, 1)
-    sc = a.scatter(x, y, s=5)
-    if invert:
-        a.invert_yaxis()
-    if xlim:
-         a.set_xlim(xlim)
-    if ylim:
-        a.set_ylim(ylim)
-    if filename is not None:
-        plt.savefig(filename)
-    else:
-        plt.show()
-    plt.clf()
-    plt.cla()
-    
 def get_binary_masks(image_list):
-    """Obtains a mask of the image using
+    """
+    Obtains a mask of the image using
     the tissue recognition library (automatic)
     """
     assert(len(image_list) > 0)
@@ -178,7 +165,8 @@ def get_binary_masks(image_list):
     return binary_masks
     
 def mask_images(image_list, binary_masks):
-    """Applies binary masks to a list of images
+    """
+    Applies binary masks to a list of images
     """
     assert(len(image_list) == len(binary_masks))
     masked_images = list()
@@ -191,7 +179,8 @@ def mask_images(image_list, binary_masks):
     return masked_images
 
 def center_images(image_list, binary_masks):
-    """Center masked images using their center of mass
+    """
+    Centers masked images using their center of mass
     Returns the centered images and the transformations
     """
     assert(len(image_list) == len(binary_masks))
@@ -216,7 +205,8 @@ def center_images(image_list, binary_masks):
     return centered_images, centered_maks, transf_matrices
 
 def add_borders(image_list, size=1000):
-    """Adds a white border to an image
+    """
+    Adds a white border to images
     """
     images_border = list()
     for image in image_list:
@@ -228,7 +218,8 @@ def add_borders(image_list, size=1000):
     return images_border
 
 def remove_borders(image_list, size=1000):
-    """Removes a white border of an image
+    """
+    Removes a white border of images
     """
     images_no_border = list()
     for image in image_list:
@@ -238,7 +229,8 @@ def remove_borders(image_list, size=1000):
     return images_no_border
     
 def mse(imageA, imageB):
-    """The 'Mean Squared Error' between the two images is the
+    """
+    The 'Mean Squared Error' between the two images is the
     sum of the squared difference between the two images;
     NOTE: the two images must have the same dimension
     returns the MSE, the lower the error, the more "similar"
@@ -250,8 +242,9 @@ def mse(imageA, imageB):
     return err
 
 def euclidean_alignment(image_list, number_of_iterations=1000, termination_eps=0.0001):
-    """ Aligns images using the first image as reference
-    The methods uses the brigthness and the contour to find
+    """
+    Aligns images using the first image as reference
+    The methods uses the brightness and the contour to find
     the best alignment.
     Returns the aligned images and the warp transformations
     """
@@ -309,7 +302,8 @@ def euclidean_alignment(image_list, number_of_iterations=1000, termination_eps=0
     return aligned_images, warp_list
 
 def detect_edges(image, sigma=0.33):
-    """Detects edges in image using
+    """
+    Detects edges in image using
     the Canny detection algorithm and returns
     the x,y coordinates of the edges
     """
@@ -322,7 +316,8 @@ def detect_edges(image, sigma=0.33):
     return ref_coordinates
 
 def edges_detection_aligment(image_list):
-    """ Aligns images using the first image as reference
+    """
+    Aligns images using the first image as reference
     The methods uses edges detection and points matching to find
     the best alignment.
     Returns the aligned images and the warp transformations
@@ -375,7 +370,8 @@ def edges_detection_aligment(image_list):
     return aligned_images, warp_list
 
 def select_points(img):
-    """Lets the user select points
+    """
+    Lets the user select points
     in an image and returns the points
     """
     posList = list()
@@ -394,7 +390,8 @@ def select_points(img):
     return np.array(posList)
     
 def manual_aligment(image_list):
-    """ Aligns images using the first image as reference
+    """
+    Aligns images using the first image as reference
     The methods lets the user chooses points to be used as references
     Returns the aligned images and the warp transformations
     """
@@ -450,7 +447,8 @@ def manual_aligment(image_list):
     return aligned_images, warp_list
 
 def project_warp_matrix(warp_list, warp_list_c, images, w, h):
-    """Adjusts the warp transformation matrices to work on the 
+    """
+    Adjusts the warp transformation matrices to work on the
     original images by combining them
     """
     assert(len(warp_list) == len(images) == len(warp_list_c))
@@ -471,8 +469,9 @@ def project_warp_matrix(warp_list, warp_list_c, images, w, h):
     return warp_list_backtransf
 
 def transform_original_image(image_list, warp_list_backtransf):
-    """ Given a list of images and a list of affine matrices
-    transform the images with the matrices and returns the 
+    """
+    Given a list of images and a list of affine transformation
+    transform the images with the transformation and returns the
     transformed images
     """
     assert(len(warp_list_backtransf) == len(image_list))
@@ -486,8 +485,9 @@ def transform_original_image(image_list, warp_list_backtransf):
     return transformed_images
 
 def transform_counts(counts_list, image_list, warp_list):
-    """ Given a list of counts matrices and a list of affine matrices
-    transform the spots in the matrices with the affine matrices and returns the 
+    """
+    Given a list of counts matrices and a list of affine transformation
+    transform the spots in the transformation with the affine matrices and returns the
     transformed counts matrices
     """
     assert(len(warp_list) == len(image_list) == len(counts_list))
@@ -502,14 +502,14 @@ def transform_counts(counts_list, image_list, warp_list):
         spot_coords = np.zeros((counts.shape[0],2), dtype=np.float32)
         for i,spot in enumerate(counts.index):
             x,y = spot.split("x")
-            spot_coords[i,0] = float(x)
-            spot_coords[i,1] = float(y)
+            spot_coords[i,0] = int(x)
+            spot_coords[i,1] = int(y)
         spot_coords = np.hstack([spot_coords, np.ones((spot_coords.shape[0], 1))])
         M = np.vstack([warp_matrix, [0, 0, 1]])
         A = t_inv @ M @ t 
         spot_coords_adjusted = np.dot(A, spot_coords.transpose()).transpose()
-        counts.index = ["{}x{}".format(abs(x), abs(y)) for x,y in zip(np.around(spot_coords_adjusted[:,0], 2),
-                                                                      np.around(spot_coords_adjusted[:,1], 2))]
+        counts.index = ["{}x{}".format(abs(x), abs(y)) for x,y in zip(spot_coords_adjusted[:,0],
+                                                                      spot_coords_adjusted[:,1])]
         #TODO Remove spots that are outside after alignment
         transformed_counts.append(counts)
     return transformed_counts

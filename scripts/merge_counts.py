@@ -9,7 +9,6 @@ The merging is done by rows adding an optional index to the rows that correspond
 import argparse
 import sys
 import os
-import pandas as pd
 from stanalysis.preprocessing import aggregate_datatasets
 
 def main(counts_files, no_header, no_index, outfile):

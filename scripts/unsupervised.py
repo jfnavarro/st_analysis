@@ -3,12 +3,12 @@
 """
 This tool performs unsupervised learning on one or more
 Spatial Transcriptomics datasets (matrices of counts)
-It takes a list of datasets as input and outputs (for each given input):
+It takes a list of datasets as input and outputs:
 
- - a file containing the reduced coordinates and their labels
+ - a file containing the reduced coordinates and their labels (for each spot)
  - a scatter plot (dimensionality reduction space) colored by computed classes
 
-The input data frames must have the gene names as columns and the spots coordinates as rows.
+The input datasets must have gene names as columns and spots coordinates as rows.
 
 The user can select what clustering algorithm to use, what 
 dimensionality reduction technique to use and normalization method to use. 
@@ -21,18 +21,13 @@ Noisy genes (expressed in very few spots) are removed using a parameter.
 import argparse
 import sys
 import os
-import numpy as np
-import pandas as pd
 from sklearn.decomposition import PCA, FastICA, SparsePCA, FactorAnalysis
 from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering
 from sklearn.mixture import GaussianMixture
 from sklearn.manifold import TSNE
 import umap
-from stanalysis.visualization import scatter_plot, scatter_plot3d, histogram
+from stanalysis.visualization import scatter_plot, scatter_plot3d
 from stanalysis.preprocessing import *
-from stanalysis.analysis import linear_conv
-from collections import defaultdict
-import matplotlib.pyplot as plt
 
 def main(counts_table_files, 
          normalization, 

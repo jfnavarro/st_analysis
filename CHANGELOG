@@ -75,8 +75,10 @@ Version 0.5.6
 * Added option to make a joint plot of a gene set in st_data_plotter
 
 Version 0.6.0
-* Improvements in data_plotter
-* Improvements in unsupervised
+* Removed R dependencies
+* Improvements in data_plotter.py
+* Improvements in unsupervised.py
 * Removed deprecated scripts
-* Added script to perform image alignment
-* Added script to plot genes and covariates onto a dimensionality reduced space
+* Added script to perform image/data alignment of consecutive sections
+* Added script to plot genes and covariates onto a dimensionality reduced space (manifold)
+* Added script to convert a Visium dataset to a ST dataset

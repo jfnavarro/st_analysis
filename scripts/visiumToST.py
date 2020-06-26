@@ -5,11 +5,12 @@ to a Spatial Transcriptomics dataset
 import os
 import scipy.io
 import pandas as pd
+import numpy as np
 import sys
 import argparse
 
-# Most of this code was borrowed from Alma Anderson (@almaan)
-def main(matrix, features, barcodes, positions, outdir):
+# Most of this code was borrowed from Alma Anderson (github@almaan)
+def main(matrix, features, barcodes, positions, outdir, adjust):
     
     if not outdir:
         outdir = os.getcwd()
@@ -20,7 +21,7 @@ def main(matrix, features, barcodes, positions, outdir):
         sys.exit(1)
 
     if not os.path.isfile(features):
-        sys.stderr.write("Error, input feaatures not present or invalid format\n")
+        sys.stderr.write("Error, input features not present or invalid format\n")
         sys.exit(1)
         barcodes
         
@@ -32,18 +33,18 @@ def main(matrix, features, barcodes, positions, outdir):
         sys.stderr.write("Error, input positions not present or invalid format\n")
         sys.exit(1)
 
-    # Parse the matrix of counts
-    mat = scipy.io.mmread(matrix)
-    
     # Parse the genes
     genes = pd.read_csv(features, sep='\t', header=None, index_col=None)
     genes.columns = ['ensg', 'hgnc', 'info']
     genes = genes['hgnc'].values
     
     # Parse the barcodes
-    barcodes = pd.Index(pd.read_csv(barcodes, sep='\t', 
-                                    header=None, index_col=None).values.reshape(-1,))
-    
+    barcodes = pd.read_csv(barcodes, sep='\t',
+                           header=None, index_col=None).values.flatten()
+
+    # Parse the matrix of counts
+    mat = scipy.io.mmread(matrix)
+
     # Parse the positions and create the ST data frame
     dmat = pd.DataFrame(mat.toarray().T, index=barcodes, columns=genes)
     tp = pd.read_csv(positions, sep=',', header=None, index_col=0)
@@ -55,23 +56,30 @@ def main(matrix, features, barcodes, positions, outdir):
     dmat.index = ["{}x{}".format(x, y) for x, y in zip(tp['x'].values, tp['y'].values)]
     dmat.to_csv(os.path.join(outdir, "st_data.tsv"), index=True, header=True, sep='\t')
     
-    # Create the ST spot coordinate file
-
-    tp = tp.loc[:, ['px', 'py']]
+    # Create the ST spot coordinate file (Pixel x and y coordinates are transposed in Visium)
     tp.index = dmat.index
+    if adjust:
+        tp = tp.loc[:, ['py', 'px']]
+        tp = pd.DataFrame(data=np.transpose(np.rot90(tp, k=1, axes=(1, 0))),
+                          index=tp.index,
+                          columns=tp.columns)
+    else:
+        tp = tp.loc[:, ['px', 'py']]
     tp.to_csv(os.path.join(outdir, "st_coordinates.tsv"), index=True, header=False, sep='\t')
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--matrix", required=True, type=str,
-                        help="10x matrix file in GMX format")
+                        help="Visium matrix file in GMX format")
     parser.add_argument("--features", required=True, type=str,
-                        help="10x features file in TSV format")
+                        help="Visium features file in TSV format")
     parser.add_argument("--barcodes", required=True, type=str,
-                        help="10x barcodes file in TSV format")
+                        help="Visium barcodes file in TSV format")
     parser.add_argument("--positions", required=True, type=str,
-                        help="10x positions file in CSV format")
+                        help="Visium positions file in CSV format")
+    parser.add_argument("--adjust", action="store_true", default=False,
+                        help="Transform the Visium coordinates origin to ST coordinates origin")
     parser.add_argument("--outdir", help="Name of the output folder")
     args = parser.parse_args()
-    main(args.matrix, args.features, args.barcodes, args.positions, args.outdir)
+    main(args.matrix, args.features, args.barcodes, args.positions, args.outdir, args.adjust)

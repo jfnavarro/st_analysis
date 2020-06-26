@@ -1,19 +1,18 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 """ 
-This script performs a supervised training and prediction for ST datasets
+This script performs a supervised training and prediction for
+Spatial Transcriptomics datasets
 
 The multi-class classification is performed using a 2 layers
-neural network with the option to use CUDA
+neural network with the option to use GPU (CUDA) acceleration
 
-The training set will be a matrix
-with counts (genes as columns and spots as rows)
+The training set will be a matrix with counts (genes as columns and spots as rows)
 and the test set will be a matrix of counts with the same format
 
 One file with class labels for the training set is needed
-so the classifier knows what class each spot(row) in
-the training set belongs to, the file should
-be tab delimited :
+so for the classifier to know what class each spot(row) in
+the training set belongs to, the file should be tab delimited :
 
 SPOT_NAME(as it in the matrix) CLASS_NUMBER
 
@@ -22,7 +21,7 @@ test set. If class labels for the test sets
 are given the script will compute accuracy of the prediction.
 
 The script allows to normalize the train/test counts using different
-methods as well as pre-filtering operations.
+methods as well as performing pre-filtering operations.
 
 @Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """

@@ -79,12 +79,12 @@ def compute_plotting_data_clusters(counts, names, clusters):
 def plot_data(plotting_data, n_col, n_row, dot_size, data_alpha,
               color_scale, xlim, ylim, invert=False, colorbar=False):
     fig, ax = plt.subplots(n_row, n_col, figsize=(4*n_col, 4*n_row,)) 
-    fig.subplots_adjust(left = 0.1, 
-                        right = 0.9,
-                        bottom = 0.1,
-                        top = 0.9,
-                        hspace = 0.2, 
-                        wspace = 0.4)  
+    fig.subplots_adjust(left=0.1,
+                        right=0.9,
+                        bottom=0.1,
+                        top=0.9,
+                        hspace=0.2,
+                        wspace=0.4)
     sc = list()
     for i,a in enumerate(ax.flatten() if n_row > 1 or n_col > 1 else [ax]):
         # Make the actual plot

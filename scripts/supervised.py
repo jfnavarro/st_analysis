@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 """
-This script performs a supervised training and prediction for ST datasets
+This script performs a supervised training and prediction for
+Spatial Transcriptomics datasets
 
 The multi-class classification can be performed with either SVC, NN or
 logistic regression
@@ -9,7 +10,7 @@ The training set will be a matrix with counts (genes as columns and spots as row
 and the test set will be a matrix of counts with the same format
 
 One file with class labels for the training set is needed
-so the classifier knows what to what class each spot(row) in
+so for the classifier to know what class each spot(row) in
 the training set belongs to, the file should be tab delimited :
 
 SPOT_NAME(as it in the matrix) CLASS_NUMBER
@@ -19,17 +20,15 @@ test set. If class labels for the test sets
 are given the script will compute accuracy of the prediction.
 
 The script allows to normalize the train/test counts using different
-methods as well as pre-filtering operations.
+methods as well as performing pre-filtering operations.
 
 @Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """
 import argparse
 import sys
 import os
-import numpy as np
 import pandas as pd
 import pickle
-import gc
 from stanalysis.preprocessing import *
 from stanalysis.utils import *
 from sklearn.svm import SVC
@@ -39,7 +38,6 @@ from sklearn.multiclass import OneVsRestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import RandomForestClassifier
-from cProfile import label
 
 def main(train_data,
          test_data,
