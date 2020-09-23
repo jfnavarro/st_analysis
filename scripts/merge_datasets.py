@@ -1,9 +1,10 @@
 #! /usr/bin/env python
 """
-Script that stiches a set of Spatial Transcriptomics datasets
-together to create one single image/counts matrix/spot coordinates.
-The (i,j) position of the dataset in the stiched image is appended
-to the spots ids.
+Script that combines a set of Spatial Transcriptomics datasets
+together to create one single image, counts matrix and spot coordinates.
+The (i,j) position of the dataset in the combined image is appended
+to the spots ids. This script can be useful to visualize several
+sections at once.
 
 @Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """
@@ -52,6 +53,7 @@ def main(counts_files, images_files, coordinates_files, down_width, down_height,
     # Compute number of columns/rows
     n_col = min(num_columns, len(counts_files))
     n_row = max(int(len(counts_files) / n_col), 1)
+
     # Stiched image/counts/coordinates
     img_stitched = np.zeros((down_height * n_row, down_width * n_col, 3), dtype=np.double)
     pixel_coords_stiched = np.empty((0,2))
@@ -61,6 +63,7 @@ def main(counts_files, images_files, coordinates_files, down_width, down_height,
     for counts_file, img_file, coord_file in zip(counts_files, images_files, coordinates_files):
         counts = pd.read_csv(counts_file, sep="\t", header=0, index_col=0)
         spots = pd.read_csv(coord_file, sep="\t", header=0, index_col=None)
+        # Use only spots inside tissue
         if spots.shape[1] == 7:
             spots = spots.loc[spots.iloc[:,6] == 1]
         spots.index = ["{}x{}".format(x,y) for x,y in zip(spots.iloc[:,0], spots.iloc[:,1])]
@@ -72,7 +75,8 @@ def main(counts_files, images_files, coordinates_files, down_width, down_height,
 
         counts.index = ["{}{}_{}".format(i, j, spot) for spot in counts.index]
         stiched_counts = stiched_counts.append(counts, sort=True)
-
+        print(i)
+        print(j)
         height, width, _ = img.shape
         offset_x = i * down_width
         offset_y = j * down_height
@@ -123,7 +127,7 @@ if __name__ == '__main__':
     parser.add_argument("--down-height", default=2000, metavar="[INT]", type=int,
                         help="The size if pixels of the downsampled images  (height) (default: %(default)s)")
     parser.add_argument("--columns", default=None, metavar="[INT]", type=int, required=True,
-                        help="The number of columns for the stiched image")
+                        help="The number of columns for the combined image")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
 
     args = parser.parse_args()
