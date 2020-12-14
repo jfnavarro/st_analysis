@@ -35,7 +35,7 @@ def main(counts_files, images_files, coordinates_files, down_width, down_height,
         sys.exit(1)
 
     if len(images_files) != len(counts_files) or len(coordinates_files) != len(counts_files):
-        sys.stderr.write("Error, counts and images or spot coordinates have different sizes\n")
+        sys.stderr.write("Error, counts, images and spot coordinates input files must be of the same size\n")
         sys.exit(1)
 
     if down_width < 100 or down_height < 100:
@@ -70,30 +70,29 @@ def main(counts_files, images_files, coordinates_files, down_width, down_height,
         img = imageio.imread(img_file)
 
         shared_spots = np.intersect1d(counts.index, spots.index)
+        if len(shared_spots) == 0:
+            sys.stderr.write("Error, could not match any spots for {} and {}\n".format(counts_file, coord_file))
+            sys.exit(1)
         counts = counts.loc[shared_spots,:]
         spots = spots.loc[shared_spots,:]
 
         counts.index = ["{}{}_{}".format(i, j, spot) for spot in counts.index]
         stiched_counts = stiched_counts.append(counts, sort=True)
-        print(i)
-        print(j)
+
         height, width, _ = img.shape
         offset_x = i * down_width
         offset_y = j * down_height
+        sx = down_width / width
+        sy = down_height / height
 
-        # Can probably combine these two transformations into one
-        t1 = np.array([[1, 0, offset_x],
-                       [0, 1, offset_y],
-                       [0, 0, 1]])
-
-        t2 = np.array([[down_width / width, 0, 0],
-                       [0, down_height / height, 0],
-                       [ 0, 0, 1]])
+        t = np.array([[sx, 0, offset_x],
+                      [0, sy, offset_y],
+                      [ 0, 0, 1]])
 
         pixel_coords = spots.iloc[:, [4, 5]]
         pixel_coords = np.hstack([pixel_coords, np.ones((pixel_coords.shape[0], 1))])
-        pixel_coords = pixel_coords @ t2 @ t1
-        pixel_coords_stiched = np.vstack([pixel_coords_stiched, pixel_coords[:,[0,1]]])
+        pixel_coords =  t @ pixel_coords.transpose()
+        pixel_coords_stiched = np.vstack([pixel_coords_stiched, pixel_coords.transpose()[:,[0,1]]])
 
         img_resized = resize(img, (down_height, down_width), anti_aliasing=True)
         img_stitched[offset_y:offset_y + down_height, offset_x:offset_x + down_width, :] = img_resized

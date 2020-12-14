@@ -487,8 +487,8 @@ def transform_original_image(image_list, warp_list_backtransf):
 def transform_counts(counts_list, image_list, warp_list):
     """
     Given a list of counts matrices and a list of affine transformation
-    transform the spots in the transformation with the affine matrices and returns the
-    transformed counts matrices
+    transform the spots in the counts matrices with the affine transformations
+    and return the transformed counts matrices
     """
     assert(len(warp_list) == len(image_list) == len(counts_list))
     transformed_counts = list()
@@ -497,7 +497,9 @@ def transform_counts(counts_list, image_list, warp_list):
         height, width, _ = img.shape
         sx = width / 32
         sy = height / 34
-        t = np.array([[sx, 0, -sx], [0, sy, -sy], [0, 0, 1]])
+        t = np.array([[sx, 0, 0],
+                      [0, sy, 0],
+                      [-sx, -sy, 1]])
         t_inv = np.linalg.inv(t)
         spot_coords = np.zeros((counts.shape[0],2), dtype=np.float32)
         for i,spot in enumerate(counts.index):

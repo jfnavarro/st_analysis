@@ -3,11 +3,11 @@
 Scripts that converts spot coordinates file without pixel coordinates
 to the ST Spot detector format that contains the pixel coordinates
 
-Input: image and spot_coordinates in the following format
+Input: HE image and spot_coordinates in the following format
 
 SPOT_X SPOT_Y ARRAY_X ARRAY_Y
 
-Output: spot_coodinates in the following format:
+Output: spot_coordinates in the following format:
 
 SPOT_X SPOT_Y ARRAY_X ARRAY_Y PIXEL_X PIXEL_Y
 
@@ -24,11 +24,11 @@ import imageio
 def main(image_file, coordinates_file, outfile):
 
     if not os.path.isfile(image_file):
-        sys.stderr.write("Error, input image not present or invalid format\n")
+        sys.stderr.write("Error, input image file not present or invalid format\n")
         sys.exit(1)
 
     if not os.path.isfile(coordinates_file):
-        sys.stderr.write("Error, input spot coordinates not present or invalid format\n")
+        sys.stderr.write("Error, input spot coordinates file not present or invalid format\n")
         sys.exit(1)
 
     if not outfile:
@@ -37,13 +37,15 @@ def main(image_file, coordinates_file, outfile):
     image = imageio.imread(image_file)
     coords = pd.read_csv(coordinates_file, sep='\t', header=None, index_col=None)
     if coords.shape[1] != 4:
-        sys.stderr.write("Error, input spot coordinates has the wrong format\n")
+        sys.stderr.write("Error, input spot coordinates file has the wrong format\n")
         sys.exit(1)
     coords.columns = ["spot_x", "spot_y", "array_x", "array_y"]
     height, width, _ = image.shape
     sx = width / 32
     sy = height / 34
-    t = np.array([[sx, 0, -sx], [0, sy, -sy], [0, 0, 1]])
+    t = np.array([[sx, 0, 0],
+                  [0, sy, 0],
+                  [-sx, -sy, 1]])
     spot_coords = coords.loc[:,["array_x", "array_y"]]
     spot_coords = np.hstack([spot_coords, np.ones((spot_coords.shape[0], 1))])
     pixel_coords = spot_coords @ t
