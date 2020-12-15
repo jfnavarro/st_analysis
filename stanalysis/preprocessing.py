@@ -205,9 +205,11 @@ def normalize_data(counts, normalization):
     # Spots as columns and genes as rows
     norm_counts = counts.transpose()
     if normalization in "REL":
-        norm_counts = norm_counts / norm_counts.sum(axis=0)
+        norm_counts = norm_counts / norm_counts.sum(axis=1)
     elif normalization in "CPM":
-        col_sums = counts.sum(axis=0)
+        col_sums = counts.sum(axis=1)
+        print(col_sums)
+        print(np.mean(col_sums))
         norm_counts = (norm_counts / col_sums) * np.mean(col_sums)
     elif normalization in "RAW":
         pass
