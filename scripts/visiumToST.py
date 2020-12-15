@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-""" Script that converts a Visium 10x dataset
+"""
+Script that converts a Visium 10x dataset
 to a Spatial Transcriptomics dataset
 """
 import os
@@ -8,9 +9,10 @@ import pandas as pd
 import numpy as np
 import sys
 import argparse
+import json
 
 # Most of this code was borrowed from Alma Anderson (github@almaan)
-def main(matrix, features, barcodes, positions, outdir, adjust):
+def main(matrix, features, barcodes, positions, outdir, scale_factors, adjust):
     
     if not outdir:
         outdir = os.getcwd()
@@ -31,6 +33,10 @@ def main(matrix, features, barcodes, positions, outdir, adjust):
 
     if not os.path.isfile(positions):
         sys.stderr.write("Error, input positions not present or invalid format\n")
+        sys.exit(1)
+
+    if not os.path.isfile(scale_factors):
+        sys.stderr.write("Error, scale factors not present or invalid format\n")
         sys.exit(1)
 
     # Parse the genes
@@ -55,16 +61,19 @@ def main(matrix, features, barcodes, positions, outdir, adjust):
     dmat = dmat.loc[inter, :]
     dmat.index = ["{}x{}".format(x, y) for x, y in zip(tp['x'].values, tp['y'].values)]
     dmat.to_csv(os.path.join(outdir, "st_data.tsv"), index=True, header=True, sep='\t')
-    
+
+    # Load scale factor
+    with open(scale_factors) as json_file:
+        sf = float(json.load(json_file)['tissue_hires_scalef'])
+
     # Create the ST spot coordinate file (Pixel x and y coordinates are transposed in Visium)
     tp.index = dmat.index
+    tp = tp.loc[:, ['py', 'px']]
+    tp = tp * sf
     if adjust:
-        tp = tp.loc[:, ['py', 'px']]
         tp = pd.DataFrame(data=np.transpose(np.rot90(tp, k=1, axes=(1, 0))),
                           index=tp.index,
                           columns=tp.columns)
-    else:
-        tp = tp.loc[:, ['px', 'py']]
     tp.to_csv(os.path.join(outdir, "st_coordinates.tsv"), index=True, header=False, sep='\t')
     
 if __name__ == '__main__':
@@ -78,8 +87,10 @@ if __name__ == '__main__':
                         help="Visium barcodes file in TSV format")
     parser.add_argument("--positions", required=True, type=str,
                         help="Visium positions file in CSV format")
+    parser.add_argument("--scale-factors", required=True, type=str,
+                        help="Visium scale factors in JSON format")
     parser.add_argument("--adjust", action="store_true", default=False,
                         help="Transform the Visium coordinates origin to ST coordinates origin")
     parser.add_argument("--outdir", help="Name of the output folder")
     args = parser.parse_args()
-    main(args.matrix, args.features, args.barcodes, args.positions, args.outdir, args.adjust)
+    main(args.matrix, args.features, args.barcodes, args.positions, args.outdir, args.scale_factors, args.adjust)

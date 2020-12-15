@@ -10,10 +10,10 @@ import os
 from sklearn.preprocessing import StandardScaler
 import re
 
+
 def normalize(counts, normalization):
-    return normalize_data(counts,
-                          normalization,
-                          center=False)
+    return normalize_data(counts, normalization)
+
 
 def filter_data_genes(counts, filter_genes):
     # Extract the list of the genes that must be shown
@@ -33,14 +33,17 @@ def filter_data_genes(counts, filter_genes):
     counts = counts.loc[:,genes_to_keep]
     return counts
 
+
 def filter_data(counts, num_exp_genes, num_exp_spots, min_gene_expression):
     if num_exp_spots <= 0.0 and num_exp_genes <= 0.0:
         return counts
     return remove_noise(counts, num_exp_genes, num_exp_spots,
                         min_expression=min_gene_expression)
-    
+
+
 def ztransformation(counts):
-    """ Applies a simple z-score transformation to 
+    """
+    Applies a simple z-score transformation to
     a ST data frame (genes as columns)
     which consists in substracting to each count 
     the mean of its column (gene) and then divide it by its
@@ -53,9 +56,11 @@ def ztransformation(counts):
     return pd.DataFrame(data=scaled_counts,
                         index=rows,
                         columns=cols)
-    
+
+
 def aggregate_datatasets(counts_table_files, add_index=True, header=0):
-    """ This functions takes a list of data frames with ST data
+    """
+    This functions takes a list of data frames with ST data
     (genes as columns and spots as rows) and merges them into
     one data frame using the genes as merging criteria. 
     An index will be appended to each spot to be able to identify
@@ -81,9 +86,11 @@ def aggregate_datatasets(counts_table_files, add_index=True, header=0):
     counts.replace([np.inf, -np.inf], np.nan)
     counts.fillna(0.0, inplace=True)
     return counts
-  
+
+
 def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=1):
-    """This functions remove noisy genes and spots 
+    """
+    This functions remove noisy genes and spots
     for a given ST data frame (Genes as columns and spots as rows).
     - The noisy spots are removed so to keep a percentage
     of the total distribution of spots whose gene counts >= min_expression
@@ -126,7 +133,8 @@ def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=
         counts = counts.transpose()
     
     return counts 
-    
+
+
 def keep_top_genes(counts, num_genes_discard, criteria="Variance"):
     """ This function takes a data frame
     with ST data (Genes as columns and spots as rows)
@@ -167,6 +175,7 @@ def keep_top_genes(counts, num_genes_discard, criteria="Variance"):
     print("Dropped {} genes".format(num_genes - len(counts.index)))
     return counts.transpose()
 
+
 def compute_size_factors(counts, normalization):
     """ Helper function to compute normalization size factors
     """
@@ -182,32 +191,25 @@ def compute_size_factors(counts, normalization):
         raise RunTimeError("Error, incorrect normalization method\n")   
     return size_factors
 
-def normalize_data(counts, normalization, center=False):
-    """This functions takes a data frame as input
+
+def normalize_data(counts, normalization):
+    """
+    This functions takes a data frame as input
     with ST data (genes as columns and spots as rows) and 
     returns a data frame with the normalized counts using
     different methods.
     :param counts: a data frame with the counts
     :param normalization: the normalization method to use (RAW, REL or CPM)
-    :param center: if True the size factors will be centered by their mean
-    :return: a Pandas data frame with the normalized counts (genes as columns)
+    :return: a data frame with the normalized counts (genes as columns)
     """
-    # Compute the size factors
-    size_factors = compute_size_factors(counts, normalization)
-    if np.all(size_factors == 1.0):
-        return counts
-    if np.isnan(size_factors).any() or np.isinf(size_factors).any() \
-    or np.any(size_factors <= 0.0):
-        print("Warning: Computed size factors contained NaN or zeroes or Inf values."
-              "\nSpots for these will be discarded!")
-        valid = (size_factors > 0) & np.isfinite(size_factors)
-        counts = counts[valid]
-        size_factors = size_factors[valid]
     # Spots as columns and genes as rows
-    counts = counts.transpose()
-    # Center size factors if requested
-    if center: 
-        size_factors = size_factors - np.mean(size_factors)
-    norm_counts = counts / size_factors
+    norm_counts = counts.transpose()
+    if normalization in "REL":
+        norm_counts = norm_counts / norm_counts.sum(axis=0)
+    elif normalization in "CPM":
+        col_sums = counts.sum(axis=0)
+        norm_counts = (norm_counts / col_sums) * np.mean(col_sums)
+    elif normalization in "RAW":
+        pass
     # return normalize counts (genes as columns)
     return norm_counts.transpose()
