@@ -208,8 +208,6 @@ def normalize_data(counts, normalization):
         norm_counts = norm_counts / norm_counts.sum(axis=1)
     elif normalization in "CPM":
         col_sums = counts.sum(axis=1)
-        print(col_sums)
-        print(np.mean(col_sums))
         norm_counts = (norm_counts / col_sums) * np.mean(col_sums)
     elif normalization in "RAW":
         pass
