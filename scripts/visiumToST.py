@@ -11,13 +11,10 @@ import sys
 import argparse
 import json
 
+
 # Most of this code was borrowed from Alma Anderson (github@almaan)
 def main(matrix, features, barcodes, positions, outdir, scale_factors, adjust):
-    
-    if not outdir:
-        outdir = os.getcwd()
-    print("Output folder {}".format(outdir))
-    
+
     if not os.path.isfile(matrix):
         sys.stderr.write("Error, input matrix not present or invalid format\n")
         sys.exit(1)
@@ -26,7 +23,7 @@ def main(matrix, features, barcodes, positions, outdir, scale_factors, adjust):
         sys.stderr.write("Error, input features not present or invalid format\n")
         sys.exit(1)
         barcodes
-        
+
     if not os.path.isfile(barcodes):
         sys.stderr.write("Error, input barcodes not present or invalid format\n")
         sys.exit(1)
@@ -39,11 +36,15 @@ def main(matrix, features, barcodes, positions, outdir, scale_factors, adjust):
         sys.stderr.write("Error, scale factors not present or invalid format\n")
         sys.exit(1)
 
+    if not outdir:
+        outdir = os.getcwd()
+    print("Output folder {}".format(outdir))
+
     # Parse the genes
     genes = pd.read_csv(features, sep='\t', header=None, index_col=None)
     genes.columns = ['ensg', 'hgnc', 'info']
     genes = genes['hgnc'].values
-    
+
     # Parse the barcodes
     barcodes = pd.read_csv(barcodes, sep='\t',
                            header=None, index_col=None).values.flatten()
@@ -75,7 +76,8 @@ def main(matrix, features, barcodes, positions, outdir, scale_factors, adjust):
                           index=tp.index,
                           columns=tp.columns)
     tp.to_csv(os.path.join(outdir, "st_coordinates.tsv"), index=True, header=False, sep='\t')
-    
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)

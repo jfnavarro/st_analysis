@@ -1,12 +1,9 @@
 #! /usr/bin/env python
 """ 
-This script aligns a set of images/counts matrices using the first
+This script aligns a set of Spatial Transcriptomics datasets using the first
 image as reference. It provides different alignment methods (manual
 and automatic) and it outputs the aligned images, the aligned counts
-matrices and the alignment matrices.
-
-@TODO remove spots outside frame when converted
-@TODO allow to pass spot coordinates files and transform it too
+matrices and the alignment spot coordinates.
 
 @Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """
@@ -69,7 +66,7 @@ def nearest_neighbor(src, dst):
     Input:
         src: Nxm array of points
         dst: Nxm array of points
-    Output:
+    Returns:
         distances: Euclidean distances of the nearest neighbor
         indices: dst indices of the nearest neighbor
     """
@@ -88,7 +85,7 @@ def icp(A, B, init_pose=None, max_iterations=50, tolerance=0.001):
         init_pose: (m+1)x(m+1) homogeneous transformation
         max_iterations: exit algorithm after max_iterations
         tolerance: convergence criteria
-    Output:
+    Returns:
         T: final homogeneous transformation that maps A on to B
         distances: Euclidean distances (errors) of the nearest neighbor
         i: number of iterations to converge
@@ -123,8 +120,8 @@ def icp(A, B, init_pose=None, max_iterations=50, tolerance=0.001):
 
 def plot_images(image_list, is_gray=False, filename=None):
     """
-    Helper function to debug
-    Args:
+    Helper function to debug images
+    Input:
         image_list: list of images (OpenCV)
         is_gray: whether the images are in grayscale or not
         filename: name of the output file
@@ -153,8 +150,13 @@ def plot_images(image_list, is_gray=False, filename=None):
     
 def get_binary_masks(image_list):
     """
-    Obtains a mask of the image using
-    the tissue recognition library (automatic)
+    Obtains a binary mask of the image using
+    the tissue recognition library (automatic).
+    Returns the mask (1 inside, 0 outside).
+    Input:
+        - A list of images
+    Returns:
+        - A list of binary masks
     """
     assert(len(image_list) > 0)
     binary_masks = list()
@@ -166,7 +168,13 @@ def get_binary_masks(image_list):
     
 def mask_images(image_list, binary_masks):
     """
-    Applies binary masks to a list of images
+    Applies a binary masks to a list of images to keep only
+    the pixels inside tissue.
+    Input:
+        - A list of images
+        - A list of binary masks
+    Returns:
+        - A list of masked images
     """
     assert(len(image_list) == len(binary_masks))
     masked_images = list()
@@ -180,8 +188,14 @@ def mask_images(image_list, binary_masks):
 
 def center_images(image_list, binary_masks):
     """
-    Centers masked images using their center of mass
-    Returns the centered images and the transformations
+    Center images and binary masks applying the center of mass.
+    Input:
+        - A list of images
+        - A list of binary masks
+    Returns:
+        - A list of centered images
+        - A list of centered binary masks
+        - A list of affine transformations (applied to center)
     """
     assert(len(image_list) == len(binary_masks))
     centered_images = list()
@@ -207,6 +221,11 @@ def center_images(image_list, binary_masks):
 def add_borders(image_list, size=1000):
     """
     Adds a white border to images
+    Input:
+        - A list of images
+        - Amount of border to add (in pixels)
+    Returns:
+        - A list of images with borders added (white)
     """
     images_border = list()
     for image in image_list:
@@ -220,6 +239,11 @@ def add_borders(image_list, size=1000):
 def remove_borders(image_list, size=1000):
     """
     Removes a white border of images
+    Input:
+        - A list of images
+        - Amount of border to remove (in pixels)
+    Returns:
+        - A list of images with borders removed (white)
     """
     images_no_border = list()
     for image in image_list:
@@ -245,8 +269,14 @@ def euclidean_alignment(image_list, number_of_iterations=1000, termination_eps=0
     """
     Aligns images using the first image as reference
     The methods uses the brightness and the contour to find
-    the best alignment.
-    Returns the aligned images and the warp transformations
+    the best alignment (ECC algorithm).
+    Input:
+        - A list of images
+        - Number of iterations
+        - EPS value to stop iterations
+    Returns:
+        - A list of aligned images
+        - A list of affine transformations (to align the images)
     """
     ref_img = image_list[0]
     warp_list = [np.eye(2, 3, dtype=np.float32)]
@@ -306,6 +336,11 @@ def detect_edges(image, sigma=0.33):
     Detects edges in image using
     the Canny detection algorithm and returns
     the x,y coordinates of the edges
+    Input:
+        - An image
+        - Sigma value for upper/lower bands in the Canny algorithm
+    Returns:
+        - A list of points (edges)
     """
     v = np.median(image)
     lower = int(max(0, (1.0 - sigma) * v))
@@ -320,7 +355,11 @@ def edges_detection_aligment(image_list):
     Aligns images using the first image as reference
     The methods uses edges detection and points matching to find
     the best alignment.
-    Returns the aligned images and the warp transformations
+    Input:
+        - A list of images
+    Returns:
+        - A list of aligned images
+        - A list of affine transformations (to align the images)
     """
     ref_img = image_list[0]
     ref_coordinates = detect_edges(ref_img)
@@ -371,8 +410,13 @@ def edges_detection_aligment(image_list):
 
 def select_points(img):
     """
-    Lets the user select points
-    in an image and returns the points
+    Shows the image in a window and lets the user
+    click on different points. The points will be
+    stored and returned when the user closes the window.
+    Input:
+        - An image
+    Returns:
+        - A list of coordinates
     """
     posList = list()
     def onMouse(event, x, y, flags, param):
@@ -393,7 +437,12 @@ def manual_aligment(image_list):
     """
     Aligns images using the first image as reference
     The methods lets the user chooses points to be used as references
-    Returns the aligned images and the warp transformations
+    for the alignment of each image (manual method).
+    Input:
+        - A list of images
+    Returns:
+        - A list of aligned images
+        - A list of affine transformations (to align the images)
     """
     ref_img = image_list[0]
     ref_points = select_points(ref_img.copy())
@@ -489,6 +538,12 @@ def transform_counts(counts_list, image_list, warp_list):
     Given a list of counts matrices and a list of affine transformation
     transform the spots in the counts matrices with the affine transformations
     and return the transformed counts matrices
+    Input:
+        - A list of counts matrices
+        - A list of images
+        - A list of affine transformations
+    Returns:
+        - List of transformed matrices of counts
     """
     assert(len(warp_list) == len(image_list) == len(counts_list))
     transformed_counts = list()
@@ -516,10 +571,35 @@ def transform_counts(counts_list, image_list, warp_list):
         transformed_counts.append(counts)
     return transformed_counts
 
+def transform_spots_coordinates(spot_coords_list, warp_list):
+    """
+    Given a list of spot coordinates and a list of affine transformation
+    transform the spots coordinates (pixel values) with the affine transformations
+    and return the transformed spot coordinates
+    Input:
+        - A list of spot coordinates
+        - A list of affine transformations
+    Returns:
+        - List of transformed spot coordinates (pixel values)
+    """
+    assert(len(warp_list) == len(spot_coords_list))
+    transformed_coordinates = list()
+    for coords, warp_matrix in zip(spot_coords_list, warp_list):
+        tp = pd.read_csv(coords, sep='\t', header=None, index_col=None)
+        tp.columns = ["spot_x", "spot_y", "array_x", "array_y", "pixel_x", "pixel_y"]
+        tp.loc[:, ['py', 'px']] = tp.loc[:, ['py', 'px']] * warp_matrix
+        transformed_coordinates.append(tp)
+    return transformed_coordinates
+
 def hist_norm(source, template):
     """
     Adjust the pixel values of a grayscale image such that its histogram
-    matches that of a target image
+    matches that of a reference image
+    Input:
+        - Reference image
+        - Target image
+    Returns:
+        - Normalized target image
     """
     olddtype = source.dtype
     oldshape = source.shape
@@ -547,8 +627,16 @@ def hist_norm(source, template):
 
     return interp_t_values[bin_idx].reshape(oldshape)
 
-def main(counts_files, images_files, down_width, down_height, outdir,
-         debug, alignment_method, normalize, border):
+def main(counts_files,
+         images_files,
+         coordinates,
+         down_width,
+         down_height,
+         outdir,
+         debug,
+         alignment_method,
+         normalize,
+         border):
     
     if len(counts_files) == 0 or \
     any([not os.path.isfile(f) for f in counts_files]):
@@ -559,9 +647,17 @@ def main(counts_files, images_files, down_width, down_height, outdir,
     any([not os.path.isfile(f) for f in images_files]):
         sys.stderr.write("Error, input images not present or invalid format\n")
         sys.exit(1)
+
+    if coordinates and any([not os.path.isfile(f) for f in coordinates]):
+        sys.stderr.write("Error, spot coordinates not present or invalid format\n")
+        sys.exit(1)
     
     if len(images_files) != len(counts_files):
         sys.stderr.write("Error, counts and images have different size\n")
+        sys.exit(1)
+
+    if len(coordinates) != len(counts_files):
+        sys.stderr.write("Error, counts and coordinates have different size\n")
         sys.exit(1)
             
     if down_width < 100 or down_height < 100:
@@ -573,9 +669,11 @@ def main(counts_files, images_files, down_width, down_height, outdir,
     outdir = os.path.abspath(outdir)
 
     print("Output directory {}".format(outdir))
-    print("Input datasets {}".format(" ".join(counts_files)))
+    print("Input counts matrices {}".format(" ".join(counts_files)))
     print("Input images {}".format(" ".join(images_files))) 
-    
+    if coordinates:
+        print("Input spot coordinates {}".format(" ".join(coordinates)))
+
     print("Parsing counts matrices...")
     counts = [pd.read_csv(c, sep="\t", header=0,
                           index_col=0, engine='c', low_memory=True) for c in counts_files]
@@ -639,7 +737,11 @@ def main(counts_files, images_files, down_width, down_height, outdir,
      
     print("Transforming original counts matrices...")
     transformed_counts = transform_counts(counts, transformed_original_images, warp_list_backtransf)
-    
+
+    if coordinates:
+        print("Transforming original spot coordinates...")
+        transformed_coordinates = transform_spots_coordinates(coordinates, warp_list_backtransf)
+
     # Save transformations
     for tr, name in zip(warp_list_backtransf, counts_files):
         clean_name = os.path.basename(name).split(".")[0]
@@ -654,14 +756,21 @@ def main(counts_files, images_files, down_width, down_height, outdir,
     for counts, name in zip(transformed_counts, counts_files):
         clean_name = os.path.basename(name).split(".")[0]
         counts.to_csv(os.path.join(outdir, "aligned_{}.tsv".format(clean_name)), sep="\t")
+
+    # Save spot coordinates
+    for coord, name in zip(transformed_coordinates, coordinates):
+        clean_name = os.path.basename(name).split(".")[0]
+        coord.to_csv(os.path.join(outdir, "aligned_{}.tsv".format(clean_name)), sep="\t")
         
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--counts", required=True, nargs='+', type=str,
-                        help="One or more matrices with gene counts per feature/spot (genes as columns)")
+                        help="One or more matrices with gene counts per spot (genes as columns)")
     parser.add_argument("--images", required=True, nargs='+', type=str,
                         help="The HE images corresponding to the counts matrices (same order)")
+    parser.add_argument("--coordinates", required=False, nargs='+', type=str,
+                        help="The spoot coordinates corresponding to the counts matrices (same order)")
     parser.add_argument("--down-width", default=500, metavar="[INT]", type=int,
                         help="The size of the width in pixels of the down-sampled images (default: %(default)s)")
     parser.add_argument("--down-height", default=500, metavar="[INT]", type=int,
@@ -683,5 +792,13 @@ if __name__ == '__main__':
                         "MANUAL = manual alignment based selected points\n" \
                         "(default: %(default)s)")
     args = parser.parse_args()
-    main(args.counts, args.images, args.down_width, args.down_height, args.outdir,
-         args.debug, args.alignment_method, args.normalize, args.border)
+    main(args.counts,
+         args.images,
+         args.coordinates,
+         args.down_width,
+         args.down_height,
+         args.outdir,
+         args.debug,
+         args.alignment_method,
+         args.normalize,
+         args.border)

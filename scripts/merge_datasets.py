@@ -50,6 +50,10 @@ def main(counts_files, images_files, coordinates_files, down_width, down_height,
         outdir = os.getcwd()
     outdir = os.path.abspath(outdir)
 
+    print("Input counts {}".format(" ".join(counts_files)))
+    print("Input images {}".format(" ".join(images_files)))
+    print("Input spot coordinates {}".format(" ".join(coordinates_files)))
+
     # Compute number of columns/rows
     n_col = min(num_columns, len(counts_files))
     n_row = max(int(len(counts_files) / n_col), 1)

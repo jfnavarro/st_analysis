@@ -46,7 +46,7 @@ def main(image_file, coordinates_file, outfile):
     t = np.array([[sx, 0, 0],
                   [0, sy, 0],
                   [-sx, -sy, 1]])
-    spot_coords = coords.loc[:,["array_x", "array_y"]]
+    spot_coords = coords.loc[:, ["array_x", "array_y"]]
     spot_coords = np.hstack([spot_coords, np.ones((spot_coords.shape[0], 1))])
     pixel_coords = spot_coords @ t
     coords["pixel_x"] = pixel_coords[:,0]

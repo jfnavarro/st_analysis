@@ -1,12 +1,12 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 """ 
-Script that creates a scatter plot from one or more ST datasets in matrix format
+Script that creates a scatter plot from one or more ST datasets (matrix of counts)
 (genes as columns and spots as rows)
 
 It allows to choose transparency and size for the data points
 
-It allows to normalize the counts using different algorithms
+It allows to normalize the data using different algorithms
 
 It allows to apply different thresholds
 
@@ -136,6 +136,7 @@ def main(counts_table_files,
          disable_invert_y_axes,
          disable_color_bar,
          combine_genes):
+
     if cutoff_upper <= cutoff:
         sys.stderr.write("Error, incorrect cut-off values {}\n".format(cutoff))
         sys.exit(1)

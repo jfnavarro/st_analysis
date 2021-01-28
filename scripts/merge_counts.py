@@ -1,7 +1,8 @@
 #! /usr/bin/env python
 """ 
-This script simply merges matrices of counts (ST datasets) into a combined one.\n
-The merging is done by rows adding an optional index to the rows that corresponds to the order in the input.
+This script simply merges matrices of counts (ST datasets) into a combined matrix.\n
+The merging is done by rows (spots) adding an optional index to the rows (spots)
+that corresponds to the order in the input.
 
 @Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """
@@ -10,6 +11,7 @@ import argparse
 import sys
 import os
 from stanalysis.preprocessing import aggregate_datatasets
+
 
 def main(counts_files, no_header, no_index, outfile):
 

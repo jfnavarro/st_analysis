@@ -82,3 +82,6 @@ Version 0.6.0
 * Added script to perform image/data alignment of consecutive sections
 * Added script to plot genes and covariates onto a dimensionality reduced space (manifold)
 * Added script to convert a Visium dataset to a ST dataset
+
+Version 0.6.5
+* Added script to combine (stitch) multiple datasets
