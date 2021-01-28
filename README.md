@@ -21,7 +21,7 @@ For bugs, feedback or help you can contact Jose Fernandez Navarro <jc.fernandez.
 ### Input Format
 The referred matrix format is the ST data format, a matrix of counts where spot coordinates are row names
 and the genes are column names. This matrix format (.TSV) is generated with the
-[ST Pipeline](https://github.com/SpatialTranscriptomicsResearch/st_pipeline)
+[ST Pipeline](https://github.com/jfnavarro/st_pipeline)
 
 ### Installation
 Before you install the ST Analysis package we recommend that you create a Python 3 virtual
@@ -29,26 +29,15 @@ environment. We recommend [Anaconda](https://anaconda.org/anaconda/python).
 
 The ST Analysis is only computatible with Python 3. 
 
-#### OSX
 The following instructions are for installing the ST Analysis package with Python 3.6 and Anaconda
 
     conda install matplotlib
     conda install pandas
     conda install scikit-learn
-    git clone https://github.com/SpatialTranscriptomicsResearch/st_analysis.git
+    git clone https://github.com/jfnavarro/st_analysis.git
     cd st_analysis
     python setup.py install
-
-#### Linux
-The following instructions are for installing the ST Analysis package with Python 3.6 and Anaconda
-
-    conda install matplotlib
-    conda install pandas
-    conda install scikit-learn
-    conda install readline
-    git clone https://github.com/SpatialTranscriptomicsResearch/st_analysis.git
-    cd st_analysis
-    python setup.py install
+    
 
 A bunch of scripts (described behind) will then be available in your system.
 Note that you can always type script_name.py --help to get more information
