@@ -1,13 +1,10 @@
-# Spatial Transcriptomics Analysis 
+# Spatial Transcriptomics Analysis Tools
 
-Set of tools for visualization, processing and analysis (supervised and un-supervised learning,
-image alignment, etc..) of Spatial Transcriptomics datasets (can also be used for single cell data
-and Visium datasets).
+Set of tools for visualization, processing and analysis (supervised, unsupervised,
+image alignment, etc..) of Spatial Transcriptomics datasets.
 
 The package is compatible with the output format of the data generated with the
-ST Pipeline (https://github.com/SpatialTranscriptomicsResearch/st_pipeline) and 
-it is compatible with any single cell dataset where the data is stored as 
-a matrix of counts (genes as columns and spot/cells as rows).
+ST Pipeline (https://github.com/jfnavarro/st_pipeline).
 
 ### License
 MIT License, see LICENSE file.
@@ -19,9 +16,8 @@ See AUTHORS file.
 For bugs, feedback or help you can contact Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 
 ### Input Format
-The referred matrix format is the ST data format, a matrix of counts where spot coordinates are row names
-and the genes are column names. This matrix format (.TSV) is generated with the
-[ST Pipeline](https://github.com/jfnavarro/st_pipeline)
+The input format is a matrix of counts (tab delimited) where spot coordinates are row names
+and the genes are column names. 
 
 ### Installation
 Before you install the ST Analysis package we recommend that you create a Python 3 virtual
@@ -31,35 +27,39 @@ The ST Analysis is only computatible with Python 3.
 
 The following instructions are for installing the ST Analysis package with Python 3.6 and Anaconda
 
-    conda install matplotlib
-    conda install pandas
-    conda install scikit-learn
+
     git clone https://github.com/jfnavarro/st_analysis.git
     cd st_analysis
     python setup.py install
     
 
-A bunch of scripts (described behind) will then be available in your system.
-Note that you can always type script_name.py --help to get more information
-about how the script works. 
+A set of scripts (described below) will then be available in your system or
+the environment if you chose to work on a specific environment.
 
-## Analysis tools (NOTE the interface will be ported to CLI soon)
+Note that you can always type ´script_name.py --help´ to get more information
+about how a script works. 
 
-### To do un-supervised learning
-To see how spots cluster together based on their expression profiles you can run:
+## Analysis tools
 
-    unsupervised.py --counts-files matrix_counts.tsv --normalization REL --num-clusters 5 --clustering KMeans --dimensionality tSNE --use-log-scale 
+### Unsupervised clustering
+To cluster spot together based on their expression profiles you can run:
+
+    unsupervised.py --counts matrix_counts.tsv --normalization REL --num-clusters 5 --clustering KMeans --dimensionality tSNE --use-log-scale 
     
-The script can be given one or serveral datasets (matrices with counts). It will perform dimesionality reduction
-and then cluster the spots together based on the dimesionality reduced space.
-It generates a scatter plot of the clusters. 
-It also generate a file with the predicted classes for each spot that can be used in other analysis.
+The script can be given one or serveral datasets (matrices of counts). 
+The script allows for multiple normalization and filtering options.
+The script will perform dimesionality reduction and then cluster the spot 
+together based on the dimesionality reduced space.
+The script implement multiple options for clustering and dimensionality reduction.
+The script generates a scatter plot of the clustered spots in a 2D or 3D manifold. 
+The script will write the computer clusters per spot in a file (tab delimited). 
+
 To know more about the parameters you can type --help
 
-### To do supervised learning
+### Supervised classification
 You can train a classifier with the expression profiles of a set of spots
-where you know the class (spot type) and then predict on a new dataset
-of the same tissue. For that you can use the following script:
+where you know the class (cluster) and then predict the class of the spots 
+of a new dataset of the same tissue. For that you can use the following script:
 
     supervised.py --train-data data_matrix.tsv --test-data data_matrix.tsv --train-casses train_classes.txt --test-classes test_classes.txt
     
@@ -78,13 +78,14 @@ To know more about the parameters you can type --help
 
 NOTE: there is version that uses GPU and NN (supervised_torch.py)
 
-### To visualize ST data (output from the ST Pipeline) 
-Use the script st_data_plotter.py to plot ST data, you can use different thresholds and
+### To visualize Spatial Transcriptomics (ST) datasets
+Use the script data_plotter.py to visualize ST data, you can use different thresholds and
 filters (counts) and different normalization and visualization options. 
-It plots one image for each gene given in the --show-genes option (one sub-image for each input dataset).
-You need one or many matrices with the spots as rows and the genes as columns. 
+The script allows to plot clusters as well as gene sets. 
+The script plots one image for each gene given in the --show-genes option (one sub-image for each input dataset).
+You need one or more matrices of counts where the spots ares rows and the genes are columns. 
 
-    data_plotter.py --cutoff 2 --show-genes Actb --counts-files data_matrix.tsv --normalization REL
+    data_plotter.py --cutoff 2 --show-genes Actb Apoe --counts data_matrix.tsv --normalization REL
     
 This will generate a scatter plot of the expression of the spots that contain a gene Actb and with higher expression than 2.
 
@@ -92,13 +93,60 @@ More info if you type --help
   
 ### To filter a matrix of counts (keep or remove genes)
 
-    filter_genes_matrix.py --help
-    keep_genes_matrix.py --help
-
-### To align ST datasets using the images 
-
-    align_sections.py --help
+    filter_genes_matrix.py --counts data_matrix.tsv --filter-genes Malat1 Actb
+    keep_genes_matrix.py --counts data_matrix.tsv --keep-genes Malat1 Actb
     
-### To visualize covariants on a manifold (dimensionality reduction)
+More info if you type --help
 
-    dimredu_plotter.py --help
+### To merge matrices of counts into one
+An index corresponding to each dataset will be appended to the spot ids. 
+
+    merge_counts.py --counts data_matrix1.tsv data_matrix2.tsv
+    
+More info if you type --help
+    
+### To merge Spatial Transcriptomics datasets into one
+This script will merge Spatial Transcriptomics datasets into one (matrices
+of counrs, spot coordinates and HE images). The matrices of counts will be
+merged as in the previous script. The HE images will be stiched together
+and the spoot coordinates will be merged together. An index corresponding
+to each dataset will be appended to the spot ids. 
+
+    merge_datasets.py --counts data_matrix1.tsv data_matrix2.tsv --coordinates spots1.txt spots2.txt --images image1.jpg --images image2.jpg
+
+More info if you type --help
+
+### To align Spatial Transcriptomics datasets of the same tissue using the HE images 
+If you have multiple sections (dataset) of the same tissue you may want to align them
+so they all have the same orienation and angle. This enables better visuaalizations. 
+The script align_sections.py takes as input a list of matrices of counts, spot coordinates
+and HE images corresponding to the datasets that must be aligned. It will output a list of
+aligned matrices of counts, aligned spot coordinates and aligned HE images. The script supports
+different algorithms for the image detection and alignment process. 
+
+    align_sections.py --counts data_matrix1.tsv data_matrix2.tsv --coordinates spots1.txt spots2.txt --images image1.jpg --images image2.jpg
+    
+More info if you type --help
+    
+### To visualize variables or genes on a manifold (dimensionality reduction) space
+This script takes as input a list of matrices of counts and file with the reduced coordinates
+of the spots (2D) and a meta-file (spots and variables). The script will generate a list of 
+scatter where each variable will be plotted onto the 2D manifold of the datasets. The script
+can also plot genes if given as input. It allows to use different normalization, filtering
+and visualization options. 
+
+    dimredu_plotter.py --counts data_matrix.tsv --dim-redu-file dimred.txt --meta-file meta.tsv --show-genes Actb Apoe
+    
+More info if you type --help
+
+### To transform Visium datasets to the standard ST format 
+This script will transformt a dataset in Visium format to the standard ST format (matrix of counts, 
+spot coordinates and HE image). 
+
+    visiumToST.py --help
+    
+### To transform old ST spot coordinates to new format (including pixel coordinates) 
+
+    convert_spot_coordinates.py --help
+    
+
