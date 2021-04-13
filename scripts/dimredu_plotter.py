@@ -27,6 +27,7 @@ from stanalysis.visualization import color_map
 from matplotlib import cm
 from matplotlib import colors 
 
+
 def plot_tsne(x, y, c, filename, title, xlab, ylab, alpha, size, color_scale, legend, color_bar):
     a = plt.subplot(1, 1, 1)
     # Create the scatter plot
@@ -71,7 +72,8 @@ def plot_tsne(x, y, c, filename, title, xlab, ylab, alpha, size, color_scale, le
         plt.close(fig)
     else:
         plt.show()
-    
+
+
 def main(counts_files,
          dim_redu_file,
          meta_file,
@@ -194,7 +196,7 @@ def main(counts_files,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument("--counts-files", required=True, nargs='+', type=str,
+    parser.add_argument("--counts", required=True, nargs='+', type=str,
                         help="One or more matrices with gene counts per feature/spot (genes as columns)")
     parser.add_argument("--dim-redu-file", required=True, metavar="[STR]", type=str,
                         help="One file containing the dimensionality reduction results\n"
@@ -213,9 +215,9 @@ if __name__ == '__main__':
     parser.add_argument("--normalization", default="RAW", 
                         type=str, 
                         choices=["RAW", "REL", "CPM"],
-                        help="Normalize the counts using:\n" \
-                        "RAW = absolute counts\n" \
-                        "REL = Each gene count divided by the total count of its spot\n" \
+                        help="Normalize the counts using:\n"
+                        "RAW = absolute counts\n"
+                        "REL = Each gene count divided by the total count of its spot\n"
                         "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n"
                         "(default: %(default)s)")
     parser.add_argument("--standard-transformation", action="store_true", default=False,
@@ -240,7 +242,7 @@ if __name__ == '__main__':
                         nargs='+')
     args = parser.parse_args()
 
-    main(args.counts_files,
+    main(args.counts,
          args.dim_redu_file,
          args.meta_file,
          args.data_alpha,

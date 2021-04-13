@@ -39,7 +39,7 @@ def main(counts_matrix, reg_exps, outfile):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--counts-matrix", required=True,
+    parser.add_argument("--counts", required=True,
                         help="Matrix with gene counts (genes as columns)")
     parser.add_argument("--outfile", help="Name of the output file")
     parser.add_argument("--keep-genes", help="Regular expression for \
@@ -48,5 +48,5 @@ if __name__ == '__main__':
                         type=str,
                         action='append')
     args = parser.parse_args()
-    main(args.counts_matrix, args.keep_genes, args.outfile)
+    main(args.counts, args.keep_genes, args.outfile)
 

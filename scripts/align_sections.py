@@ -781,15 +781,15 @@ if __name__ == '__main__':
     parser.add_argument("--border", action="store_true", default=False,
                         help="Whether to add a white border to images prior alignment (recommended for EDGES alignment method)")
     parser.add_argument("--normalize", action="store_true", default=False,
-                        help="Whether to perform a cumulative histogram normalization on the images\n" \
+                        help="Whether to perform a cumulative histogram normalization on the images\n"
                         "to equalize the intensities (recommended for ECC alignment method")
     parser.add_argument("--alignment-method", default="ECC", metavar="[STR]", 
                         type=str, 
                         choices=["ECC", "EDGES", "MANUAL"],
-                        help="The method to use for the image alignment:\n" \
-                        "ECC = automatic alignment based on the brightness and contour (ECC algorithm) \n" \
-                        "EDGES = automatic alignment based on edges detection\n" \
-                        "MANUAL = manual alignment based selected points\n" \
+                        help="The method to use for the image alignment:\n"
+                        "ECC = automatic alignment based on the brightness and contour (ECC algorithm) \n"
+                        "EDGES = automatic alignment based on edges detection\n"
+                        "MANUAL = manual alignment based selected points\n"
                         "(default: %(default)s)")
     args = parser.parse_args()
     main(args.counts,

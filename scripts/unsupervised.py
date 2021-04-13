@@ -1,14 +1,15 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-This tool performs unsupervised learning on one or more
-Spatial Transcriptomics datasets (matrices of counts)
-It takes a list of datasets as input and outputs:
+This tool performs unsupervised clustering on one or more
+matrices of counts.
 
- - a file containing the reduced coordinates and their labels (for each spot)
+It takes a list of matrices of counts as input and outputs:
+
+ - a file containing the reduced coordinates (manifold) and their labels (cluster) for each spot
  - a scatter plot (dimensionality reduction space) colored by computed classes
 
-The input datasets must have gene names as columns and spots coordinates as rows.
+The input matrices must have gene names as columns and spots coordinates as rows.
 
 The user can select what clustering algorithm to use, what 
 dimensionality reduction technique to use and normalization method to use. 
@@ -61,7 +62,7 @@ def main(counts_table_files,
         sys.exit(1)
 
     if num_clusters is None and clustering != "DBSCAN":
-        sys.stderr.write("Error, num_clusters must be given if clustering algorith is not DBSCAN\n")
+        sys.stderr.write("Error, num_clusters must be given if clustering algorithm is not DBSCAN\n")
         sys.exit(1)
 
     if tsne_theta < 0.0 or tsne_theta > 1.0:
@@ -252,18 +253,18 @@ def main(counts_table_files,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument("--counts-files", required=True, nargs='+', type=str,
+    parser.add_argument("--counts", required=True, nargs='+', type=str,
                         help="One or more matrices with gene counts per spot (genes as columns)")
     parser.add_argument("--normalization", default="RAW",
                         type=str,
                         choices=["RAW", "REL", "CPM"],
-                        help="Normalize the counts using:\n" \
-                             "RAW = absolute counts\n" \
+                        help="Normalize the counts using:\n"
+                             "RAW = absolute counts\n"
                              "REL = Each gene count divided by the total count of its spot\n"
                              "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n"
                              "(default: %(default)s)")
     parser.add_argument("--num-clusters", default=None, metavar="[INT]", type=int, choices=range(2, 30),
-                        help="The number of clusters/regions expected to find.\n" \
+                        help="The number of clusters expected to find.\n"
                              "Note that this parameter has no effect with DBSCAN clustering.")
     parser.add_argument("--num-exp-genes", default=0.01, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n"
@@ -277,7 +278,7 @@ if __name__ == '__main__':
     parser.add_argument("--num-genes-discard", default=0.5, metavar="[FLOAT]", type=float,
                         help="The percentage of genes (0.0 - 1.0) to discard from the distribution of all the genes\n"
                              "across all the spots using the variance or the top highest expressed\n"
-                             "(see --top-genes-criteria)\n " \
+                             "(see --top-genes-criteria)\n "
                              "Low variance or lowly expressed will be discarded (default: %(default)s)")
     parser.add_argument("--clustering", default="KMeans",
                         type=str, choices=["Hierarchical", "KMeans", "DBSCAN", "Gaussian"],
@@ -314,13 +315,17 @@ if __name__ == '__main__':
     parser.add_argument("--tsne-theta", default=0.5, metavar="[FLOAT]", type=float,
                         help="The value of theta for the t-SNE method. (default: %(default)s)")
     parser.add_argument("--umap-neighbors", default=15, metavar="[INT]", type=int,
-                        help="The number of neighboring points used in local approximations of manifold structure (UMAP) (default: %(default)s)")
+                        help="The number of neighboring points used in local approximations of "
+                             "manifold structure (UMAP) (default: %(default)s)")
     parser.add_argument("--umap-min-dist", default=0.1, metavar="[FLOAT]", type=float,
-                        help="This controls how tightly the embedding is allowed to compress points together (UMAP) (default: %(default)s)")
+                        help="This controls how tightly the embedding is allowed to compress "
+                             "points together (UMAP) (default: %(default)s)")
     parser.add_argument("--umap-metric", default="euclidean", metavar="[STR]", type=str,
-                        help="This controls how the distance is computed in the ambient space of the input data (UMAP) (default: %(default)s)")
+                        help="This controls how the distance is computed in the ambient space "
+                             "of the input data (UMAP) (default: %(default)s)")
     parser.add_argument("--tsne-initial-dims", default=50, metavar="[INT]", type=int,
-                        help="The number of initial dimensions of the PCA step in the t-SNE clustering. (default: %(default)s)")
+                        help="The number of initial dimensions of the PCA step in "
+                             "the t-SNE clustering. (default: %(default)s)")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
     parser.add_argument("--pca-auto-components", default=None, metavar="[FLOAT]", type=float,
                         help="For the PCA dimensionality reduction the number of dimensions\n"
@@ -332,7 +337,7 @@ if __name__ == '__main__':
     parser.add_argument("--seed", default=999, metavar="[INT]", type=int,
                         help="The value of the random seed. (default: %(default)s)")
     args = parser.parse_args()
-    main(args.counts_files,
+    main(args.counts,
          args.normalization,
          args.num_clusters,
          args.num_exp_genes,

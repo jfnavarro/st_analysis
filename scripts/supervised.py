@@ -1,22 +1,22 @@
 #! /usr/bin/env python
 """
 This script performs a supervised training and prediction for
-Spatial Transcriptomics datasets
+Spatial Transcriptomics datasets.
 
 The multi-class classification can be performed with either SVC, NN or
 logistic regression
 
-The training set will be a matrix with counts (genes as columns and spots as rows)
-and the test set will be a matrix of counts with the same format
+The training set must be a matrix with counts (genes as columns and spots as rows)
+and the test set must also be a matrix of counts with the same format.
 
-One file with class labels for the training set is needed
-so for the classifier to know what class each spot(row) in
+One file with class/cluster labels for the training set is needed
+so for the classifier to know what class/cluster each spot in
 the training set belongs to, the file should be tab delimited :
 
 SPOT_NAME(as it in the matrix) CLASS_NUMBER
 
-It will then try to predict the classes of the spots(rows) in the
-test set. If class labels for the test sets
+The script will then try to predict the classes of the spots in the
+test set. If class/cluster labels for the test sets
 are given the script will compute accuracy of the prediction.
 
 The script allows to normalize the train/test counts using different
@@ -38,6 +38,7 @@ from sklearn.multiclass import OneVsRestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import RandomForestClassifier
+
 
 def main(train_data,
          test_data,
@@ -299,13 +300,14 @@ def main(train_data,
         sys.stdout.write("Warning, model's weights could not be obtained\n")
         pass
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--train-data", required=True, type=str,
-                        help="Path to the input training data file (matrix of counts, spots as rows)")
+                        help="Path to the input training data file (matrix of counts, genes as columns)")
     parser.add_argument("--test-data", required=True, type=str,
-                        help="Path to the test training data file (matrix of counts, spots as rows)")
+                        help="Path to the test training data file (matrix of counts, genes as columns)")
     parser.add_argument("--train-classes", required=True, type=str,
                         help="Path to the training classes file (SPOT LABEL)")
     parser.add_argument("--test-classes", required=False, type=str,
@@ -319,19 +321,19 @@ if __name__ == '__main__':
     parser.add_argument("--normalization", default="RAW", metavar="[STR]",
                         type=str,
                         choices=["RAW", "REL", "CPM"],
-                        help="Normalize the counts using:\n" \
-                        "RAW = absolute counts\n" \
-                        "REL = Each gene count divided by the total count of its spot\n" \
-                        "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n" \
+                        help="Normalize the counts using:\n"
+                        "RAW = absolute counts\n"
+                        "REL = Each gene count divided by the total count of its spot\n"
+                        "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n"
                         "(default: %(default)s)")
     parser.add_argument("--epochs", type=int, default=1000, metavar="[INT]",
                         help="The number of epochs to train (default: %(default)s)")
     parser.add_argument("--outdir", help="Path to output dir")
     parser.add_argument("--num-exp-genes", default=0.01, metavar="[FLOAT]", type=float,
-                        help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
+                        help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n"
                         "must have to be kept from the distribution of all expressed genes (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--num-exp-spots", default=0.01, metavar="[FLOAT]", type=float,
-                        help="The percentage of number of expressed spots (>= --min-gene-expression) a gene\n" \
+                        help="The percentage of number of expressed spots (>= --min-gene-expression) a gene\n"
                         "must have to be kept from the total number of spots (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--min-gene-expression", default=1, type=float, metavar="[FLOAT]",
                         help="The minimum count a gene must have in a spot to be\n"
@@ -339,26 +341,26 @@ if __name__ == '__main__':
     parser.add_argument("--classifier", default="SVC", metavar="[STR]",
                         type=str,
                         choices=["SVM", "LR", "NN", "GB", "RF"],
-                        help="The classifier to use:\n" \
-                        "SVM = Support Vector Machine\n" \
-                        "LR = Logistic Regression\n" \
-                        "NN = Neural Network\n" \
-                        "GB = Gradient Boosting\n" \
-                        "RF = Random Forest\n" \
+                        help="The classifier to use:\n"
+                        "SVM = Support Vector Machine\n"
+                        "LR = Logistic Regression\n"
+                        "NN = Neural Network\n"
+                        "GB = Gradient Boosting\n"
+                        "RF = Random Forest\n"
                         "(default: %(default)s)")
     parser.add_argument("--svm-kernel", default="linear", metavar="[STR]",
                         type=str,
                         choices=["linear", "poly", "rbf", "sigmoid"],
-                        help="What kernel to use with the SVM classifier:\n" \
-                        "linear = a linear kernel\n" \
-                        "poly = a polynomial kernel\n" \
-                        "rbf = a rbf kernel\n" \
-                        "sigmoid = a sigmoid kernel\n" \
+                        help="What kernel to use with the SVM classifier:\n"
+                        "linear = a linear kernel\n"
+                        "poly = a polynomial kernel\n"
+                        "rbf = a rbf kernel\n"
+                        "sigmoid = a sigmoid kernel\n"
                         "(default: %(default)s)")
     parser.add_argument("--batch-size", type=int, default=200, metavar="[INT]",
                         help="The batch size for the Neural Network classifier (default: %(default)s)")
     parser.add_argument("--hidden-layers-size", type=int, nargs="+", metavar="[INT]", default=[1000, 500],
-                        help="The sizes of the hidden layers for the Neural Network\n " \
+                        help="The sizes of the hidden layers for the Neural Network\n"
                         "The number of hidden layers will correspond to the number of sizes given (default: %(default)s)")
     parser.add_argument("--learning-rate", type=float, default=0.001, metavar="[FLOAT]",
                         help="The learning rate for the Neural Network classifier (default: %(default)s)")
@@ -367,14 +369,14 @@ if __name__ == '__main__':
     parser.add_argument("--min-class-size", type=int, default=10, metavar="[INT]",
                         help="The minimum number of elements a class must has in the training set (default: %(default)s)")
     parser.add_argument("--num-genes-keep-train", default=50, metavar="[INT]", type=int, choices=range(0, 99),
-                        help="The percentage of genes to discard from the distribution of all the genes\n" \
-                        "across all the spots using the variance or the top highest expressed\n" \
-                        "(see --top-genes-criteria-train)\n " \
+                        help="The percentage of genes to discard from the distribution of all the genes\n"
+                        "across all the spots using the variance or the top highest expressed\n"
+                        "(see --top-genes-criteria-train)\n "
                         "Low variance or low expressed genes will be discarded (default: %(default)s)")
     parser.add_argument("--num-genes-keep-test", default=50, metavar="[INT]", type=int, choices=range(0, 99),
-                        help="The percentage of genes to discard from the distribution of all the genes\n" \
-                        "across all the spots using the variance or the top highest expressed\n" \
-                        "(see --top-genes-criteria-test)\n " \
+                        help="The percentage of genes to discard from the distribution of all the genes\n"
+                        "across all the spots using the variance or the top highest expressed\n"
+                        "(see --top-genes-criteria-test)\n "
                         "Low variance or low expressed genes will be discarded (default: %(default)s)")
     parser.add_argument("--top-genes-criteria-train", default="Variance", metavar="[STR]", 
                         type=str, choices=["Variance", "TopRanked"],
@@ -383,13 +385,28 @@ if __name__ == '__main__':
                         type=str, choices=["Variance", "TopRanked"],
                         help="What criteria to use to reduce the number of genes (Variance or TopRanked) (default: %(default)s)")
     args = parser.parse_args()
-    main(args.train_data, args.test_data, args.train_classes,
-         args.test_classes, args.log_scale, args.normalization,
-         args.outdir, args.standard_transformation,
-         args.epochs, args.num_exp_genes, args.num_exp_spots,
-         args.min_gene_expression, args.classifier, args.svm_kernel,
-         args.batch_size, args.learning_rate, args.stratified_sampler,
-         args.min_class_size, args.hidden_layers_size, args.model_file,
-         args.num_genes_keep_train, args.num_genes_keep_test,
-         args.top_genes_criteria_train, args.top_genes_criteria_test)
+    main(args.train_data,
+         args.test_data,
+         args.train_classes,
+         args.test_classes,
+         args.log_scale,
+         args.normalization,
+         args.outdir,
+         args.standard_transformation,
+         args.epochs,
+         args.num_exp_genes,
+         args.num_exp_spots,
+         args.min_gene_expression,
+         args.classifier,
+         args.svm_kernel,
+         args.batch_size,
+         args.learning_rate,
+         args.stratified_sampler,
+         args.min_class_size,
+         args.hidden_layers_size,
+         args.model_file,
+         args.num_genes_keep_train,
+         args.num_genes_keep_test,
+         args.top_genes_criteria_train,
+         args.top_genes_criteria_test)
 

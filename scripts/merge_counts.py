@@ -33,11 +33,12 @@ def main(counts_files, no_header, no_index, outfile):
     
     # Write filtered table
     counts.to_csv(outfile, sep='\t', header=not no_header)
-               
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--counts-files", required=True, nargs='+', type=str,
+    parser.add_argument("--counts", required=True, nargs='+', type=str,
                         help="One or more matrices of counts (spots as rows and genes as columns)")
     parser.add_argument("--no-header", action="store_true", default=False,
                         help="Use this flag if the input matrices do not contain a header")
@@ -45,6 +46,6 @@ if __name__ == '__main__':
                         help="Use this flag to not add an index to the rows in the merged matrix (one index per input dataset)")
     parser.add_argument("--outfile", help="Name of the output file")
     args = parser.parse_args()
-    main(args.counts_files, args.no_header, args.no_index, args.outfile)
+    main(args.counts, args.no_header, args.no_index, args.outfile)
 
 

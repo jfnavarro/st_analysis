@@ -36,11 +36,12 @@ def main(counts_matrix, reg_exps, outfile):
     counts_table.drop(genes, axis=1, inplace=True)
     # Write filtered table
     counts_table.to_csv(outfile, sep='\t')
-               
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--counts-matrix", required=True,
+    parser.add_argument("--counts", required=True,
                         help="Matrix with gene counts (genes as columns)")
     parser.add_argument("--outfile", help="Name of the output file")
     parser.add_argument("--filter-genes", help="Regular expression for \
@@ -49,5 +50,5 @@ if __name__ == '__main__':
                         type=str,
                         action='append')
     args = parser.parse_args()
-    main(args.counts_matrix, args.filter_genes, args.outfile)
+    main(args.counts, args.filter_genes, args.outfile)
 

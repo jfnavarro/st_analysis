@@ -309,10 +309,10 @@ def main(counts_table_files,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument("--counts-files", required=True, nargs='+', type=str,
+    parser.add_argument("--counts", required=True, nargs='+', type=str,
                         help="One or more matrices of counts (spots as rows and genes as columns)")
     parser.add_argument("--num-exp-genes", default=0.0, metavar="[FLOAT]", type=float,
-                        help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
+                        help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n"
                              "must have to be kept from the distribution of all expressed genes (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--num-exp-spots", default=0.0, metavar="[FLOAT]", type=float,
                         help="The percentage of number of expressed spots a gene\n" \
@@ -321,10 +321,10 @@ if __name__ == '__main__':
                         help="The minimum count (number of reads) a gene must have in a spot to be\n"
                              "considered expressed (default: %(default)s)")
     parser.add_argument("--cutoff", default=0.0, metavar="[FLOAT]", type=float,
-                        help="The percentage of reads a gene must have in a spot to be included in the plots from\n" \
+                        help="The percentage of reads a gene must have in a spot to be included in the plots from\n"
                              "the distribution of reads of the gene across all the spots (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--cutoff-upper", default=1.0, metavar="[FLOAT]", type=float,
-                        help="The percentage of reads a gene should not have in a spot to be included in the plots from\n" \
+                        help="The percentage of reads a gene should not have in a spot to be included in the plots from\n"
                              "the distribution of reads of the gene across all the spots (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--data-alpha", type=float, default=1.0, metavar="[FLOAT]",
                         help="The transparency level for the data points, 0 min and 1 max (default: %(default)s)")
@@ -341,24 +341,24 @@ if __name__ == '__main__':
     parser.add_argument("--normalization", default="RAW",
                         type=str,
                         choices=["RAW", "REL", "CPM"],
-                        help="Normalize the counts using:\n" \
-                             "RAW = absolute counts\n" \
-                             "REL = Each gene count divided by the total count of its spot\n" \
-                             "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n" \
+                        help="Normalize the counts using:\n"
+                             "RAW = absolute counts\n"
+                             "REL = Each gene count divided by the total count of its spot\n"
+                             "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n"
                              "(default: %(default)s)")
     parser.add_argument("--standard-transformation", action="store_true", default=False,
                         help="Apply the z-score transformation to each feature (gene)")
-    parser.add_argument("--show-genes", help="Regular expression for gene symbols to be shown (one image per gene).\n" \
+    parser.add_argument("--show-genes", help="Regular expression for gene symbols to be shown (one image per gene).\n"
                                              "The genes matching the reg-exp will be shown in separate files.",
                         required=False,
                         default=None,
                         type=str,
                         nargs='+')
-    parser.add_argument("--clusters", help="Path to a tab delimited file containing clustering results for each spot.\n" \
+    parser.add_argument("--clusters", help="Path to a tab delimited file containing clustering results for each spot.\n"
                                            "First column spot id and second column the cluster number (integer).",
                         default=None,
                         type=str)
-    parser.add_argument("--gene-family", help="Path to one or more files containing set of genes (one per row).\n" \
+    parser.add_argument("--gene-family", help="Path to one or more files containing set of genes (one per row).\n"
                                               "A combined image will be generated using the value of --combine-genes",
                         required=False,
                         default=None,
@@ -382,15 +382,15 @@ if __name__ == '__main__':
     parser.add_argument("--combine-genes", default="None",
                         type=str,
                         choices=["None", "NaiveMean", "NaiveSum", "CumSum"],
-                        help="Whether to generate a combined plot with the all the genes given in --show-genes:\n" \
-                             "None = do not create combined plot\n" \
-                             "NaiveMean = create combine plot using the mean value of the genes in the spot adjusted by size\n" \
-                             "NaiveSum = create combine plot using the sum value of the genes in the spot adjusted by size\n" \
-                             "CumSum = create combined plot using a cumulative sum of the genes (0.90) and the Fisher test\n" \
+                        help="Whether to generate a combined plot with the all the genes given in --show-genes:\n"
+                             "None = do not create combined plot\n"
+                             "NaiveMean = create combine plot using the mean value of the genes in the spot adjusted by size\n"
+                             "NaiveSum = create combine plot using the sum value of the genes in the spot adjusted by size\n"
+                             "CumSum = create combined plot using a cumulative sum of the genes (0.90) and the Fisher test\n"
                              "(default: %(default)s)")
     args = parser.parse_args()
 
-    main(args.counts_files,
+    main(args.counts,
          args.cutoff,
          args.cutoff_upper,
          args.data_alpha,
