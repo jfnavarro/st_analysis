@@ -36,7 +36,7 @@ The following instructions are for installing the ST Analysis package with Pytho
 A set of scripts (described below) will then be available in your system or
 the environment if you chose to work on a specific environment.
 
-Note that you can always type ´´script_name.py --help´´ to get more information
+Note that you can always type `script_name.py --help` to get more information
 about how a script works. 
 
 ## Analysis tools
