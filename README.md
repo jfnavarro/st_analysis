@@ -36,7 +36,7 @@ The following instructions are for installing the ST Analysis package with Pytho
 A set of scripts (described below) will then be available in your system or
 the environment if you chose to work on a specific environment.
 
-Note that you can always type ´script_name.py --help´ to get more information
+Note that you can always type ´´script_name.py --help´´ to get more information
 about how a script works. 
 
 ## Analysis tools
@@ -49,8 +49,8 @@ To cluster spot together based on their expression profiles you can run:
 The script can be given one or serveral datasets (matrices of counts). 
 The script allows for multiple normalization and filtering options.
 The script will perform dimesionality reduction and then cluster the spot 
-together based on the dimesionality reduced space.
-The script implement multiple options for clustering and dimensionality reduction.
+together based on the manifold space.
+The script implements multiple options for clustering and dimensionality reduction.
 The script generates a scatter plot of the clustered spots in a 2D or 3D manifold. 
 The script will write the computer clusters per spot in a file (tab delimited). 
 
@@ -63,8 +63,7 @@ of a new dataset of the same tissue. For that you can use the following script:
 
     supervised.py --train-data data_matrix.tsv --test-data data_matrix.tsv --train-casses train_classes.txt --test-classes test_classes.txt
     
-This will generate some statistics, a file with the predicted classes for each spot and a plot of
-the predicted spots on top of the tissue image (if the image and the alignment matrix are given).
+This will generate some statistics and a file with the predicted classes/clusters for each spot.
 The script allows for several options for normalization and classification settings and algorithms. 
 The test/train classes file shoud look like:
 
@@ -76,14 +75,14 @@ Where X is the spot X coordinate and Y is the spot Y coordinate and 1,1 and 2 ar
 spot classes (regions).
 To know more about the parameters you can type --help
 
-NOTE: there is version that uses GPU and NN (supervised_torch.py)
+NOTE: there is version that uses GPU and Neural Networks (supervised_torch.py)
 
 ### To visualize Spatial Transcriptomics (ST) datasets
 Use the script data_plotter.py to visualize ST data, you can use different thresholds and
 filters (counts) and different normalization and visualization options. 
 The script allows to plot clusters as well as gene sets. 
 The script plots one image for each gene given in the --show-genes option (one sub-image for each input dataset).
-You need one or more matrices of counts where the spots ares rows and the genes are columns. 
+You need one or more matrices of counts where the spots are rows and the genes are columns. 
 
     data_plotter.py --cutoff 2 --show-genes Actb Apoe --counts data_matrix.tsv --normalization REL
     
