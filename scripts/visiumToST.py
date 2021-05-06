@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Script that converts a Visium 10x dataset
 to a Spatial Transcriptomics dataset

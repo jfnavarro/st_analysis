@@ -1,6 +1,6 @@
 #!/usr/bin/python
 """
-A toolkit for analysis and visualization
+A toolset for analysis and visualization
 of Spatial Transcriptomics datasets
 """
 

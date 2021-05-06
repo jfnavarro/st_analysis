@@ -1,8 +1,10 @@
 #! /usr/bin/env python
+# -*- coding: utf-8 -*-
 """ 
-This script simply merges matrices of counts (ST datasets) into a combined matrix.\n
+This script simply merges matrices of counts into a combined matrix
+
 The merging is done by rows (spots) adding an optional index to the rows (spots)
-that corresponds to the order in the input.
+that corresponds to the order of the matrices in the input.
 
 @Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """
@@ -16,21 +18,21 @@ from stanalysis.preprocessing import aggregate_datatasets
 def main(counts_files, no_header, no_index, outfile):
 
     if len(counts_files) == 0 or \
-    any([not os.path.isfile(f) for f in counts_files]):
+            any([not os.path.isfile(f) for f in counts_files]):
         sys.stderr.write("Error, input file/s not present or invalid format\n")
-        sys.exit(1) 
-     
+        sys.exit(1)
+
     if not outfile:
         outfile = "merged_counts.tsv"
-    print("Input datasets {}".format(" ".join(counts_files))) 
-    
+    print("Input datasets {}".format(" ".join(counts_files)))
+
     # Merge input datasets by rows
-    counts = aggregate_datatasets(counts_files, 
-                                  add_index=not no_index, 
+    counts = aggregate_datatasets(counts_files,
+                                  add_index=not no_index,
                                   header=None if no_header else 0)
     print("Total number of spots {}".format(len(counts.index)))
     print("Total number of genes {}".format(len(counts.columns)))
-    
+
     # Write filtered table
     counts.to_csv(outfile, sep='\t', header=not no_header)
 
@@ -43,9 +45,8 @@ if __name__ == '__main__':
     parser.add_argument("--no-header", action="store_true", default=False,
                         help="Use this flag if the input matrices do not contain a header")
     parser.add_argument("--no-index", action="store_true", default=False,
-                        help="Use this flag to not add an index to the rows in the merged matrix (one index per input dataset)")
+                        help="Use this flag to not add an index to the rows in the merged matrix "
+                             "(one index per input dataset)")
     parser.add_argument("--outfile", help="Name of the output file")
     args = parser.parse_args()
     main(args.counts, args.no_header, args.no_index, args.outfile)
-
-

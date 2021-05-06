@@ -8,7 +8,7 @@ The multi-class classification is performed using a 2 layers
 neural network with the option to use GPU (CUDA) acceleration
 
 The training set will be a matrix with counts (genes as columns and spots as rows)
-and the test set will be a matrix of counts with the same format
+and the test set will be another matrix of counts with the same format
 
 One file with class labels for the training set is needed
 so for the classifier to know what class each spot(row) in
@@ -97,8 +97,10 @@ def str_to_act_func(str):
         return torch.nn.ReLU()
 
 
-def create_model(n_feature, n_class,
-                 hidden_layer_one, hidden_layer_two,
+def create_model(n_feature,
+                 n_class,
+                 hidden_layer_one,
+                 hidden_layer_two,
                  activation_function):
     # Init model
     H1 = hidden_layer_one
@@ -110,15 +112,18 @@ def create_model(n_feature, n_class,
         torch.nn.Linear(H1, H2),
         torch.nn.BatchNorm1d(num_features=H2),
         str_to_act_func(activation_function),
-        torch.nn.Linear(H2, n_class),
-    )
+        torch.nn.Linear(H2, n_class))
     return model
 
 
-def create_loaders(trn_set, vali_set,
-                   train_batch_size, validation_batch_size,
-                   train_sampler, test_sampler,
-                   shuffle_train, shuffle_test,
+def create_loaders(trn_set,
+                   vali_set,
+                   train_batch_size,
+                   validation_batch_size,
+                   train_sampler,
+                   test_sampler,
+                   shuffle_train,
+                   shuffle_test,
                    kwargs):
     # Create loaders
     trn_loader = utils.DataLoader(trn_set,
@@ -458,7 +463,7 @@ def main(train_data,
                     counter = 0
                     best_model_local = dict()
                     if grid_search:
-                        print("Training model with:\n L2 {}\n learning rate {}\n train batch size {}\n " \
+                        print("Training model with:\n L2 {}\n learning rate {}\n train batch size {}\n "
                               "test batch size {}\n hidden layer one {}\n hidden layer two {}".format(l2, lr, trn_bs,
                                                                                                       vali_bs, h1, h2))
                     for epoch in range(epochs):
@@ -555,16 +560,16 @@ if __name__ == '__main__':
     parser.add_argument("--test-classes", required=False, type=str,
                         help="Path to the test classes file (SPOT LABEL)")
     parser.add_argument("--log-scale", action="store_true", default=False,
-                        help="Convert the training and test sets to log space (not applied when using batch correction)")
+                        help="Convert the training and test sets to log space (log2 + 1)")
     parser.add_argument("--standard-transformation", action="store_true", default=False,
                         help="Apply the standard transformation to each gene on the train and test sets")
     parser.add_argument("--normalization", default="RAW", metavar="[STR]",
                         type=str,
                         choices=["RAW", "REL", "CPM"],
-                        help="Normalize the counts using:\n" \
-                             "RAW = absolute counts\n" \
-                             "REL = Each gene count divided by the total count of its spot\n" \
-                             "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n" \
+                        help="Normalize the counts using:\n"
+                             "RAW = absolute counts\n"
+                             "REL = Each gene count divided by the total count of its spot\n"
+                             "CPM = Each gene count divided by the total count of its spot multiplied by its mean\n"
                              "(default: %(default)s)")
     parser.add_argument("--train-batch-size", type=int, default=200, metavar="[INT]",
                         help="The input batch size for training (default: %(default)s)")
@@ -577,10 +582,10 @@ if __name__ == '__main__':
     parser.add_argument("--hidden-layer-two", type=int, default=1000, metavar="[INT]",
                         help="The number of neurons in the second hidden layer (default: %(default)s)")
     parser.add_argument("--train-validation-ratio", type=float, default=0.2, metavar="[FLOAT]",
-                        help="The percentage of the training set that will be used to validate" \
+                        help="The percentage of the training set that will be used to validate"
                              "the model during training (default: %(default)s)")
     parser.add_argument("--train-test-ratio", type=float, default=0.2, metavar="[FLOAT]",
-                        help="The percentage of the training set that will be used to test" \
+                        help="The percentage of the training set that will be used to test"
                              "the model after training (default: %(default)s)")
     parser.add_argument("--learning-rate", type=float, default=0.001, metavar="[FLOAT]",
                         help="The learning rate for the Adam optimizer (default: %(default)s)")
@@ -589,10 +594,10 @@ if __name__ == '__main__':
     parser.add_argument("--activation-function", default="RELU", metavar="[STR]",
                         type=str,
                         choices=["RELU", "TANH", "SELU"],
-                        help="Activation function to be used in the hidden layers:\n" \
-                             "RELU = rectified linear unit \n" \
-                             "TANH = hyperbolic tangent\n" \
-                             "SELU = self normalizing linear unit\n" \
+                        help="Activation function to be used in the hidden layers:\n"
+                             "RELU = rectified linear unit \n"
+                             "TANH = hyperbolic tangent\n"
+                             "SELU = self normalizing linear unit\n"
                              "(default: %(default)s)")
     parser.add_argument("--use-cuda", action="store_true", default=False,
                         help="Whether to use CUDA (GPU computation)")
@@ -601,7 +606,7 @@ if __name__ == '__main__':
     parser.add_argument("--stratified-loss", action="store_true", default=False,
                         help="Penalizes more small classes in the loss")
     parser.add_argument("--min-class-size", type=int, default=10, metavar="[INT]",
-                        help="The minimum number of elements a class must has in the" \
+                        help="The minimum number of elements a class must has in the"
                              "training set (default: %(default)s)")
     parser.add_argument("--verbose", action="store_true", default=False,
                         help="Whether to show extra messages")
@@ -609,40 +614,61 @@ if __name__ == '__main__':
                         help="Perform a grid search to find the most optimal hyper parameters")
     parser.add_argument("--outdir", help="Path to output directory")
     parser.add_argument("--num-exp-genes", default=0.01, metavar="[FLOAT]", type=float,
-                        help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n" \
+                        help="The percentage of number of expressed genes (>= --min-gene-expression) a spot\n"
                              "must have to be kept from the distribution of all expressed genes (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--num-exp-spots", default=0.01, metavar="[FLOAT]", type=float,
-                        help="The percentage of number of expressed spots (>= --min-gene-expression) a gene\n" \
+                        help="The percentage of number of expressed spots (>= --min-gene-expression) a gene\n"
                              "must have to be kept from the total number of spots (0.0 - 1.0) (default: %(default)s)")
     parser.add_argument("--min-gene-expression", default=1, type=float, metavar="[FLOAT]",
                         help="The minimum count a gene must have in a spot to be\n"
                              "considered expressed when filtering (default: %(default)s)")
     parser.add_argument("--num-genes-keep-train", default=50, metavar="[INT]", type=int, choices=range(0, 99),
-                        help="The percentage of genes to discard from the distribution of all the genes\n" \
-                             "across all the spots using the variance or the top highest expressed\n" \
-                             "(see --top-genes-criteria-train)\n " \
+                        help="The percentage of genes to discard from the distribution of all the genes\n"
+                             "across all the spots using the variance or the top highest expressed\n"
+                             "(see --top-genes-criteria-train)\n "
                              "Low variance or low expressed genes will be discarded (default: %(default)s)")
     parser.add_argument("--num-genes-keep-test", default=50, metavar="[INT]", type=int, choices=range(0, 99),
-                        help="The percentage of genes to discard from the distribution of all the genes\n" \
-                             "across all the spots using the variance or the top highest expressed\n" \
-                             "(see --top-genes-criteria-test)\n " \
+                        help="The percentage of genes to discard from the distribution of all the genes\n"
+                             "across all the spots using the variance or the top highest expressed\n"
+                             "(see --top-genes-criteria-test)\n "
                              "Low variance or low expressed genes will be discarded (default: %(default)s)")
     parser.add_argument("--top-genes-criteria-train", default="Variance", metavar="[STR]",
                         type=str, choices=["Variance", "TopRanked"],
-                        help="What criteria to use to reduce the number of genes (Variance or TopRanked) (default: %(default)s)")
+                        help="What criteria to use to reduce the number of genes "
+                             "(Variance or TopRanked) (default: %(default)s)")
     parser.add_argument("--top-genes-criteria-test", default="Variance", metavar="[STR]",
                         type=str, choices=["Variance", "TopRanked"],
-                        help="What criteria to use to reduce the number of genes (Variance or TopRanked) (default: %(default)s)")
+                        help="What criteria to use to reduce the number of genes "
+                             "(Variance or TopRanked) (default: %(default)s)")
     args = parser.parse_args()
-    main(args.train_data, args.test_data, args.train_classes,
-         args.test_classes, args.log_scale, args.normalization,
-         args.stratified_loss, args.outdir,
-         args.standard_transformation, args.train_batch_size, args.validation_batch_size,
-         args.epochs, args.learning_rate, args.stratified_sampler,
-         args.min_class_size, args.use_cuda, args.num_exp_genes,
-         args.num_exp_spots, args.min_gene_expression, args.verbose,
-         args.hidden_layer_one, args.hidden_layer_two,
-         args.train_validation_ratio, args.train_test_ratio,
-         args.grid_search, args.activation_function, args.l2,
-         args.num_genes_keep_train, args.num_genes_keep_test,
-         args.top_genes_criteria_train, args.top_genes_criteria_test)
+    main(args.train_data,
+         args.test_data,
+         args.train_classes,
+         args.test_classes,
+         args.log_scale,
+         args.normalization,
+         args.stratified_loss,
+         args.outdir,
+         args.standard_transformation,
+         args.train_batch_size,
+         args.validation_batch_size,
+         args.epochs,
+         args.learning_rate,
+         args.stratified_sampler,
+         args.min_class_size,
+         args.use_cuda,
+         args.num_exp_genes,
+         args.num_exp_spots,
+         args.min_gene_expression,
+         args.verbose,
+         args.hidden_layer_one,
+         args.hidden_layer_two,
+         args.train_validation_ratio,
+         args.train_test_ratio,
+         args.grid_search,
+         args.activation_function,
+         args.l2,
+         args.num_genes_keep_train,
+         args.num_genes_keep_test,
+         args.top_genes_criteria_train,
+         args.top_genes_criteria_test)

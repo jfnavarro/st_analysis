@@ -78,7 +78,8 @@ def nearest_neighbor(src, dst):
 
 def icp(A, B, init_pose=None, max_iterations=50, tolerance=0.001):
     """
-    The Iterative Closest Point method: finds best-fit transform that maps points A on to points B
+    The Iterative Closest Point method: finds best-fit transform
+    that maps points A on to points B
     Input:
         A: Nxm numpy array of source mD points
         B: Nxm numpy array of destination mD point
@@ -770,7 +771,7 @@ if __name__ == '__main__':
     parser.add_argument("--images", required=True, nargs='+', type=str,
                         help="The HE images corresponding to the counts matrices (same order)")
     parser.add_argument("--coordinates", required=False, nargs='+', type=str,
-                        help="The spoot coordinates corresponding to the counts matrices (same order)")
+                        help="The spot coordinates corresponding to the counts matrices (same order)")
     parser.add_argument("--down-width", default=500, metavar="[INT]", type=int,
                         help="The size of the width in pixels of the down-sampled images (default: %(default)s)")
     parser.add_argument("--down-height", default=500, metavar="[INT]", type=int,
@@ -779,7 +780,8 @@ if __name__ == '__main__':
     parser.add_argument("--debug", action="store_true", default=False,
                         help="Whether to generate debug images for each step")
     parser.add_argument("--border", action="store_true", default=False,
-                        help="Whether to add a white border to images prior alignment (recommended for EDGES alignment method)")
+                        help="Whether to add a white border to the images prior alignment "
+                             "(recommended for EDGES alignment method)")
     parser.add_argument("--normalize", action="store_true", default=False,
                         help="Whether to perform a cumulative histogram normalization on the images\n"
                         "to equalize the intensities (recommended for ECC alignment method")
