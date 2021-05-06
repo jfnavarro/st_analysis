@@ -1,10 +1,11 @@
 #! /usr/bin/env python
+# -*- coding: utf-8 -*-
 """
 Script that combines a set of Spatial Transcriptomics datasets
 together to create one single image, counts matrix and spot coordinates.
 The (i,j) position of the dataset in the combined image is appended
 to the spots ids. This script can be useful to visualize several
-sections at once.
+datasets at once.
 
 @Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """
@@ -58,7 +59,7 @@ def main(counts_files, images_files, coordinates_files, down_width, down_height,
     n_col = min(num_columns, len(counts_files))
     n_row = max(int(len(counts_files) / n_col), 1)
 
-    # Stiched image/counts/coordinates
+    # Stitched image/counts/coordinates
     img_stitched = np.zeros((down_height * n_row, down_width * n_col, 3), dtype=np.double)
     pixel_coords_stiched = np.empty((0,2))
     stiched_counts = pd.DataFrame()
@@ -109,12 +110,12 @@ def main(counts_files, images_files, coordinates_files, down_width, down_height,
     # Replace Nan and Inf by zeroes
     stiched_counts.replace([np.inf, -np.inf], np.nan)
     stiched_counts.fillna(0.0, inplace=True)
-    stiched_counts.to_csv(os.path.join(outdir, "stiched_counts.tsv"), sep="\t")
+    stiched_counts.to_csv(os.path.join(outdir, "stitched_counts.tsv"), sep="\t")
 
     pd.DataFrame(data=pixel_coords_stiched, index=stiched_counts.index, columns=None).to_csv(
-        os.path.join(outdir, "stiched_coordinates.tsv"), sep="\t", header=False, index=True)
+        os.path.join(outdir, "stitched_coordinates.tsv"), sep="\t", header=False, index=True)
 
-    imageio.imwrite(os.path.join(outdir, "stiched_he.jpg"), img_stitched)
+    imageio.imwrite(os.path.join(outdir, "stitched_he.jpg"), img_stitched)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
@@ -126,13 +127,18 @@ if __name__ == '__main__':
     parser.add_argument("--coordinates", required=True, nargs='+', type=str,
                         help="The spot coordinates files corresponding to the counts matrices (same order)")
     parser.add_argument("--down-width", default=2000, metavar="[INT]", type=int,
-                        help="The size if pixels of the downsampled images (width) (default: %(default)s)")
+                        help="The size if pixels of the down-sampled images (width) (default: %(default)s)")
     parser.add_argument("--down-height", default=2000, metavar="[INT]", type=int,
-                        help="The size if pixels of the downsampled images  (height) (default: %(default)s)")
+                        help="The size if pixels of the down-sampled images  (height) (default: %(default)s)")
     parser.add_argument("--columns", default=None, metavar="[INT]", type=int, required=True,
                         help="The number of columns for the combined image")
     parser.add_argument("--outdir", default=None, help="Path to output dir")
 
     args = parser.parse_args()
-    main(args.counts, args.images, args.coordinates,
-         args.down_width, args.down_height, args.outdir, args.columns)
+    main(args.counts,
+         args.images,
+         args.coordinates,
+         args.down_width,
+         args.down_height,
+         args.outdir,
+         args.columns)

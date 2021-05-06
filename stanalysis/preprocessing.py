@@ -1,5 +1,5 @@
 """ 
-Pre-processing and normalization functions for the ST data.
+Pre-processing and normalization functions for the ST datasets.
 """
 
 import numpy as np
@@ -36,7 +36,7 @@ def filter_data_genes(counts, filter_genes):
         genes_to_keep = counts.columns
     # Check that we hit some genes
     if len(genes_to_keep) == 0:
-        raise RuntimeError("No genes found in the datasets from the "
+        raise RuntimeError("No genes found in the dataset from the "
                            "list given\n{}\n".format(' '.join([x for x in filter_genes])))
     return counts.loc[:, genes_to_keep]
 
@@ -85,6 +85,7 @@ def aggregate_datatasets(counts_table_files, add_index=True, header=0):
     them (this is optional).
     :param counts_table_files: a list of file names corresponding to the matrices
     :param add_index: add the dataset index (position) to the spot's when True
+    :param header: whether to include the columns of the matrices or not
     :return: a matrix counts with the merged data
     """
     # Spots are rows and genes are columns
@@ -108,7 +109,7 @@ def aggregate_datatasets(counts_table_files, add_index=True, header=0):
 
 def remove_noise(counts, num_exp_genes=0.01, num_exp_spots=0.01, min_expression=1):
     """
-    This functions remove noisy (low qualityh) genes and spots
+    This functions remove noisy (low quality) genes and spots
     for a given matrix of counts (Genes as columns and spots as rows).
     - The noisy spots are removed so to keep a percentage
     of the total distribution of spots whose gene counts >= min_expression

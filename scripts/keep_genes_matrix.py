@@ -1,8 +1,10 @@
 #! /usr/bin/env python
+# -*- coding: utf-8 -*-
 """ 
-Script that takes a ST dataset (matrix of counts)
+Script that takes a matrix of counts
 where the columns are genes and the rows
 are spot coordinates
+
         gene    gene    
 XxY
 XxY
@@ -19,6 +21,7 @@ import os
 import pandas as pd
 import re
 
+
 def main(counts_matrix, reg_exps, outfile):
 
     if not os.path.isfile(counts_matrix):
@@ -31,11 +34,14 @@ def main(counts_matrix, reg_exps, outfile):
     # Read the data frame (genes as columns)
     counts_table = pd.read_csv(counts_matrix, sep="\t", header=0, index_col=0)
     genes = counts_table.columns
+
     # Keep the genes that match any of the reg-exps
     genes = [gene for gene in genes if any([re.fullmatch(regex,gene) for regex in reg_exps])]
+
     # Write filtered table
     counts_table.loc[:,genes].to_csv(outfile, sep='\t')
-               
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)

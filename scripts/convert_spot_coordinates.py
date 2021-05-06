@@ -1,6 +1,7 @@
 #! /usr/bin/env python
+# -*- coding: utf-8 -*-
 """
-Scripts that converts spot coordinates file without pixel coordinates
+Scripts that converts a spot coordinates file without pixel coordinates
 to the ST Spot detector format that contains the pixel coordinates
 
 Input: HE image and spot_coordinates in the following format

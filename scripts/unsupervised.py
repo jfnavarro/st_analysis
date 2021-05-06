@@ -1,18 +1,17 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-This tool performs unsupervised clustering on one or more
-matrices of counts.
+This tool performs unsupervised clustering of one or more matrices of counts.
 
 It takes a list of matrices of counts as input and outputs:
 
- - a file containing the reduced coordinates (manifold) and their labels (cluster) for each spot
- - a scatter plot (dimensionality reduction space) colored by computed classes
+ - a file containing the reduced coordinates (manifold) and their classes (cluster) for each spot
+ - a scatter plot (dimensionality reduction space) colored by the computed classes (clusters)
 
 The input matrices must have gene names as columns and spots coordinates as rows.
 
 The user can select what clustering algorithm to use, what 
-dimensionality reduction technique to use and normalization method to use. 
+dimensionality reduction technique to use and what normalization method to use.
 
 Noisy spots (very few genes expressed) are removed using a parameter.
 Noisy genes (expressed in very few spots) are removed using a parameter.
@@ -121,9 +120,7 @@ def main(counts_table_files,
 
     # Normalize data
     print("Computing per spot normalization...")
-    norm_counts = normalize_data(counts,
-                                 normalization,
-                                 center=False)
+    norm_counts = normalize_data(counts, normalization)
 
     if use_log_scale:
         print("Using pseudo-log counts log1p(counts)")
@@ -305,7 +302,7 @@ if __name__ == '__main__':
     parser.add_argument("--num-dimensions", default=2, metavar="[INT]", type=int,
                         help="The number of dimensions to use in the dimensionality reduction. (default: %(default)s)")
     parser.add_argument("--spot-size", default=4, metavar="[INT]", type=int,
-                        help="The size of the spots when generating the plots. (default: %(default)s)")
+                        help="The size of the dots when generating the scatter plots. (default: %(default)s)")
     parser.add_argument("--top-genes-criteria", default="Variance", metavar="[STR]",
                         type=str, choices=["Variance", "TopRanked"],
                         help="What criteria to use to keep top genes before doing\n"

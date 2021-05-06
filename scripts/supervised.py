@@ -1,10 +1,9 @@
 #! /usr/bin/env python
+# -*- coding: utf-8 -*-
 """
-This script performs a supervised training and prediction for
-Spatial Transcriptomics datasets.
+This script performs a supervised training and prediction for Spatial Transcriptomics datasets.
 
-The multi-class classification can be performed with either SVC, NN or
-logistic regression
+The multi-class classification can be performed with either SVC, NN or logistic regression
 
 The training set must be a matrix with counts (genes as columns and spots as rows)
 and the test set must also be a matrix of counts with the same format.
@@ -315,7 +314,7 @@ if __name__ == '__main__':
     parser.add_argument("--model-file", required=False, type=str, default=None,
                         help="Path to saved model file to avoid recomputing the model and only predict")
     parser.add_argument("--log-scale", action="store_true", default=False,
-                        help="Convert the training and test sets to log space (if no batch correction is performed)")
+                        help="Convert the training and test sets to log space (log2 + 1)")
     parser.add_argument("--standard-transformation", action="store_true", default=False,
                         help="Apply the z-score transformation to each feature (gene)")
     parser.add_argument("--normalization", default="RAW", metavar="[STR]",
@@ -380,10 +379,12 @@ if __name__ == '__main__':
                         "Low variance or low expressed genes will be discarded (default: %(default)s)")
     parser.add_argument("--top-genes-criteria-train", default="Variance", metavar="[STR]", 
                         type=str, choices=["Variance", "TopRanked"],
-                        help="What criteria to use to reduce the number of genes (Variance or TopRanked) (default: %(default)s)")
+                        help="What criteria to use to reduce the number of genes "
+                             "(Variance or TopRanked) (default: %(default)s)")
     parser.add_argument("--top-genes-criteria-test", default="Variance", metavar="[STR]", 
                         type=str, choices=["Variance", "TopRanked"],
-                        help="What criteria to use to reduce the number of genes (Variance or TopRanked) (default: %(default)s)")
+                        help="What criteria to use to reduce the number of genes "
+                             "(Variance or TopRanked) (default: %(default)s)")
     args = parser.parse_args()
     main(args.train_data,
          args.test_data,

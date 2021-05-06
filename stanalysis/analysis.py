@@ -1,5 +1,5 @@
 """
-Different functions for analysis for ST data
+Set of functions for numerical analysis
 """
 
 from matplotlib import colors as mpcolors
@@ -19,7 +19,7 @@ def linear_conv(value, old_min, old_max, new_min, new_max):
 def weighted_color(n_classes, probs, n_bins=100):
     """
     Compute a weighted sum probability given
-    a list of probabalities, a number of classes
+    a list of probabilities, a number of classes
     and a number of bins
     Returns:
         Weighted probability value
@@ -37,7 +37,7 @@ def weighted_color(n_classes, probs, n_bins=100):
 def composite_colors(colors, probs):
     """
     Merge a list of colors (rgba)
-    using a list of probabilities
+    using a list of probabilities (weights)
     Returns:
         Merged color (rgba)
     """
