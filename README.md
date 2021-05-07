@@ -37,6 +37,9 @@ The following instructions are for installing the ST Analysis package with Pytho
 A set of scripts (described below) will then be available in your system or
 the environment of choice if you chose to work on a specific environment.
 
+Note that if you want to use `align_sections.py`you will have to install
+the [st_tissue_recognition](https://github.com/jfnavarro/st_tissue_recognition) library. 
+
 Note that you can always type `script_name.py --help` to get more information
 about how a script works and its parameters. 
 
