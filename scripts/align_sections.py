@@ -7,10 +7,7 @@ matrices and the alignment spot coordinates.
 
 @Author Jose Fernandez Navarro <jc.fernandez.navarro@gmail.com>
 """
-try:
-    import tissue_recognition as tr
-except ImportError as e:
-    print("Error importing st_tissue_recognition")
+import tissue_recognition as tr
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib
@@ -657,7 +654,7 @@ def main(counts_files,
         sys.stderr.write("Error, counts and images have different size\n")
         sys.exit(1)
 
-    if len(coordinates) != len(counts_files):
+    if coordinates and len(coordinates) != len(counts_files):
         sys.stderr.write("Error, counts and coordinates have different size\n")
         sys.exit(1)
             
