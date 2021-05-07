@@ -756,9 +756,10 @@ def main(counts_files,
         counts.to_csv(os.path.join(outdir, "aligned_{}.tsv".format(clean_name)), sep="\t")
 
     # Save spot coordinates
-    for coord, name in zip(transformed_coordinates, coordinates):
-        clean_name = os.path.basename(name).split(".")[0]
-        coord.to_csv(os.path.join(outdir, "aligned_{}.tsv".format(clean_name)), sep="\t")
+    if coordinates:
+        for coord, name in zip(transformed_coordinates, coordinates):
+            clean_name = os.path.basename(name).split(".")[0]
+            coord.to_csv(os.path.join(outdir, "aligned_{}.tsv".format(clean_name)), sep="\t")
         
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
