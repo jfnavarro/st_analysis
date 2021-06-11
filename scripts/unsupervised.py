@@ -5,7 +5,7 @@ This tool performs unsupervised clustering of one or more matrices of counts.
 
 It takes a list of matrices of counts as input and outputs:
 
- - a file containing the reduced coordinates (manifold) and their classes (cluster) for each spot
+ - a tab delimited file containing the reduced coordinates (manifold) and their classes (cluster) for each spot
  - a scatter plot (dimensionality reduction space) colored by the computed classes (clusters)
 
 The input matrices must have gene names as columns and spots coordinates as rows.
